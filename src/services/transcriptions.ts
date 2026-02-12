@@ -1,0 +1,267 @@
+import { eq } from "drizzle-orm";
+import type {
+	InsertTranscription,
+	Transcription,
+	UpdateTranscription,
+} from "@/db/schema";
+import { transcriptions } from "@/db/schema";
+import { getErrorMessage } from "@/lib/errors";
+import type { Logger } from "@/lib/logger";
+
+export const TranscriptionStatus = {
+	PENDING: "pending",
+	PROCESSING: "processing",
+	COMPLETED: "completed",
+	FAILED: "failed",
+} as const;
+
+export type TranscriptionStatusType =
+	(typeof TranscriptionStatus)[keyof typeof TranscriptionStatus];
+
+export const TranscriptionSource = {
+	WEB: "web",
+	TELEGRAM: "telegram",
+} as const;
+
+export type TranscriptionSourceType =
+	(typeof TranscriptionSource)[keyof typeof TranscriptionSource];
+
+type Database = Parameters<typeof eq>[0] extends never
+	? never
+	: // biome-ignore lint: needed for generic DB type
+		any;
+
+export class TranscriptionsService {
+	constructor(
+		private db: Database,
+		private logger: Logger,
+	) {}
+
+	async create({
+		audioKey,
+		filename,
+		source = TranscriptionSource.WEB,
+		userMetadata = {},
+	}: {
+		audioKey: string;
+		filename: string;
+		source?: TranscriptionSourceType;
+		userMetadata?: Record<string, unknown>;
+	}): Promise<string> {
+		try {
+			const transcriptionId = crypto.randomUUID();
+
+			const now = new Date().toISOString();
+			const transcriptionData: InsertTranscription = {
+				id: transcriptionId,
+				status: TranscriptionStatus.PENDING,
+				progress: 0,
+				source,
+				audioKey,
+				filename,
+				userMetadata,
+				createdAt: now,
+				updatedAt: now,
+			};
+
+			await this.db.insert(transcriptions).values(transcriptionData);
+
+			this.logger.info("Transcription created", {
+				transcriptionId,
+				audioKey,
+				filename,
+				source,
+			});
+
+			return transcriptionId;
+		} catch (error) {
+			this.logger.error("Failed to create transcription", {
+				audioKey,
+				filename,
+				source,
+				error: getErrorMessage(error),
+			});
+			throw error;
+		}
+	}
+
+	async findById(transcriptionId: string): Promise<Transcription | null> {
+		try {
+			const result = await this.db
+				.select()
+				.from(transcriptions)
+				.where(eq(transcriptions.id, transcriptionId))
+				.limit(1);
+
+			return result[0] || null;
+		} catch (error) {
+			this.logger.error("Failed to find transcription", {
+				transcriptionId,
+				error: getErrorMessage(error),
+			});
+			throw error;
+		}
+	}
+
+	async update(
+		transcriptionId: string,
+		updates: UpdateTranscription,
+	): Promise<Transcription> {
+		this.logger.info("Updating transcription", {
+			transcriptionId,
+			updates: Object.keys(updates),
+		});
+
+		try {
+			const transcription = await this.findById(transcriptionId);
+
+			if (!transcription) {
+				throw new Error(`Transcription not found: ${transcriptionId}`);
+			}
+
+			const result = await this.db
+				.update(transcriptions)
+				.set(updates)
+				.where(eq(transcriptions.id, transcriptionId))
+				.returning();
+
+			const updatedTranscription = result[0];
+
+			this.logger.info("Transcription updated", {
+				transcriptionId,
+				status: updatedTranscription.status,
+				progress: updatedTranscription.progress,
+			});
+
+			return updatedTranscription;
+		} catch (error) {
+			this.logger.error("Failed to update transcription", {
+				transcriptionId,
+				error: getErrorMessage(error),
+			});
+			throw error;
+		}
+	}
+
+	async markStarted(
+		transcriptionId: string,
+		progress = 5,
+	): Promise<Transcription> {
+		return this.update(transcriptionId, {
+			status: TranscriptionStatus.PROCESSING,
+			progress,
+			startedAt: new Date().toISOString(),
+		});
+	}
+
+	async markCompleted(
+		transcriptionId: string,
+		preview: string | null = null,
+		transcriptText: string,
+	): Promise<Transcription> {
+		return this.update(transcriptionId, {
+			status: TranscriptionStatus.COMPLETED,
+			progress: 100,
+			preview,
+			transcriptText,
+			completedAt: new Date().toISOString(),
+		});
+	}
+
+	async markFailed(
+		transcriptionId: string,
+		errorCode: string,
+		errorMessage: string,
+	): Promise<Transcription> {
+		return this.update(transcriptionId, {
+			status: TranscriptionStatus.FAILED,
+			errorDetails: { code: errorCode, message: errorMessage },
+			completedAt: new Date().toISOString(),
+		});
+	}
+
+	async updateProgress(
+		transcriptionId: string,
+		progress: number,
+	): Promise<Transcription> {
+		return this.update(transcriptionId, { progress });
+	}
+
+	async findByStatus(
+		status: TranscriptionStatusType,
+		limit = 100,
+	): Promise<Transcription[]> {
+		try {
+			return await this.db
+				.select()
+				.from(transcriptions)
+				.where(eq(transcriptions.status, status))
+				.limit(limit)
+				.orderBy(transcriptions.createdAt);
+		} catch (error) {
+			this.logger.error("Failed to find transcriptions by status", {
+				status,
+				error: getErrorMessage(error),
+			});
+			throw error;
+		}
+	}
+
+	async findAll(limit = 20): Promise<Transcription[]> {
+		try {
+			return await this.db
+				.select()
+				.from(transcriptions)
+				.limit(limit)
+				.orderBy(transcriptions.createdAt);
+		} catch (error) {
+			this.logger.error("Failed to find all transcriptions", {
+				error: getErrorMessage(error),
+			});
+			throw error;
+		}
+	}
+
+	async delete(transcriptionId: string): Promise<void> {
+		try {
+			await this.db
+				.delete(transcriptions)
+				.where(eq(transcriptions.id, transcriptionId));
+
+			this.logger.info("Transcription deleted", { transcriptionId });
+		} catch (error) {
+			this.logger.error("Failed to delete transcription", {
+				transcriptionId,
+				error: getErrorMessage(error),
+			});
+			throw error;
+		}
+	}
+
+	async getStatus(transcriptionId: string) {
+		const transcription = await this.findById(transcriptionId);
+
+		if (!transcription) {
+			return null;
+		}
+
+		return {
+			transcriptionId: transcription.id,
+			jobId: transcription.id,
+			status: transcription.status,
+			progress: transcription.progress,
+			filename: transcription.filename,
+			createdAt: transcription.createdAt,
+			startedAt: transcription.startedAt,
+			completedAt: transcription.completedAt,
+			updatedAt: transcription.updatedAt,
+			preview: transcription.preview,
+			error: transcription.errorDetails
+				? {
+						code: transcription.errorDetails.code,
+						message: transcription.errorDetails.message,
+					}
+				: undefined,
+		};
+	}
+}
