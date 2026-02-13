@@ -2,17 +2,68 @@ import OpenAI from "openai";
 import { TranscriptionError, getErrorMessage } from "@/lib/errors";
 import type { Logger } from "@/lib/logger";
 
-export class AiService {
-	private readonly openai: OpenAI;
-	private readonly logger: Logger;
+export type TranscriptionProvider = "groq" | "openai";
 
-	constructor(openaiKey: string, logger: Logger) {
-		this.openai = new OpenAI({ apiKey: openaiKey });
+export interface AiServiceConfig {
+	provider: TranscriptionProvider;
+	groqKey: string;
+	openaiKey: string;
+}
+
+const PROVIDER_CONFIG = {
+	groq: {
+		baseURL: "https://api.groq.com/openai/v1",
+		model: "whisper-large-v3-turbo",
+	},
+	openai: {
+		baseURL: undefined,
+		model: "whisper-1",
+	},
+} as const;
+
+const VALID_PROVIDERS: TranscriptionProvider[] = ["groq", "openai"];
+
+export function parseProvider(
+	value: string | undefined,
+): TranscriptionProvider {
+	if (!value) return "groq";
+	if (VALID_PROVIDERS.includes(value as TranscriptionProvider)) {
+		return value as TranscriptionProvider;
+	}
+	throw new Error(
+		`Invalid TRANSCRIPTION_PROVIDER "${value}". Must be one of: ${VALID_PROVIDERS.join(", ")}`,
+	);
+}
+
+export class AiService {
+	private readonly client: OpenAI;
+	private readonly logger: Logger;
+	readonly provider: TranscriptionProvider;
+	readonly model: string;
+
+	constructor(config: AiServiceConfig, logger: Logger) {
+		this.provider = config.provider;
+		this.model = PROVIDER_CONFIG[config.provider].model;
 		this.logger = logger;
+
+		const apiKey =
+			config.provider === "groq" ? config.groqKey : config.openaiKey;
+		if (!apiKey) {
+			throw new Error(
+				`Missing API key for transcription provider "${config.provider}"`,
+			);
+		}
+
+		this.client = new OpenAI({
+			apiKey,
+			baseURL: PROVIDER_CONFIG[config.provider].baseURL,
+		});
 	}
 
 	async transcribeAudio(audioBuffer: ArrayBuffer): Promise<string> {
 		this.logger.info("Starting transcription", {
+			provider: this.provider,
+			model: this.model,
 			audioSize: audioBuffer.byteLength,
 			audioSizeMB: (audioBuffer.byteLength / 1024 / 1024).toFixed(2),
 		});
@@ -20,14 +71,18 @@ export class AiService {
 		const startTime = Date.now();
 
 		try {
-			const transcription = await this.openai.audio.transcriptions.create({
+			// Groq rate limits (whisper-large-v3-turbo): 20 req/min, 2M audio-sec/day.
+			// Handled by Inngest's built-in retry with backoff (4 retries).
+			const transcription = await this.client.audio.transcriptions.create({
 				file: new File([audioBuffer], "audio.m4a", { type: "audio/m4a" }),
-				model: "whisper-1",
+				model: this.model,
 			});
 
 			const duration = Date.now() - startTime;
 
 			this.logger.info("Transcription completed", {
+				provider: this.provider,
+				model: this.model,
 				duration: `${duration}ms`,
 				transcriptionLength: transcription.text.length,
 				transcriptionPreview: `${transcription.text.substring(0, 100)}...`,
@@ -40,17 +95,18 @@ export class AiService {
 
 			const errorDetails: Record<string, unknown> = {
 				error: errorMsg,
+				provider: this.provider,
+				model: this.model,
 				duration: `${duration}ms`,
 				audioSize: audioBuffer.byteLength,
 				audioSizeMB: (audioBuffer.byteLength / 1024 / 1024).toFixed(2),
-				model: "whisper-1",
 			};
 
 			if (error && typeof error === "object" && "status" in error) {
-				errorDetails.openaiStatus = (error as { status: unknown }).status;
+				errorDetails.apiStatus = (error as { status: unknown }).status;
 			}
 			if (error && typeof error === "object" && "code" in error) {
-				errorDetails.openaiCode = (error as { code: unknown }).code;
+				errorDetails.apiCode = (error as { code: unknown }).code;
 			}
 
 			this.logger.error("Transcription failed", errorDetails);
