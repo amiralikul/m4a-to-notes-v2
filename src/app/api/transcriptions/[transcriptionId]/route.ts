@@ -11,14 +11,15 @@ export async function GET(
 	}
 
 	const { transcriptionId } = await params;
-	const status = await transcriptionsService.getStatus(transcriptionId);
+	const transcription = await transcriptionsService.findById(transcriptionId);
 
-	if (!status) {
+	if (!transcription || transcription.userId !== userId) {
 		return Response.json(
 			{ error: "Transcription not found" },
 			{ status: 404 },
 		);
 	}
 
+	const status = await transcriptionsService.getStatus(transcriptionId);
 	return Response.json(status);
 }

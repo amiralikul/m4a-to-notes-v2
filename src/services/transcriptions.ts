@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { count, desc, eq } from "drizzle-orm";
 import type {
 	InsertTranscription,
 	Transcription,
@@ -42,11 +42,13 @@ export class TranscriptionsService {
 		filename,
 		source = TranscriptionSource.WEB,
 		userMetadata = {},
+		userId,
 	}: {
 		audioKey: string;
 		filename: string;
 		source?: TranscriptionSourceType;
 		userMetadata?: Record<string, unknown>;
+		userId?: string;
 	}): Promise<string> {
 		try {
 			const transcriptionId = crypto.randomUUID();
@@ -60,6 +62,7 @@ export class TranscriptionsService {
 				audioKey,
 				filename,
 				userMetadata,
+				userId,
 				createdAt: now,
 				updatedAt: now,
 			};
@@ -216,6 +219,39 @@ export class TranscriptionsService {
 				.orderBy(transcriptions.createdAt);
 		} catch (error) {
 			this.logger.error("Failed to find all transcriptions", {
+				error: getErrorMessage(error),
+			});
+			throw error;
+		}
+	}
+
+	async findByUserId(userId: string, limit = 50): Promise<Transcription[]> {
+		try {
+			return await this.db
+				.select()
+				.from(transcriptions)
+				.where(eq(transcriptions.userId, userId))
+				.orderBy(desc(transcriptions.createdAt))
+				.limit(limit);
+		} catch (error) {
+			this.logger.error("Failed to find transcriptions by userId", {
+				userId,
+				error: getErrorMessage(error),
+			});
+			throw error;
+		}
+	}
+
+	async countByUserId(userId: string): Promise<number> {
+		try {
+			const result = await this.db
+				.select({ count: count() })
+				.from(transcriptions)
+				.where(eq(transcriptions.userId, userId));
+			return result[0]?.count ?? 0;
+		} catch (error) {
+			this.logger.error("Failed to count transcriptions by userId", {
+				userId,
 				error: getErrorMessage(error),
 			});
 			throw error;

@@ -56,6 +56,7 @@ export const transcriptions = sqliteTable(
 			.default(sql`(CURRENT_TIMESTAMP)`),
 		startedAt: text("started_at"),
 		completedAt: text("completed_at"),
+		userId: text("user_id"),
 		updatedAt: text("updated_at")
 			.notNull()
 			.default(sql`(CURRENT_TIMESTAMP)`)
@@ -64,6 +65,7 @@ export const transcriptions = sqliteTable(
 	(table) => [
 		index("idx_transcriptions_status").on(table.status),
 		index("idx_transcriptions_created_at").on(table.createdAt),
+		index("idx_transcriptions_user_id").on(table.userId),
 	],
 );
 

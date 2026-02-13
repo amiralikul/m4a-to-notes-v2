@@ -28,6 +28,7 @@ export async function POST(request: Request) {
 			audioKey: blobUrl,
 			filename,
 			source: "web",
+			userId,
 			userMetadata: { userId },
 		});
 

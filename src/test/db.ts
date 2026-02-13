@@ -38,11 +38,13 @@ export function createTestDb() {
 			created_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
 			started_at TEXT,
 			completed_at TEXT,
+			user_id TEXT,
 			updated_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL
 		);
 
 		CREATE INDEX IF NOT EXISTS idx_transcriptions_status ON transcriptions(status);
 		CREATE INDEX IF NOT EXISTS idx_transcriptions_created_at ON transcriptions(created_at);
+		CREATE INDEX IF NOT EXISTS idx_transcriptions_user_id ON transcriptions(user_id);
 
 		CREATE TABLE IF NOT EXISTS conversations (
 			chat_id TEXT PRIMARY KEY NOT NULL,

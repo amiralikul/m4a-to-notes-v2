@@ -101,8 +101,8 @@ export const processTranscription = inngest.createFunction(
 			},
 		);
 
-		// Step 4: Save result and cleanup blob
-		await step.run("save-and-cleanup", async () => {
+		// Step 4: Save result
+		await step.run("save-result", async () => {
 			const preview =
 				transcriptText.substring(0, 150) +
 				(transcriptText.length > 150 ? "..." : "");
@@ -112,20 +112,6 @@ export const processTranscription = inngest.createFunction(
 				preview,
 				transcriptText,
 			);
-
-			try {
-				await storageService.deleteObject(t.audioKey);
-				logger.info("Cleaned up audio blob", {
-					transcriptionId,
-					audioKey: t.audioKey,
-				});
-			} catch (cleanupError) {
-				logger.warn("Failed to clean up audio blob", {
-					transcriptionId,
-					audioKey: t.audioKey,
-					error: getErrorMessage(cleanupError),
-				});
-			}
 		});
 
 		// Step 5: Notify Telegram if source is telegram (#1)

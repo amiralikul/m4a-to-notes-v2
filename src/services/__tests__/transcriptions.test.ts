@@ -129,6 +129,101 @@ describe("TranscriptionsService", () => {
 		});
 	});
 
+	describe("create with userId", () => {
+		it("stores userId in the column", async () => {
+			const id = await service.create({
+				audioKey: "blob://test.m4a",
+				filename: "test.m4a",
+				userId: "user_123",
+			});
+
+			const transcription = await service.findById(id);
+			expect(transcription!.userId).toBe("user_123");
+		});
+
+		it("leaves userId null when not provided", async () => {
+			const id = await service.create({
+				audioKey: "blob://test.m4a",
+				filename: "test.m4a",
+			});
+
+			const transcription = await service.findById(id);
+			expect(transcription!.userId).toBeNull();
+		});
+	});
+
+	describe("findByUserId", () => {
+		it("returns only that user's transcriptions", async () => {
+			await service.create({
+				audioKey: "a1",
+				filename: "a.m4a",
+				userId: "user_1",
+			});
+			await service.create({
+				audioKey: "a2",
+				filename: "b.m4a",
+				userId: "user_1",
+			});
+			await service.create({
+				audioKey: "a3",
+				filename: "c.m4a",
+				userId: "user_2",
+			});
+
+			const results = await service.findByUserId("user_1");
+			expect(results).toHaveLength(2);
+			expect(results.every((t) => t.userId === "user_1")).toBe(true);
+		});
+
+		it("returns empty array for unknown user", async () => {
+			await service.create({
+				audioKey: "a1",
+				filename: "a.m4a",
+				userId: "user_1",
+			});
+
+			const results = await service.findByUserId("unknown_user");
+			expect(results).toHaveLength(0);
+		});
+
+		it("respects limit parameter", async () => {
+			for (let i = 0; i < 5; i++) {
+				await service.create({
+					audioKey: `a${i}`,
+					filename: `${i}.m4a`,
+					userId: "user_1",
+				});
+			}
+
+			const results = await service.findByUserId("user_1", 3);
+			expect(results).toHaveLength(3);
+		});
+	});
+
+	describe("countByUserId", () => {
+		it("returns correct count", async () => {
+			await service.create({
+				audioKey: "a1",
+				filename: "a.m4a",
+				userId: "user_1",
+			});
+			await service.create({
+				audioKey: "a2",
+				filename: "b.m4a",
+				userId: "user_1",
+			});
+			await service.create({
+				audioKey: "a3",
+				filename: "c.m4a",
+				userId: "user_2",
+			});
+
+			expect(await service.countByUserId("user_1")).toBe(2);
+			expect(await service.countByUserId("user_2")).toBe(1);
+			expect(await service.countByUserId("unknown")).toBe(0);
+		});
+	});
+
 	describe("delete", () => {
 		it("deletes a transcription", async () => {
 			const id = await service.create({

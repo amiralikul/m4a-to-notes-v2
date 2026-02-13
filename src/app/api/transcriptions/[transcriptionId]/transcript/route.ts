@@ -14,7 +14,7 @@ export async function GET(
 	const transcription =
 		await transcriptionsService.findById(transcriptionId);
 
-	if (!transcription) {
+	if (!transcription || transcription.userId !== userId) {
 		return Response.json(
 			{ error: "Transcription not found" },
 			{ status: 404 },

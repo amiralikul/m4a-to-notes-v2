@@ -108,9 +108,7 @@ describe("process-transcription Inngest function", () => {
 			expect.any(String),
 			"This is the transcribed text from the audio file.",
 		);
-		expect(storageService.deleteObject).toHaveBeenCalledWith(
-			"https://blob.vercel/audio.m4a",
-		);
+		expect(storageService.deleteObject).not.toHaveBeenCalled();
 	});
 
 	it("skips already completed transcription", async () => {
@@ -212,7 +210,7 @@ describe("process-transcription Inngest function", () => {
 		expect(sendTelegramMessage).not.toHaveBeenCalled();
 	});
 
-	it("continues cleanup even if blob delete fails", async () => {
+	it("does not delete audio blob after transcription (kept for dashboard)", async () => {
 		const mockTranscription = {
 			id: "tx-6",
 			status: "pending",
@@ -232,18 +230,10 @@ describe("process-transcription Inngest function", () => {
 		vi.mocked(transcriptionsService.markStarted).mockResolvedValue({} as never);
 		vi.mocked(transcriptionsService.updateProgress).mockResolvedValue({} as never);
 		vi.mocked(transcriptionsService.markCompleted).mockResolvedValue({} as never);
-		vi.mocked(storageService.deleteObject).mockRejectedValue(
-			new Error("Delete failed"),
-		);
 
-		const result = await runProcessTranscription("tx-6");
+		await runProcessTranscription("tx-6");
 
-		// Should still complete even if cleanup fails
-		expect(result).toEqual({
-			status: "completed",
-			transcriptionId: "tx-6",
-			transcriptionLength: 15,
-		});
+		expect(storageService.deleteObject).not.toHaveBeenCalled();
 		expect(transcriptionsService.markCompleted).toHaveBeenCalled();
 	});
 });
