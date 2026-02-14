@@ -1,4 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
+import { db } from "@/db";
+import { BillingSubscriptionsService } from "@/services/billing-subscriptions";
 import { getErrorMessage } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 
@@ -22,42 +24,51 @@ export async function POST(request: Request) {
 			);
 		}
 
-		const paddleApiKey = process.env.PADDLE_API_KEY;
-		const paddleEnvironment =
-			process.env.PADDLE_ENVIRONMENT || "sandbox";
+		// IDOR prevention: verify the subscription belongs to this user
+		const billingService = new BillingSubscriptionsService(db, logger);
+		const isOwner = await billingService.verifyOwnership(
+			userId,
+			subscriptionId,
+			"lemonsqueezy",
+		);
 
-		if (!paddleApiKey) {
-			throw new Error("PADDLE_API_KEY is required");
+		if (!isOwner) {
+			return Response.json(
+				{ error: "Forbidden" },
+				{ status: 403 },
+			);
 		}
 
-		const baseUrl =
-			paddleEnvironment === "production"
-				? "https://api.paddle.com"
-				: "https://sandbox-api.paddle.com";
-
-		const body: Record<string, string> = {
-			effective_from: "next_billing_period",
-		};
-		if (cancellationReason) {
-			body.cancellation_reason = cancellationReason;
+		const apiKey = process.env.LEMONSQUEEZY_API_KEY;
+		if (!apiKey) {
+			throw new Error("LEMONSQUEEZY_API_KEY is required");
 		}
 
 		const response = await fetch(
-			`${baseUrl}/subscriptions/${subscriptionId}/cancel`,
+			`https://api.lemonsqueezy.com/v1/subscriptions/${subscriptionId}`,
 			{
-				method: "POST",
+				method: "PATCH",
 				headers: {
-					Authorization: `Bearer ${paddleApiKey}`,
-					"Content-Type": "application/json",
+					Authorization: `Bearer ${apiKey}`,
+					"Content-Type": "application/vnd.api+json",
+					Accept: "application/vnd.api+json",
 				},
-				body: JSON.stringify(body),
+				body: JSON.stringify({
+					data: {
+						type: "subscriptions",
+						id: subscriptionId,
+						attributes: {
+							cancelled: true,
+						},
+					},
+				}),
 			},
 		);
 
 		if (!response.ok) {
 			const errorText = await response.text();
 			throw new Error(
-				`Paddle API error: ${response.status} - ${errorText}`,
+				`Lemon Squeezy API error: ${response.status} - ${errorText}`,
 			);
 		}
 

@@ -69,6 +69,7 @@ export class UsersService {
 					...existing?.limits,
 					...entitlementsData.limits,
 				},
+				meta: entitlementsData.meta ?? existing?.meta ?? {},
 			};
 
 			this._validateEntitlements(entitlements);
@@ -112,6 +113,7 @@ export class UsersService {
 				expiresAt: null,
 				features: [],
 				limits: {},
+				meta: {},
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 			} as UserEntitlement;

@@ -52,7 +52,7 @@ export function CancelSubscription({
 }) {
 	const { user } = useUser();
 	const [isDialogOpen, setIsDialogOpen] = useState(false);
-	const [cancellationMethod, setCancellationMethod] = useState("portal"); // 'portal' or 'direct'
+	const [cancellationMethod, setCancellationMethod] = useState("portal");
 	const [cancellationReason, setCancellationReason] = useState("");
 	const [isProcessing, setIsProcessing] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -61,12 +61,11 @@ export function CancelSubscription({
 		entitlements?.status &&
 		["active", "trialing", "past_due"].includes(entitlements.status);
 	const subscriptionId = entitlements?.meta?.subscriptionId;
-	const customerId = entitlements?.meta?.customerId;
-	const periodEnd = entitlements?.meta?.periodEnd;
+	const periodEnd = entitlements?.meta?.renewsAt || entitlements?.meta?.endsAt;
 
 	const handleCustomerPortal = async () => {
-		if (!customerId) {
-			setError("Customer ID not found. Please contact support.");
+		if (!subscriptionId) {
+			setError("Subscription ID not found. Please contact support.");
 			return;
 		}
 
@@ -74,12 +73,12 @@ export function CancelSubscription({
 		setError(null);
 
 		try {
-			const response = await fetch("/api/paddle/portal", {
+			const response = await fetch("/api/lemonsqueezy/portal", {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
 				},
-				body: JSON.stringify({ customerId }),
+				body: JSON.stringify({ subscriptionId }),
 			});
 
 			if (!response.ok) {
@@ -89,7 +88,6 @@ export function CancelSubscription({
 			const data = await response.json();
 
 			if (data.portalUrl) {
-				// Open in new tab
 				window.open(data.portalUrl, "_blank");
 				setIsDialogOpen(false);
 			} else {
@@ -112,7 +110,7 @@ export function CancelSubscription({
 		setError(null);
 
 		try {
-			const response = await fetch("/api/paddle/cancel", {
+			const response = await fetch("/api/lemonsqueezy/cancel", {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
@@ -239,9 +237,9 @@ export function CancelSubscription({
 											</Badge>
 										</div>
 										<p className="text-sm text-gray-600">
-											Manage your subscription through Paddle&apos;s secure
-											portal. You can also update payment methods and download
-											invoices.
+											Manage your subscription through Lemon Squeezy&apos;s
+											customer portal. You can also update payment methods and
+											download invoices.
 										</p>
 									</div>
 									<ExternalLink className="w-4 h-4 text-gray-400 mt-1" />
@@ -337,7 +335,6 @@ export function CancelSubscription({
 	);
 }
 
-// Success notification component for showing cancellation confirmations
 export function CancellationSuccess({ method, onClose }: { method: string; onClose?: () => void }) {
 	return (
 		<Card className="bg-green-50 border-green-200">

@@ -1,7 +1,7 @@
 "use client";
 
 import { Crown, Lock } from "lucide-react";
-import { PaddleCheckout } from "@/components/paddle-checkout";
+import { LemonSqueezyCheckout } from "@/components/lemonsqueezy-checkout";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -13,14 +13,6 @@ import {
 import { useEntitlements } from "@/hooks/use-entitlements";
 import { PRICING_PLANS } from "@/lib/pricing";
 
-/**
- * Component that gates features behind Pro subscription
- * @param {Object} props
- * @param {'basic'|'pro'|'business'} props.requiredPlan - Required plan level
- * @param {React.ReactNode} props.children - Content to show when user has access
- * @param {string} props.feature - Feature name for display
- * @param {string} props.description - Feature description
- */
 interface ProFeatureProps {
 	requiredPlan?: "basic" | "pro" | "business";
 	children: React.ReactNode;
@@ -44,12 +36,10 @@ export function ProFeature({
 		);
 	}
 
-	// User has access - show the feature
 	if (hasAccess(requiredPlan)) {
 		return children;
 	}
 
-	// User doesn't have access - show upgrade prompt
 	return (
 		<Card className="border-2 border-dashed border-gray-300 bg-gray-50">
 			<CardHeader className="text-center">
@@ -81,22 +71,15 @@ export function ProFeature({
 				</div>
 
 				<div className="flex justify-center">
-					{requiredPlan === "pro" && PRICING_PLANS.PRO.priceId ? (
-						<PaddleCheckout
-							priceId={PRICING_PLANS.PRO.priceId}
+					{requiredPlan === "pro" && PRICING_PLANS.PRO.monthlyVariantId ? (
+						<LemonSqueezyCheckout
+							variantId={PRICING_PLANS.PRO.monthlyVariantId}
+							planKey="pro"
 							className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
 						>
 							<Crown className="w-4 h-4 mr-2" />
-							Upgrade to Pro - ${PRICING_PLANS.PRO.price}/mo
-						</PaddleCheckout>
-					) : requiredPlan === "business" && PRICING_PLANS.BUSINESS.priceId ? (
-						<PaddleCheckout
-							priceId={PRICING_PLANS.BUSINESS.priceId}
-							className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
-						>
-							<Crown className="w-4 h-4 mr-2" />
-							Upgrade to Business - ${PRICING_PLANS.BUSINESS.price}/mo
-						</PaddleCheckout>
+							Upgrade to {PRICING_PLANS.PRO.name} - ${PRICING_PLANS.PRO.monthlyPrice}/mo
+						</LemonSqueezyCheckout>
 					) : (
 						<Button disabled>
 							Upgrade to{" "}
@@ -106,16 +89,13 @@ export function ProFeature({
 				</div>
 
 				<p className="text-xs text-gray-500">
-					Cancel anytime • 30-day money-back guarantee
+					Cancel anytime - 30-day money-back guarantee
 				</p>
 			</CardContent>
 		</Card>
 	);
 }
 
-/**
- * Simple wrapper for Pro-only content
- */
 export function ProOnly({ children }: { children: React.ReactNode }) {
 	return (
 		<ProFeature
@@ -128,9 +108,6 @@ export function ProOnly({ children }: { children: React.ReactNode }) {
 	);
 }
 
-/**
- * Simple wrapper for Business-only content
- */
 export function BusinessOnly({ children }: { children: React.ReactNode }) {
 	return (
 		<ProFeature

@@ -11,9 +11,10 @@ interface Entitlements {
 	meta?: {
 		subscriptionId?: string;
 		customerId?: string;
-		periodEnd?: string;
-		unitPrice?: number;
-		currency?: string;
+		renewsAt?: string;
+		endsAt?: string;
+		variantId?: string;
+		productName?: string;
 	};
 	updatedAt?: string;
 }
@@ -54,7 +55,7 @@ export function useEntitlements() {
 				userId: user?.id || "",
 				plan: "free",
 				status: "none",
-				provider: "paddle",
+				provider: "lemonsqueezy",
 				meta: {},
 				updatedAt: new Date().toISOString(),
 			});

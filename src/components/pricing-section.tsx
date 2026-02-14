@@ -2,7 +2,8 @@
 
 import { CheckCircle, Star } from "lucide-react";
 import Link from "next/link";
-import { PaddleCheckout } from "@/components/paddle-checkout";
+import { useState } from "react";
+import { LemonSqueezyCheckout } from "@/components/lemonsqueezy-checkout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +19,13 @@ import { PRICING_PLANS } from "@/lib/pricing";
 export function PricingSection() {
 	const { entitlements, loading, getCurrentPlan, hasActiveSubscription } =
 		useEntitlements();
+	const [billingInterval, setBillingInterval] = useState<"monthly" | "yearly">("monthly");
+
+	const getPrice = (plan: (typeof PRICING_PLANS)[string]) =>
+		billingInterval === "yearly" ? plan.yearlyPrice : plan.monthlyPrice;
+
+	const getVariantId = (plan: (typeof PRICING_PLANS)[string]) =>
+		billingInterval === "yearly" ? plan.yearlyVariantId : plan.monthlyVariantId;
 
 	return (
 		<section id="pricing" className="w-full py-12 md:py-24 lg:py-32 bg-muted">
@@ -32,9 +40,40 @@ export function PricingSection() {
 							free tier or upgrade for unlimited access.
 						</p>
 					</div>
+
+					{/* Billing Interval Toggle */}
+					<div className="flex items-center gap-2 bg-background rounded-lg p-1 border">
+						<button
+							type="button"
+							onClick={() => setBillingInterval("monthly")}
+							className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+								billingInterval === "monthly"
+									? "bg-primary text-primary-foreground"
+									: "text-muted-foreground hover:text-foreground"
+							}`}
+						>
+							Monthly
+						</button>
+						<button
+							type="button"
+							onClick={() => setBillingInterval("yearly")}
+							className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+								billingInterval === "yearly"
+									? "bg-primary text-primary-foreground"
+									: "text-muted-foreground hover:text-foreground"
+							}`}
+						>
+							Yearly
+							{PRICING_PLANS.PRO.yearlyPrice > 0 && (
+								<span className="ml-1 text-xs">
+									(Save {Math.round((1 - PRICING_PLANS.PRO.yearlyPrice / (PRICING_PLANS.PRO.monthlyPrice * 12)) * 100)}%)
+								</span>
+							)}
+						</button>
+					</div>
 				</div>
 
-				<div className="mx-auto grid max-w-5xl items-start gap-6 py-12 lg:grid-cols-3 lg:gap-8">
+				<div className="mx-auto grid max-w-3xl items-start gap-6 py-12 lg:grid-cols-2 lg:gap-8">
 					{/* Free Plan */}
 					<Card
 						className={`relative ${getCurrentPlan() === "free" && hasActiveSubscription() ? "ring-2 ring-green-500" : ""}`}
@@ -78,7 +117,7 @@ export function PricingSection() {
 						</CardContent>
 					</Card>
 
-					{/* Pro Plan */}
+					{/* Unlimited Plan */}
 					<Card
 						className={`relative ${getCurrentPlan() === "pro" && hasActiveSubscription() ? "ring-2 ring-green-500" : "border-primary"}`}
 					>
@@ -100,12 +139,21 @@ export function PricingSection() {
 								{PRICING_PLANS.PRO.name}
 							</CardTitle>
 							<div className="text-4xl font-bold">
-								${PRICING_PLANS.PRO.price}
-								<span className="text-lg font-normal">/month</span>
+								${getPrice(PRICING_PLANS.PRO)}
+								<span className="text-lg font-normal">
+									/{billingInterval === "yearly" ? "year" : "month"}
+								</span>
 							</div>
-							<CardDescription>
-								For professionals and small teams
-							</CardDescription>
+							{billingInterval === "yearly" && PRICING_PLANS.PRO.yearlyPrice > 0 && (
+								<CardDescription>
+									${(PRICING_PLANS.PRO.yearlyPrice / 12).toFixed(2)}/mo billed annually
+								</CardDescription>
+							)}
+							{billingInterval === "monthly" && (
+								<CardDescription>
+									For professionals and small teams
+								</CardDescription>
+							)}
 						</CardHeader>
 						<CardContent className="space-y-4">
 							<ul className="space-y-2 text-sm">
@@ -116,56 +164,13 @@ export function PricingSection() {
 									</li>
 								))}
 							</ul>
-							<PaddleCheckout
-								priceId={PRICING_PLANS.PRO.priceId}
+							<LemonSqueezyCheckout
+								variantId={getVariantId(PRICING_PLANS.PRO)}
 								planKey="pro"
-								quantity={1}
 								className="w-full"
 							>
-								Start Pro Plan
-							</PaddleCheckout>
-						</CardContent>
-					</Card>
-
-					{/* Business Plan */}
-					<Card
-						className={`relative ${getCurrentPlan() === "business" && hasActiveSubscription() ? "ring-2 ring-green-500" : ""}`}
-					>
-						{getCurrentPlan() === "business" && hasActiveSubscription() && (
-							<div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-								<Badge className="bg-green-500 text-white">
-									<CheckCircle className="mr-1 h-3 w-3" />
-									Current Plan
-								</Badge>
-							</div>
-						)}
-						<CardHeader className="text-center">
-							<CardTitle className="text-2xl">
-								{PRICING_PLANS.BUSINESS.name}
-							</CardTitle>
-							<div className="text-4xl font-bold">
-								${PRICING_PLANS.BUSINESS.price}
-								<span className="text-lg font-normal">/month</span>
-							</div>
-							<CardDescription>For growing businesses</CardDescription>
-						</CardHeader>
-						<CardContent className="space-y-4">
-							<ul className="space-y-2 text-sm">
-								{PRICING_PLANS.BUSINESS.features.map((feature, index) => (
-									<li key={index} className="flex items-center">
-										<CheckCircle className="mr-2 h-4 w-4 text-green-500" />
-										{feature}
-									</li>
-								))}
-							</ul>
-							<PaddleCheckout
-								priceId={PRICING_PLANS.BUSINESS.priceId}
-								planKey="business"
-								quantity={1}
-								className="w-full"
-							>
-								Start Business Plan
-							</PaddleCheckout>
+								Start {PRICING_PLANS.PRO.name} Plan
+							</LemonSqueezyCheckout>
 						</CardContent>
 					</Card>
 				</div>
@@ -177,9 +182,9 @@ export function PricingSection() {
 						24 hours
 					</p>
 					<div className="flex justify-center space-x-4 text-xs text-muted-foreground">
-						<span>✓ No setup fees</span>
-						<span>✓ Cancel anytime</span>
-						<span>✓ 30-day money-back guarantee</span>
+						<span>No setup fees</span>
+						<span>Cancel anytime</span>
+						<span>30-day money-back guarantee</span>
 					</div>
 				</div>
 			</div>
