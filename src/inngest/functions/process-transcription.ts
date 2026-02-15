@@ -15,9 +15,7 @@ export const processTranscription = inngest.createFunction(
 	{
 		id: "process-transcription",
 		retries: 4,
-		// Groq rate limit: 20 req/min. Keep concurrency well under that
-		// so retries don't compound into cascading 429s.
-		concurrency: { limit: 10 },
+		concurrency: { limit: 5 },
 		onFailure: async ({ event, error }) => {
 			const transcriptionId =
 				event.data.event.data.transcriptionId;
