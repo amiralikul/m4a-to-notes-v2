@@ -14,6 +14,9 @@ export async function POST(request: Request) {
 		const jsonResponse = await handleUpload({
 			body,
 			request,
+			token:
+				process.env.BLOB_READ_WRITE_TOKEN ||
+				process.env.M4A_TO_NOTES_READ_WRITE_TOKEN,
 			onBeforeGenerateToken: async () => {
 				return {
 					allowedContentTypes: [...AUDIO_LIMITS.VALID_MIME_TYPES],

@@ -2,6 +2,10 @@ import { del, put } from "@vercel/blob";
 import { getErrorMessage } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 
+const blobToken =
+	process.env.BLOB_READ_WRITE_TOKEN ||
+	process.env.M4A_TO_NOTES_READ_WRITE_TOKEN;
+
 export class StorageService {
 	async uploadContent(
 		pathname: string,
@@ -12,6 +16,7 @@ export class StorageService {
 			const blob = await put(pathname, content, {
 				access: "public",
 				contentType,
+				token: blobToken,
 			});
 
 			logger.info("Content uploaded to Vercel Blob", {
@@ -59,7 +64,7 @@ export class StorageService {
 
 	async deleteObject(blobUrl: string): Promise<void> {
 		try {
-			await del(blobUrl);
+			await del(blobUrl, { token: blobToken });
 
 			logger.info("Object deleted from Vercel Blob", { blobUrl });
 		} catch (error) {
