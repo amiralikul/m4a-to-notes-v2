@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mock Clerk auth
 vi.mock("@clerk/nextjs/server", () => ({
 	auth: vi.fn().mockResolvedValue({ userId: null }),
+	currentUser: vi.fn().mockResolvedValue(null),
 }));
 
 // Mock services to prevent real DB connections
@@ -17,6 +18,10 @@ vi.mock("@/inngest/client", () => ({
 
 vi.mock("@/lib/logger", () => ({
 	logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+
+vi.mock("@/db", () => ({
+	db: {},
 }));
 
 const protectedRoutes = [
@@ -50,13 +55,18 @@ const protectedRoutes = [
 	},
 	{
 		method: "POST",
-		path: "/api/paddle/portal",
-		module: () => import("../../api/paddle/portal/route"),
+		path: "/api/lemonsqueezy/portal",
+		module: () => import("../../api/lemonsqueezy/portal/route"),
 	},
 	{
 		method: "POST",
-		path: "/api/paddle/cancel",
-		module: () => import("../../api/paddle/cancel/route"),
+		path: "/api/lemonsqueezy/cancel",
+		module: () => import("../../api/lemonsqueezy/cancel/route"),
+	},
+	{
+		method: "POST",
+		path: "/api/lemonsqueezy/checkout",
+		module: () => import("../../api/lemonsqueezy/checkout/route"),
 	},
 ];
 

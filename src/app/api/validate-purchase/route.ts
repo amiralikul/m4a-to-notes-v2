@@ -1,14 +1,9 @@
 import { auth } from "@clerk/nextjs/server";
 import { usersService } from "@/services";
 import { PRICING_PLANS } from "@/lib/pricing";
+import { PLAN_HIERARCHY } from "@/lib/constants/plans";
 import { getErrorMessage } from "@/lib/errors";
 import { logger } from "@/lib/logger";
-
-const PLAN_HIERARCHY: Record<string, number> = {
-	free: 0,
-	pro: 1,
-	business: 2,
-};
 
 export async function POST(request: Request) {
 	const { userId } = await auth();
@@ -17,14 +12,14 @@ export async function POST(request: Request) {
 	}
 
 	try {
-		const { priceId, planKey } = (await request.json()) as {
-			priceId?: string;
+		const { variantId, planKey } = (await request.json()) as {
+			variantId?: string;
 			planKey?: string;
 		};
 
-		if (!priceId) {
+		if (!variantId) {
 			return Response.json(
-				{ error: "Price ID is required" },
+				{ error: "Variant ID is required" },
 				{ status: 400 },
 			);
 		}
@@ -34,7 +29,7 @@ export async function POST(request: Request) {
 		let targetPlan = planKey;
 		if (!targetPlan) {
 			for (const [key, plan] of Object.entries(PRICING_PLANS)) {
-				if (plan.priceId === priceId) {
+				if (plan.monthlyVariantId === variantId || plan.yearlyVariantId === variantId) {
 					targetPlan = key.toLowerCase();
 					break;
 				}
@@ -43,7 +38,7 @@ export async function POST(request: Request) {
 
 		if (!targetPlan || targetPlan === "unknown") {
 			return Response.json(
-				{ error: "Invalid price ID or plan key" },
+				{ error: "Invalid variant ID or plan key" },
 				{ status: 400 },
 			);
 		}

@@ -132,18 +132,6 @@ describe("UsersService", () => {
 			expect(result).toBe(true);
 		});
 
-		it("grants pro access to business users", async () => {
-			await service.set("user_1", {
-				plan: "business",
-				status: "active",
-				features: [],
-				limits: {},
-			});
-
-			const result = await service.hasAccess("user_1", "pro");
-			expect(result).toBe(true);
-		});
-
 		it("denies pro access to canceled pro users", async () => {
 			await service.set("user_1", {
 				plan: "pro",
@@ -156,15 +144,15 @@ describe("UsersService", () => {
 			expect(result).toBe(false);
 		});
 
-		it("denies business access to pro users", async () => {
+		it("denies pro access to free users", async () => {
 			await service.set("user_1", {
-				plan: "pro",
+				plan: "free",
 				status: "active",
 				features: [],
 				limits: {},
 			});
 
-			const result = await service.hasAccess("user_1", "business");
+			const result = await service.hasAccess("user_1", "pro");
 			expect(result).toBe(false);
 		});
 	});

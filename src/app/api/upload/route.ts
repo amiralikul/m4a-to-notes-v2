@@ -10,21 +10,30 @@ export async function POST(request: Request) {
 
 	const body = (await request.json()) as HandleUploadBody;
 
-	const jsonResponse = await handleUpload({
-		body,
-		request,
-		onBeforeGenerateToken: async (pathname) => {
-			return {
-				allowedContentTypes: [...AUDIO_LIMITS.VALID_MIME_TYPES],
-				maximumSizeInBytes: AUDIO_LIMITS.MAX_FILE_SIZE,
-				addRandomSuffix: true,
-				pathname: `audio/${userId}/${pathname}`,
-			};
-		},
-		onUploadCompleted: async () => {
-			// Optional: log upload completion
-		},
-	});
+	try {
+		const jsonResponse = await handleUpload({
+			body,
+			request,
+			token:
+				process.env.BLOB_READ_WRITE_TOKEN ||
+				process.env.M4A_TO_NOTES_READ_WRITE_TOKEN,
+			onBeforeGenerateToken: async () => {
+				return {
+					allowedContentTypes: [...AUDIO_LIMITS.VALID_MIME_TYPES],
+					maximumSizeInBytes: AUDIO_LIMITS.MAX_FILE_SIZE,
+					addRandomSuffix: true,
+				};
+			},
+			onUploadCompleted: async () => {
+				// Note: this callback does not work on localhost
+			},
+		});
 
-	return Response.json(jsonResponse);
+		return Response.json(jsonResponse);
+	} catch (error) {
+		return Response.json(
+			{ error: error instanceof Error ? error.message : "Upload failed" },
+			{ status: 400 },
+		);
+	}
 }

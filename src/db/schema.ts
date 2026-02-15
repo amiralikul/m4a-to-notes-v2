@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 // Jobs table - DEPRECATED: Use transcriptions table
 export const jobs = sqliteTable("jobs", {
@@ -99,6 +99,7 @@ export const userEntitlements = sqliteTable("user_entitlements", {
 	limits: text("limits", { mode: "json" })
 		.$type<Record<string, number>>()
 		.notNull(),
+	meta: text("meta", { mode: "json" }).$type<Record<string, unknown>>(),
 	createdAt: text("created_at")
 		.notNull()
 		.default(sql`(CURRENT_TIMESTAMP)`),
@@ -107,6 +108,34 @@ export const userEntitlements = sqliteTable("user_entitlements", {
 		.default(sql`(CURRENT_TIMESTAMP)`)
 		.$onUpdate(() => sql`(CURRENT_TIMESTAMP)`),
 });
+
+// Billing subscriptions table - maps payment provider IDs to internal user IDs
+export const billingSubscriptions = sqliteTable(
+	"billing_subscriptions",
+	{
+		id: text("id").primaryKey(),
+		provider: text("provider").notNull(),
+		subscriptionId: text("subscription_id").notNull(),
+		customerId: text("customer_id"),
+		userId: text("user_id").notNull(),
+		status: text("status"),
+		currentPeriodEnd: text("current_period_end"),
+		createdAt: text("created_at")
+			.notNull()
+			.default(sql`(CURRENT_TIMESTAMP)`),
+		updatedAt: text("updated_at")
+			.notNull()
+			.default(sql`(CURRENT_TIMESTAMP)`)
+			.$onUpdate(() => sql`(CURRENT_TIMESTAMP)`),
+	},
+	(table) => [
+		uniqueIndex("idx_billing_subs_provider_subscription").on(
+			table.provider,
+			table.subscriptionId,
+		),
+		index("idx_billing_subs_user_id").on(table.userId),
+	],
+);
 
 // Type definitions for conversation data
 export interface ConversationData {
@@ -137,3 +166,6 @@ export type UpdateConversation = Partial<Omit<Conversation, "chatId">>;
 export type UserEntitlement = typeof userEntitlements.$inferSelect;
 export type InsertUserEntitlement = typeof userEntitlements.$inferInsert;
 export type UpdateUserEntitlement = Partial<Omit<UserEntitlement, "userId">>;
+
+export type BillingSubscription = typeof billingSubscriptions.$inferSelect;
+export type InsertBillingSubscription = typeof billingSubscriptions.$inferInsert;

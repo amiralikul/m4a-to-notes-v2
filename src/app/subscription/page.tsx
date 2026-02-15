@@ -7,18 +7,16 @@ import {
 	Calendar,
 	CheckCircle,
 	Clock,
-	CreditCard,
 	Crown,
-	Sparkles,
 	XCircle,
 	Zap,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
 	CancellationSuccess,
 	CancelSubscription,
 } from "@/components/cancel-subscription";
-import { PaddleCheckout } from "@/components/paddle-checkout";
+import { LemonSqueezyCheckout } from "@/components/lemonsqueezy-checkout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -78,9 +76,7 @@ export default function SubscriptionPage() {
 		switch (plan) {
 			case "pro":
 				return <Crown className="w-6 h-6 text-blue-500" />;
-			case "business":
-				return <Sparkles className="w-6 h-6 text-purple-500" />;
-			default:
+				default:
 				return <Zap className="w-6 h-6 text-gray-500" />;
 		}
 	};
@@ -91,13 +87,11 @@ export default function SubscriptionPage() {
 			...plan,
 		}));
 
-		// Only show plans that user can actually upgrade to
-		return plans.filter((p) => p.priceId && canUpgradeTo(p.key as "free" | "pro" | "business"));
+		return plans.filter((p) => (p.monthlyVariantId || p.yearlyVariantId) && canUpgradeTo(p.key as "free" | "pro"));
 	};
 
 	const handleCancellationSuccess = async (method: string) => {
 		setCancellationSuccess(method);
-		// Refresh entitlements to reflect cancellation status
 		await fetchEntitlements();
 	};
 
@@ -210,8 +204,8 @@ export default function SubscriptionPage() {
 								</div>
 								<div className="text-right">
 									<div className="text-3xl font-bold">
-										${currentPlan.price}
-										{currentPlan.price > 0 && (
+										${currentPlan.monthlyPrice.toFixed(2)}
+										{currentPlan.monthlyPrice > 0 && (
 											<span className="text-sm text-gray-500 font-normal">
 												/month
 											</span>
@@ -253,7 +247,7 @@ export default function SubscriptionPage() {
 											</div>
 										)}
 
-										{entitlements.meta.periodEnd && (
+										{(entitlements.meta.renewsAt || entitlements.meta.endsAt) && (
 											<div>
 												<span className="font-medium text-gray-500">
 													{isSubscriptionActive
@@ -264,29 +258,12 @@ export default function SubscriptionPage() {
 													<Calendar className="w-4 h-4 text-gray-400" />
 													<span>
 														{new Date(
-															entitlements.meta.periodEnd,
+															(entitlements.meta.renewsAt || entitlements.meta.endsAt) as string,
 														).toLocaleDateString()}
 													</span>
 												</div>
 											</div>
 										)}
-
-										{entitlements.meta.currency &&
-											entitlements.meta.unitPrice && (
-												<div>
-													<span className="font-medium text-gray-500">
-														Amount
-													</span>
-													<div className="flex items-center gap-1 mt-1">
-														<CreditCard className="w-4 h-4 text-gray-400" />
-														<span>
-															{entitlements.meta.currency}{" "}
-															{(entitlements.meta.unitPrice / 100).toFixed(2)}
-															{isSubscriptionActive && "/month"}
-														</span>
-													</div>
-												</div>
-											)}
 
 										<div>
 											<span className="font-medium text-gray-500">
@@ -351,7 +328,7 @@ export default function SubscriptionPage() {
 													{plan.name}
 												</h4>
 												<p className="text-2xl font-bold text-blue-600">
-													${plan.price}/mo
+													${plan.monthlyPrice.toFixed(2)}/mo
 												</p>
 											</div>
 										</div>
@@ -373,8 +350,8 @@ export default function SubscriptionPage() {
 											)}
 										</div>
 
-										<PaddleCheckout
-											priceId={plan.priceId}
+										<LemonSqueezyCheckout
+											variantId={plan.monthlyVariantId}
 											planKey={plan.key}
 											className="w-full"
 										>
@@ -382,7 +359,7 @@ export default function SubscriptionPage() {
 												Upgrade to {plan.name}
 												<ArrowRight className="w-4 h-4" />
 											</div>
-										</PaddleCheckout>
+										</LemonSqueezyCheckout>
 									</div>
 								))}
 							</CardContent>
@@ -397,22 +374,14 @@ export default function SubscriptionPage() {
 						<CardContent className="space-y-4">
 							<div className="text-sm space-y-2">
 								<div className="flex justify-between">
-									<span className="text-gray-500">Payment method</span>
-									<span>•••• •••• •••• 4242</span>
-								</div>
-								<div className="flex justify-between">
 									<span className="text-gray-500">Billing email</span>
 									<span>{user.primaryEmailAddress?.emailAddress}</span>
 								</div>
 							</div>
 
 							<div className="pt-4 border-t space-y-3">
-								<Button variant="outline" className="w-full">
-									<CreditCard className="w-4 h-4 mr-2" />
-									Manage Billing
-								</Button>
 								<p className="text-xs text-gray-500 text-center">
-									Update payment method, download invoices, and more
+									Manage payment methods and invoices through the customer portal
 								</p>
 
 								{/* Cancel Subscription */}

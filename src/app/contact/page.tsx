@@ -158,7 +158,7 @@ export default function ContactPage() {
 							<CardContent>
 								<CardDescription className="text-base text-gray-600 leading-relaxed mb-4">
 									Speak directly with our support team for complex issues or
-									urgent matters. Available for Pro and Business plan customers.
+									urgent matters. Available for Unlimited plan customers.
 								</CardDescription>
 								<Button
 									variant="outline"
