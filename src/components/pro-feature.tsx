@@ -12,9 +12,12 @@ import {
 } from "@/components/ui/card";
 import { useEntitlements } from "@/hooks/use-entitlements";
 import { PRICING_PLANS } from "@/lib/pricing";
+import { SUBSCRIPTION_PLANS } from "@/lib/constants/plans";
+
+type PlanKey = (typeof SUBSCRIPTION_PLANS)[keyof typeof SUBSCRIPTION_PLANS];
 
 interface ProFeatureProps {
-	requiredPlan?: "basic" | "pro";
+	requiredPlan?: PlanKey;
 	children: React.ReactNode;
 	feature?: string;
 	description?: string;
@@ -67,21 +70,27 @@ export function ProFeature({
 				</div>
 
 				<div className="flex justify-center">
-					{requiredPlan === "pro" && PRICING_PLANS.PRO.monthlyVariantId ? (
-						<LemonSqueezyCheckout
-							variantId={PRICING_PLANS.PRO.monthlyVariantId}
-							planKey="pro"
-							className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
-						>
-							<Lock className="w-4 h-4 mr-2" />
-							Upgrade to {PRICING_PLANS.PRO.name} - ${PRICING_PLANS.PRO.monthlyPrice.toFixed(2)}/mo
-						</LemonSqueezyCheckout>
-					) : (
-						<Button disabled>
-							Upgrade to{" "}
-							{requiredPlan.charAt(0).toUpperCase() + requiredPlan.slice(1)}
-						</Button>
-					)}
+					{(() => {
+						const planConfig = PRICING_PLANS[requiredPlan.toUpperCase()];
+						const variantId = planConfig?.monthlyVariantId;
+						if (planConfig && variantId) {
+							return (
+								<LemonSqueezyCheckout
+									variantId={variantId}
+									planKey={requiredPlan}
+									className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+								>
+									<Lock className="w-4 h-4 mr-2" />
+									Upgrade to {planConfig.name} - ${planConfig.monthlyPrice.toFixed(2)}/mo
+								</LemonSqueezyCheckout>
+							);
+						}
+						return (
+							<Button disabled>
+								Upgrade to {planConfig?.name ?? "Pro"}
+							</Button>
+						);
+					})()}
 				</div>
 
 				<p className="text-xs text-gray-500">
