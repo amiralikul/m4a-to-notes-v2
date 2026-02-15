@@ -1,6 +1,6 @@
 "use client";
 
-import { Crown, Lock } from "lucide-react";
+import { Lock } from "lucide-react";
 import { LemonSqueezyCheckout } from "@/components/lemonsqueezy-checkout";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,7 +14,7 @@ import { useEntitlements } from "@/hooks/use-entitlements";
 import { PRICING_PLANS } from "@/lib/pricing";
 
 interface ProFeatureProps {
-	requiredPlan?: "basic" | "pro" | "business";
+	requiredPlan?: "basic" | "pro";
 	children: React.ReactNode;
 	feature?: string;
 	description?: string;
@@ -44,11 +44,7 @@ export function ProFeature({
 		<Card className="border-2 border-dashed border-gray-300 bg-gray-50">
 			<CardHeader className="text-center">
 				<div className="mx-auto w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center mb-4">
-					{requiredPlan === "business" ? (
-						<Crown className="w-6 h-6 text-white" />
-					) : (
-						<Lock className="w-6 h-6 text-white" />
-					)}
+					<Lock className="w-6 h-6 text-white" />
 				</div>
 				<CardTitle className="text-lg">{feature}</CardTitle>
 				<CardDescription className="text-center max-w-sm mx-auto">
@@ -77,8 +73,8 @@ export function ProFeature({
 							planKey="pro"
 							className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
 						>
-							<Crown className="w-4 h-4 mr-2" />
-							Upgrade to {PRICING_PLANS.PRO.name} - ${PRICING_PLANS.PRO.monthlyPrice}/mo
+							<Lock className="w-4 h-4 mr-2" />
+							Upgrade to {PRICING_PLANS.PRO.name} - ${PRICING_PLANS.PRO.monthlyPrice.toFixed(2)}/mo
 						</LemonSqueezyCheckout>
 					) : (
 						<Button disabled>
@@ -89,7 +85,7 @@ export function ProFeature({
 				</div>
 
 				<p className="text-xs text-gray-500">
-					Cancel anytime - 30-day money-back guarantee
+					Cancel anytime
 				</p>
 			</CardContent>
 		</Card>
@@ -101,21 +97,10 @@ export function ProOnly({ children }: { children: React.ReactNode }) {
 		<ProFeature
 			requiredPlan="pro"
 			feature="Pro Feature"
-			description="This feature is available to Pro and Business subscribers."
+			description="This feature is available to Unlimited subscribers."
 		>
 			{children}
 		</ProFeature>
 	);
 }
 
-export function BusinessOnly({ children }: { children: React.ReactNode }) {
-	return (
-		<ProFeature
-			requiredPlan="business"
-			feature="Business Feature"
-			description="This advanced feature is available to Business subscribers."
-		>
-			{children}
-		</ProFeature>
-	);
-}

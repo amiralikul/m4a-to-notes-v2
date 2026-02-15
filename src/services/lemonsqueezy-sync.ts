@@ -65,6 +65,7 @@ export class LemonSqueezySyncService {
 					Authorization: `Bearer ${this.apiKey}`,
 					Accept: "application/vnd.api+json",
 				},
+				signal: AbortSignal.timeout(10_000),
 			},
 		);
 
@@ -245,7 +246,8 @@ export class LemonSqueezySyncService {
 				...current,
 				meta: {
 					...current.meta,
-					...expected.meta,
+					renewsAt: expected.meta.renewsAt,
+					endsAt: expected.meta.endsAt,
 				},
 				lastUpdated: new Date().toISOString(),
 				source: "conflict_resolved",

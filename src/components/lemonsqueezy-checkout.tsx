@@ -31,7 +31,7 @@ export function LemonSqueezyCheckout({
 	} = useEntitlements();
 	const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
 
-	type PlanType = "free" | "pro" | "business";
+	type PlanType = "free" | "pro";
 
 	const getTargetPlan = (): PlanType => {
 		if (planKey) return planKey as PlanType;
@@ -66,6 +66,8 @@ export function LemonSqueezyCheckout({
 			}
 		} catch (validationError) {
 			console.error("Failed to validate purchase:", validationError);
+			alert("Failed to validate purchase. Please try again.");
+			return;
 		}
 
 		setIsCheckoutLoading(true);

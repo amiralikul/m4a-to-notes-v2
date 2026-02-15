@@ -82,7 +82,11 @@ export function CancelSubscription({
 			});
 
 			if (!response.ok) {
-				throw new Error(`Failed to generate portal URL: ${response.status}`);
+				const errorData = await response.json().catch(() => ({}));
+				throw new Error(
+					errorData.error ||
+						`Failed to generate portal URL: ${response.status}`,
+				);
 			}
 
 			const data = await response.json();

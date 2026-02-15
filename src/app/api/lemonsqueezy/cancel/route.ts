@@ -91,7 +91,6 @@ export async function POST(request: Request) {
 		return Response.json(
 			{
 				error: "Failed to cancel subscription",
-				details: getErrorMessage(error),
 			},
 			{ status: 500 },
 		);

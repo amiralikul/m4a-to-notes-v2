@@ -1,14 +1,9 @@
 import { auth } from "@clerk/nextjs/server";
 import { usersService } from "@/services";
 import { PRICING_PLANS } from "@/lib/pricing";
+import { PLAN_HIERARCHY } from "@/lib/constants/plans";
 import { getErrorMessage } from "@/lib/errors";
 import { logger } from "@/lib/logger";
-
-const PLAN_HIERARCHY: Record<string, number> = {
-	free: 0,
-	pro: 1,
-	business: 2,
-};
 
 export async function POST(request: Request) {
 	const { userId } = await auth();

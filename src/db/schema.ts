@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 // Jobs table - DEPRECATED: Use transcriptions table
 export const jobs = sqliteTable("jobs", {
@@ -129,7 +129,7 @@ export const billingSubscriptions = sqliteTable(
 			.$onUpdate(() => sql`(CURRENT_TIMESTAMP)`),
 	},
 	(table) => [
-		index("idx_billing_subs_provider_subscription").on(
+		uniqueIndex("idx_billing_subs_provider_subscription").on(
 			table.provider,
 			table.subscriptionId,
 		),

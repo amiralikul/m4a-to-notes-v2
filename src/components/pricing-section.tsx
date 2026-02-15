@@ -139,7 +139,7 @@ export function PricingSection() {
 								{PRICING_PLANS.PRO.name}
 							</CardTitle>
 							<div className="text-4xl font-bold">
-								${getPrice(PRICING_PLANS.PRO)}
+								${getPrice(PRICING_PLANS.PRO).toFixed(2)}
 								<span className="text-lg font-normal">
 									/{billingInterval === "yearly" ? "year" : "month"}
 								</span>
@@ -184,7 +184,6 @@ export function PricingSection() {
 					<div className="flex justify-center space-x-4 text-xs text-muted-foreground">
 						<span>No setup fees</span>
 						<span>Cancel anytime</span>
-						<span>30-day money-back guarantee</span>
 					</div>
 				</div>
 			</div>

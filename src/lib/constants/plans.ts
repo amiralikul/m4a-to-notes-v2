@@ -1,7 +1,6 @@
 export const SUBSCRIPTION_PLANS = {
 	FREE: "free",
 	PRO: "pro",
-	BUSINESS: "business",
 } as const;
 
 export const SUBSCRIPTION_STATUS = {
@@ -34,7 +33,6 @@ export const LEMON_SQUEEZY_VARIANT_IDS = {
 export const PLAN_HIERARCHY: Record<string, number> = {
 	[SUBSCRIPTION_PLANS.FREE]: 0,
 	[SUBSCRIPTION_PLANS.PRO]: 1,
-	[SUBSCRIPTION_PLANS.BUSINESS]: 2,
 };
 
 export const WEBHOOK_EVENT_TYPES = {
@@ -70,9 +68,6 @@ export function mapLemonSqueezyVariantToPlan(variantId: string): string {
 	const proYearlyId = process.env.LEMONSQUEEZY_PRO_YEARLY_VARIANT_ID || "";
 
 	if (variantId && (variantId === proMonthlyId || variantId === proYearlyId)) {
-		return SUBSCRIPTION_PLANS.PRO;
-	}
-	if (variantId) {
 		return SUBSCRIPTION_PLANS.PRO;
 	}
 

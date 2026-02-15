@@ -63,7 +63,7 @@ export function createTestDb() {
 			expires_at TEXT,
 			features TEXT NOT NULL,
 			limits TEXT NOT NULL,
-			meta TEXT DEFAULT '{}',
+			meta TEXT,
 			created_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
 			updated_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL
 		);

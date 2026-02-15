@@ -1,14 +1,9 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { usersService } from "@/services";
 import { PRICING_PLANS } from "@/lib/pricing";
+import { PLAN_HIERARCHY } from "@/lib/constants/plans";
 import { getErrorMessage } from "@/lib/errors";
 import { logger } from "@/lib/logger";
-
-const PLAN_HIERARCHY: Record<string, number> = {
-	free: 0,
-	pro: 1,
-	business: 2,
-};
 
 export async function POST(request: Request) {
 	const { userId } = await auth();
@@ -50,29 +45,34 @@ export async function POST(request: Request) {
 			}
 		}
 
-		if (targetPlan) {
-			const hasActive = ["active", "trialing"].includes(
-				entitlements.status || "",
+			if (!targetPlan) {
+			return Response.json(
+				{ error: "Unknown plan/variant" },
+				{ status: 400 },
 			);
-			const currentPlan = entitlements.plan || "free";
+		}
 
-			if (hasActive && targetPlan === currentPlan) {
-				return Response.json(
-					{ error: "You already have this plan" },
-					{ status: 400 },
-				);
-			}
+		const hasActive = ["active", "trialing"].includes(
+			entitlements.status || "",
+		);
+		const currentPlan = entitlements.plan || "free";
 
-			if (
-				hasActive &&
-				(PLAN_HIERARCHY[targetPlan] ?? 0) <=
-					(PLAN_HIERARCHY[currentPlan] ?? 0)
-			) {
-				return Response.json(
-					{ error: "Cannot downgrade. Cancel current subscription first." },
-					{ status: 400 },
-				);
-			}
+		if (hasActive && targetPlan === currentPlan) {
+			return Response.json(
+				{ error: "You already have this plan" },
+				{ status: 400 },
+			);
+		}
+
+		if (
+			hasActive &&
+			(PLAN_HIERARCHY[targetPlan] ?? 0) <=
+				(PLAN_HIERARCHY[currentPlan] ?? 0)
+		) {
+			return Response.json(
+				{ error: "Cannot downgrade. Cancel current subscription first." },
+				{ status: 400 },
+			);
 		}
 
 		const user = await currentUser();
@@ -138,7 +138,7 @@ export async function POST(request: Request) {
 				storeId,
 			});
 			return Response.json(
-				{ error: `Lemon Squeezy API error: ${response.status} - ${errorText}` },
+				{ error: "Upstream service error" },
 				{ status: 502 },
 			);
 		}

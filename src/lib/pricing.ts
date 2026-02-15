@@ -15,10 +15,10 @@ export const PRICING_PLANS: Record<string, PricingPlan> = {
 		monthlyVariantId: null,
 		yearlyVariantId: null,
 		features: [
-			"30 minutes of transcription",
-			"Basic accuracy",
-			"Standard processing speed",
+			"3 transcriptions per month",
+			"AI-powered transcription",
 			"Export to TXT",
+			"Secure file handling",
 		],
 	},
 
@@ -29,12 +29,10 @@ export const PRICING_PLANS: Record<string, PricingPlan> = {
 		monthlyVariantId: process.env.NEXT_PUBLIC_LEMONSQUEEZY_PRO_MONTHLY_VARIANT_ID || null,
 		yearlyVariantId: process.env.NEXT_PUBLIC_LEMONSQUEEZY_PRO_YEARLY_VARIANT_ID || null,
 		features: [
-			"10 hours of transcription/month",
-			"High accuracy (95%+)",
-			"Priority processing",
-			"Export to TXT, DOCX, PDF",
-			"Speaker identification",
-			"Timestamps",
+			"Unlimited transcriptions",
+			"AI-powered transcription",
+			"Export to TXT",
+			"Secure file handling",
 		],
 	},
 };

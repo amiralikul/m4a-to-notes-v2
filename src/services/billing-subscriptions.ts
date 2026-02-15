@@ -19,12 +19,11 @@ export class BillingSubscriptionsService {
 				.insert(billingSubscriptions)
 				.values(data)
 				.onConflictDoUpdate({
-					target: billingSubscriptions.id,
+					target: [billingSubscriptions.provider, billingSubscriptions.subscriptionId],
 					set: {
 						status: data.status,
 						customerId: data.customerId,
 						currentPeriodEnd: data.currentPeriodEnd,
-						updatedAt: new Date().toISOString(),
 					},
 				})
 				.returning();
@@ -72,18 +71,8 @@ export class BillingSubscriptionsService {
 		provider: string,
 	): Promise<boolean> {
 		try {
-			const result = await this.db
-				.select({ userId: billingSubscriptions.userId })
-				.from(billingSubscriptions)
-				.where(
-					and(
-						eq(billingSubscriptions.provider, provider),
-						eq(billingSubscriptions.subscriptionId, subscriptionId),
-					),
-				)
-				.limit(1);
-
-			return result[0]?.userId === userId;
+			const ownerId = await this.getUserIdBySubscriptionId(provider, subscriptionId);
+			return ownerId === userId;
 		} catch (error) {
 			this.logger.error("Failed to verify subscription ownership", {
 				error: getErrorMessage(error),

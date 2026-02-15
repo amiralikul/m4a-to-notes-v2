@@ -8,7 +8,6 @@ import {
 	CheckCircle,
 	Clock,
 	Crown,
-	Sparkles,
 	XCircle,
 	Zap,
 } from "lucide-react";
@@ -77,9 +76,7 @@ export default function SubscriptionPage() {
 		switch (plan) {
 			case "pro":
 				return <Crown className="w-6 h-6 text-blue-500" />;
-			case "business":
-				return <Sparkles className="w-6 h-6 text-purple-500" />;
-			default:
+				default:
 				return <Zap className="w-6 h-6 text-gray-500" />;
 		}
 	};
@@ -90,7 +87,7 @@ export default function SubscriptionPage() {
 			...plan,
 		}));
 
-		return plans.filter((p) => (p.monthlyVariantId || p.yearlyVariantId) && canUpgradeTo(p.key as "free" | "pro" | "business"));
+		return plans.filter((p) => (p.monthlyVariantId || p.yearlyVariantId) && canUpgradeTo(p.key as "free" | "pro"));
 	};
 
 	const handleCancellationSuccess = async (method: string) => {
@@ -207,7 +204,7 @@ export default function SubscriptionPage() {
 								</div>
 								<div className="text-right">
 									<div className="text-3xl font-bold">
-										${currentPlan.monthlyPrice}
+										${currentPlan.monthlyPrice.toFixed(2)}
 										{currentPlan.monthlyPrice > 0 && (
 											<span className="text-sm text-gray-500 font-normal">
 												/month
@@ -331,7 +328,7 @@ export default function SubscriptionPage() {
 													{plan.name}
 												</h4>
 												<p className="text-2xl font-bold text-blue-600">
-													${plan.monthlyPrice}/mo
+													${plan.monthlyPrice.toFixed(2)}/mo
 												</p>
 											</div>
 										</div>

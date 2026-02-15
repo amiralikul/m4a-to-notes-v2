@@ -46,10 +46,15 @@ export async function POST(request: Request) {
 		});
 
 		const webhookSecret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET;
-		if (
-			webhookSecret &&
-			!verifySignature(body, signature, webhookSecret)
-		) {
+		if (!webhookSecret) {
+			logger.error("LEMONSQUEEZY_WEBHOOK_SECRET not configured");
+			return Response.json(
+				{ error: "Webhook secret not configured" },
+				{ status: 500 },
+			);
+		}
+
+		if (!verifySignature(body, signature, webhookSecret)) {
 			logger.warn("Invalid webhook signature");
 			return Response.json({ error: "Invalid signature" }, { status: 401 });
 		}
@@ -116,8 +121,8 @@ export async function POST(request: Request) {
 		});
 
 		return Response.json(
-			{ received: true, error: "Processing failed but acknowledged" },
-			{ status: 200 },
+			{ error: "Processing failed" },
+			{ status: 500 },
 		);
 	}
 }

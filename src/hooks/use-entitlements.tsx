@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 
 interface Entitlements {
 	userId: string;
-	plan: "free" | "pro" | "business";
+	plan: "free" | "pro";
 	status: "none" | "active" | "trialing" | "past_due" | "canceled";
 	provider?: string;
 	meta?: {
@@ -79,7 +79,7 @@ export function useEntitlements() {
 
 	const canUpgradeTo = (targetPlan: PlanType) => {
 		const currentPlan = getCurrentPlan();
-		const planHierarchy: Record<PlanType, number> = { free: 0, pro: 1, business: 2 };
+		const planHierarchy: Record<PlanType, number> = { free: 0, pro: 1 };
 
 		return planHierarchy[targetPlan] > planHierarchy[currentPlan];
 	};
@@ -131,12 +131,7 @@ export function useEntitlements() {
 			case "basic":
 				return true; // Everyone has basic access
 			case "pro":
-				return (
-					(entitlements.plan === "pro" && hasActive) ||
-					(entitlements.plan === "business" && hasActive)
-				);
-			case "business":
-				return entitlements.plan === "business" && hasActive;
+				return entitlements.plan === "pro" && hasActive;
 			default:
 				return false;
 		}
