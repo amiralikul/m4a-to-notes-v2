@@ -202,9 +202,9 @@ export default function FeaturesPage() {
 											Flexible Output Formats
 										</h3>
 										<p className="text-gray-600 leading-relaxed">
-											Export your transcriptions in multiple formats including
-											plain text, formatted documents, and structured data with
-											timestamps and speaker identification.
+											Export your transcriptions as plain text. Copy to
+											clipboard or download as a TXT file for easy sharing and
+											editing.
 										</p>
 									</div>
 								</div>
@@ -218,9 +218,8 @@ export default function FeaturesPage() {
 											Usage Analytics
 										</h3>
 										<p className="text-gray-600 leading-relaxed">
-											Track your transcription usage, monitor accuracy rates,
-											and optimize your workflow with detailed analytics and
-											reporting features.
+											View your transcription history, access past results,
+											and manage your files from a simple dashboard.
 										</p>
 									</div>
 								</div>
@@ -250,19 +249,19 @@ export default function FeaturesPage() {
 											</div>
 											<div className="flex items-center justify-between">
 												<span className="text-sm font-medium">
-													Speaker Identification
+													Audio Upload
 												</span>
 												<CheckCircle className="h-4 w-4 text-green-500" />
 											</div>
 											<div className="flex items-center justify-between">
 												<span className="text-sm font-medium">
-													Noise Reduction
+													Text Export
 												</span>
 												<CheckCircle className="h-4 w-4 text-green-500" />
 											</div>
 											<div className="flex items-center justify-between">
 												<span className="text-sm font-medium">
-													Quality Enhancement
+													Progress Tracking
 												</span>
 												<Zap className="h-4 w-4 text-blue-500 animate-pulse" />
 											</div>
@@ -325,9 +324,9 @@ export default function FeaturesPage() {
 							</CardHeader>
 							<CardContent>
 								<CardDescription className="text-base text-gray-600 leading-relaxed">
-									Our advanced OpenAI Whisper AI analyzes your audio with
-									real-time progress updates. Advanced noise reduction and
-									quality enhancement ensure optimal results.
+									Our AI analyzes your audio using OpenAI Whisper with
+									real-time progress updates for accurate transcription
+									results.
 								</CardDescription>
 							</CardContent>
 						</Card>
@@ -345,8 +344,7 @@ export default function FeaturesPage() {
 							<CardContent>
 								<CardDescription className="text-base text-gray-600 leading-relaxed">
 									Get your transcription instantly as clean, formatted text.
-									Copy to clipboard, download as TXT file, or export in your
-									preferred format.
+									Copy to clipboard or download as a TXT file.
 								</CardDescription>
 							</CardContent>
 						</Card>

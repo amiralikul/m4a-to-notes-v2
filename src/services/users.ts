@@ -69,6 +69,7 @@ export class UsersService {
 					...existing?.limits,
 					...entitlementsData.limits,
 				},
+				meta: entitlementsData.meta ?? existing?.meta ?? {},
 			};
 
 			this._validateEntitlements(entitlements);
@@ -112,6 +113,7 @@ export class UsersService {
 				expiresAt: null,
 				features: [],
 				limits: {},
+				meta: {},
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 			} as UserEntitlement;
@@ -132,12 +134,7 @@ export class UsersService {
 				case "basic":
 					return true;
 				case "pro":
-					return (
-						(entitlements.plan === "pro" && hasActiveSubscription) ||
-						(entitlements.plan === "business" && hasActiveSubscription)
-					);
-				case "business":
-					return entitlements.plan === "business" && hasActiveSubscription;
+					return entitlements.plan === "pro" && hasActiveSubscription;
 				default:
 					return false;
 			}
@@ -172,7 +169,7 @@ export class UsersService {
 	}
 
 	private _validateEntitlements(entitlements: InsertUserEntitlement): void {
-		const validPlans = ["free", "pro", "business"];
+		const validPlans = ["free", "pro"];
 		const validStatuses = [
 			"none",
 			"trialing",

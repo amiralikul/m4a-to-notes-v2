@@ -64,7 +64,7 @@ export default function PrivacyPolicyPage() {
 								<p className="text-gray-700 mb-4">We may collect:</p>
 								<ul className="list-disc list-inside text-gray-700 mb-6 space-y-2">
 									<li>Name and email address when you create an account</li>
-									<li>Payment information processed through Paddle</li>
+									<li>Payment information processed through Lemon Squeezy</li>
 									<li>Communication preferences and support inquiries</li>
 								</ul>
 
@@ -85,7 +85,7 @@ export default function PrivacyPolicyPage() {
 								<ul className="list-disc list-inside text-gray-700 mb-6 space-y-2">
 									<li>Provide and maintain our transcription services</li>
 									<li>Process your audio files and generate transcriptions</li>
-									<li>Process payments through Paddle, our payment processor</li>
+									<li>Process payments through Lemon Squeezy, our payment processor</li>
 									<li>Send you important service updates and notifications</li>
 									<li>Improve our services and develop new features</li>
 									<li>Provide customer support and respond to inquiries</li>

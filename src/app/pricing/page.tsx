@@ -1,12 +1,8 @@
 "use client";
 
 import {
-	Award,
 	Building,
 	CheckCircle,
-	Clock,
-	Headphones,
-	Shield,
 	Sparkles,
 	Users,
 	Zap,
@@ -58,7 +54,7 @@ export default function PricingPage() {
 						<div className="flex flex-wrap justify-center gap-4 text-sm text-gray-600 pt-4">
 							<div className="flex items-center bg-white/60 px-4 py-2 rounded-full shadow-sm">
 								<CheckCircle className="mr-2 h-4 w-4 text-emerald-500" />
-								30-day money-back guarantee
+								Secure file handling
 							</div>
 							<div className="flex items-center bg-white/60 px-4 py-2 rounded-full shadow-sm">
 								<CheckCircle className="mr-2 h-4 w-4 text-emerald-500" />
@@ -96,8 +92,8 @@ export default function PricingPage() {
 					</div>
 
 					{/* Features Table */}
-					<div className="mx-auto max-w-6xl">
-						<div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+					<div className="mx-auto max-w-4xl">
+						<div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
 							<div className="text-left">
 								<h3 className="text-lg font-semibold text-gray-900 mb-4">
 									Features
@@ -111,91 +107,60 @@ export default function PricingPage() {
 							</div>
 							<div className="text-center">
 								<h3 className="text-lg font-semibold text-gray-900 mb-2">
-									Pro
+									Unlimited
 								</h3>
-								<p className="text-sm text-gray-600">$19/month</p>
-							</div>
-							<div className="text-center">
-								<h3 className="text-lg font-semibold text-gray-900 mb-2">
-									Business
-								</h3>
-								<p className="text-sm text-gray-600">$49/month</p>
+								<p className="text-sm text-gray-600">$9.90/month</p>
 							</div>
 						</div>
 
 						<div className="space-y-4">
-							{/* Transcription Minutes */}
-							<div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-4 border-b border-gray-200">
+							{/* Transcriptions */}
+							<div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-4 border-b border-gray-200">
 								<div className="font-medium text-gray-900">
-									Transcription Minutes
+									Transcriptions
 								</div>
-								<div className="text-center text-gray-600">30 minutes</div>
-								<div className="text-center text-gray-600">500 minutes</div>
+								<div className="text-center text-gray-600">3 per month</div>
 								<div className="text-center text-gray-600">Unlimited</div>
 							</div>
 
-							{/* File Size Limit */}
-							<div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-4 border-b border-gray-200">
-								<div className="font-medium text-gray-900">Max File Size</div>
-								<div className="text-center text-gray-600">25MB</div>
-								<div className="text-center text-gray-600">100MB</div>
-								<div className="text-center text-gray-600">500MB</div>
+							{/* AI Transcription */}
+							<div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-4 border-b border-gray-200">
+								<div className="font-medium text-gray-900">
+									AI-Powered Transcription
+								</div>
+								<div className="text-center">
+									<CheckCircle className="h-4 w-4 text-green-500 mx-auto" />
+								</div>
+								<div className="text-center">
+									<CheckCircle className="h-4 w-4 text-green-500 mx-auto" />
+								</div>
 							</div>
 
-							{/* Processing Speed */}
-							<div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-4 border-b border-gray-200">
-								<div className="font-medium text-gray-900">
-									Processing Speed
+							{/* Export */}
+							<div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-4 border-b border-gray-200">
+								<div className="font-medium text-gray-900">Export to TXT</div>
+								<div className="text-center">
+									<CheckCircle className="h-4 w-4 text-green-500 mx-auto" />
 								</div>
 								<div className="text-center">
-									<Clock className="h-4 w-4 text-yellow-500 mx-auto" />
-								</div>
-								<div className="text-center">
-									<Zap className="h-4 w-4 text-blue-500 mx-auto" />
-								</div>
-								<div className="text-center">
-									<Zap className="h-4 w-4 text-green-500 mx-auto" />
+									<CheckCircle className="h-4 w-4 text-green-500 mx-auto" />
 								</div>
 							</div>
 
 							{/* Security */}
-							<div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-4 border-b border-gray-200">
+							<div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-4 border-b border-gray-200">
 								<div className="font-medium text-gray-900">
-									Enterprise Security
+									Secure File Handling
 								</div>
 								<div className="text-center">
 									<CheckCircle className="h-4 w-4 text-green-500 mx-auto" />
 								</div>
-								<div className="text-center">
-									<CheckCircle className="h-4 w-4 text-green-500 mx-auto" />
-								</div>
-								<div className="text-center">
-									<Shield className="h-4 w-4 text-green-500 mx-auto" />
-								</div>
-							</div>
-
-							{/* Support */}
-							<div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-4 border-b border-gray-200">
-								<div className="font-medium text-gray-900">Support</div>
-								<div className="text-center text-gray-600">Community</div>
-								<div className="text-center">
-									<Headphones className="h-4 w-4 text-blue-500 mx-auto" />
-								</div>
-								<div className="text-center">
-									<Award className="h-4 w-4 text-purple-500 mx-auto" />
-								</div>
-							</div>
-
-							{/* API Access */}
-							<div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-4">
-								<div className="font-medium text-gray-900">API Access</div>
-								<div className="text-center text-gray-400">-</div>
-								<div className="text-center text-gray-400">-</div>
 								<div className="text-center">
 									<CheckCircle className="h-4 w-4 text-green-500 mx-auto" />
 								</div>
 							</div>
-						</div>
+
+							</div>
 					</div>
 				</div>
 			</section>
@@ -260,21 +225,20 @@ export default function PricingPage() {
 							<CardContent>
 								<CardDescription className="text-base text-gray-600 leading-relaxed mb-4">
 									Ideal for small to medium teams that need reliable
-									transcription services with enhanced features and priority
-									support.
+									transcription services with unlimited access.
 								</CardDescription>
 								<div className="space-y-2 text-sm">
 									<div className="flex items-center text-gray-600">
 										<CheckCircle className="mr-2 h-4 w-4 text-green-500" />
-										Team collaboration
+										Unlimited transcriptions
 									</div>
 									<div className="flex items-center text-gray-600">
 										<CheckCircle className="mr-2 h-4 w-4 text-green-500" />
-										Higher limits
+										Shared access
 									</div>
 									<div className="flex items-center text-gray-600">
 										<CheckCircle className="mr-2 h-4 w-4 text-green-500" />
-										Priority processing
+										Secure file handling
 									</div>
 								</div>
 							</CardContent>
@@ -291,21 +255,21 @@ export default function PricingPage() {
 							</CardHeader>
 							<CardContent>
 								<CardDescription className="text-base text-gray-600 leading-relaxed mb-4">
-									Comprehensive solution for large organizations with unlimited
-									usage, API access, and dedicated support.
+									Have specific needs for your organization? Get in touch
+									and we'll work with you on a solution.
 								</CardDescription>
 								<div className="space-y-2 text-sm">
 									<div className="flex items-center text-gray-600">
 										<CheckCircle className="mr-2 h-4 w-4 text-green-500" />
-										API integration
+										Unlimited transcriptions
 									</div>
 									<div className="flex items-center text-gray-600">
 										<CheckCircle className="mr-2 h-4 w-4 text-green-500" />
-										Custom workflows
+										Secure file handling
 									</div>
 									<div className="flex items-center text-gray-600">
 										<CheckCircle className="mr-2 h-4 w-4 text-green-500" />
-										Dedicated support
+										Contact us for details
 									</div>
 								</div>
 							</CardContent>
@@ -381,9 +345,9 @@ export default function PricingPage() {
 							</CardHeader>
 							<CardContent>
 								<p className="text-gray-600">
-									We offer a 30-day money-back guarantee on all paid plans. If
-									you're not satisfied with our service, contact our support
-									team for a full refund within the first 30 days.
+									You can cancel your subscription at any time. Your access
+									will continue until the end of your current billing period.
+									No questions asked.
 								</p>
 							</CardContent>
 						</Card>
