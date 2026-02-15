@@ -20,6 +20,7 @@ export async function GET() {
 				expiresAt: entitlements.expiresAt,
 				features: entitlements.features,
 				limits: entitlements.limits,
+				meta: entitlements.meta || {},
 				updatedAt: entitlements.updatedAt,
 			},
 		});
@@ -35,7 +36,9 @@ export async function GET() {
 					userId,
 					plan: "free",
 					status: "none",
-					provider: "paddle",
+					expiresAt: null,
+					features: [],
+					limits: {},
 					meta: {},
 					updatedAt: new Date().toISOString(),
 				},

@@ -5,15 +5,16 @@ import { useCallback, useEffect, useState } from "react";
 
 interface Entitlements {
 	userId: string;
-	plan: "free" | "pro" | "business";
+	plan: "free" | "pro";
 	status: "none" | "active" | "trialing" | "past_due" | "canceled";
 	provider?: string;
 	meta?: {
 		subscriptionId?: string;
 		customerId?: string;
-		periodEnd?: string;
-		unitPrice?: number;
-		currency?: string;
+		renewsAt?: string;
+		endsAt?: string;
+		variantId?: string;
+		productName?: string;
 	};
 	updatedAt?: string;
 }
@@ -54,7 +55,7 @@ export function useEntitlements() {
 				userId: user?.id || "",
 				plan: "free",
 				status: "none",
-				provider: "paddle",
+				provider: "lemonsqueezy",
 				meta: {},
 				updatedAt: new Date().toISOString(),
 			});
@@ -78,7 +79,7 @@ export function useEntitlements() {
 
 	const canUpgradeTo = (targetPlan: PlanType) => {
 		const currentPlan = getCurrentPlan();
-		const planHierarchy: Record<PlanType, number> = { free: 0, pro: 1, business: 2 };
+		const planHierarchy: Record<PlanType, number> = { free: 0, pro: 1 };
 
 		return planHierarchy[targetPlan] > planHierarchy[currentPlan];
 	};
@@ -130,12 +131,7 @@ export function useEntitlements() {
 			case "basic":
 				return true; // Everyone has basic access
 			case "pro":
-				return (
-					(entitlements.plan === "pro" && hasActive) ||
-					(entitlements.plan === "business" && hasActive)
-				);
-			case "business":
-				return entitlements.plan === "business" && hasActive;
+				return entitlements.plan === "pro" && hasActive;
 			default:
 				return false;
 		}

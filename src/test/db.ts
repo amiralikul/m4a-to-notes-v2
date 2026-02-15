@@ -63,9 +63,27 @@ export function createTestDb() {
 			expires_at TEXT,
 			features TEXT NOT NULL,
 			limits TEXT NOT NULL,
+			meta TEXT,
 			created_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
 			updated_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL
 		);
+
+		CREATE TABLE IF NOT EXISTS billing_subscriptions (
+			id TEXT PRIMARY KEY NOT NULL,
+			provider TEXT NOT NULL,
+			subscription_id TEXT NOT NULL,
+			customer_id TEXT,
+			user_id TEXT NOT NULL,
+			status TEXT,
+			current_period_end TEXT,
+			created_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
+			updated_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL
+		);
+
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_billing_subs_provider_subscription
+		ON billing_subscriptions(provider, subscription_id);
+
+		CREATE INDEX IF NOT EXISTS idx_billing_subs_user_id ON billing_subscriptions(user_id);
 	`);
 
 	return drizzle(sqlite, { schema });
