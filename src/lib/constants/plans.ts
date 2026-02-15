@@ -26,8 +26,8 @@ export const SUBSCRIPTION_PROVIDERS = {
 } as const;
 
 export const LEMON_SQUEEZY_VARIANT_IDS = {
-	PRO_MONTHLY: process.env.LEMONSQUEEZY_PRO_MONTHLY_VARIANT_ID || "",
-	PRO_YEARLY: process.env.LEMONSQUEEZY_PRO_YEARLY_VARIANT_ID || "",
+	PRO_MONTHLY: process.env.NEXT_PUBLIC_LEMONSQUEEZY_PRO_MONTHLY_VARIANT_ID || "",
+	PRO_YEARLY: process.env.NEXT_PUBLIC_LEMONSQUEEZY_PRO_YEARLY_VARIANT_ID || "",
 } as const;
 
 export const PLAN_HIERARCHY: Record<string, number> = {
@@ -64,8 +64,8 @@ export function mapLemonSqueezyStatus(lsStatus: string): string {
 }
 
 export function mapLemonSqueezyVariantToPlan(variantId: string): string {
-	const proMonthlyId = process.env.LEMONSQUEEZY_PRO_MONTHLY_VARIANT_ID || "";
-	const proYearlyId = process.env.LEMONSQUEEZY_PRO_YEARLY_VARIANT_ID || "";
+	const proMonthlyId = process.env.NEXT_PUBLIC_LEMONSQUEEZY_PRO_MONTHLY_VARIANT_ID || "";
+	const proYearlyId = process.env.NEXT_PUBLIC_LEMONSQUEEZY_PRO_YEARLY_VARIANT_ID || "";
 
 	if (variantId && (variantId === proMonthlyId || variantId === proYearlyId)) {
 		return SUBSCRIPTION_PLANS.PRO;
