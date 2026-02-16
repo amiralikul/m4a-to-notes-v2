@@ -8,7 +8,11 @@ vi.mock("@clerk/nextjs/server", () => ({
 
 // Mock services to prevent real DB connections
 vi.mock("@/services", () => ({
-	transcriptionsService: { getStatus: vi.fn(), findById: vi.fn() },
+	transcriptionsService: {
+		getStatus: vi.fn(),
+		findById: vi.fn(),
+		markSummaryPending: vi.fn(),
+	},
 	usersService: { getWithDefaults: vi.fn() },
 }));
 
@@ -41,6 +45,14 @@ const protectedRoutes = [
 		module: () =>
 			import(
 				"../../api/transcriptions/[transcriptionId]/transcript/route"
+			),
+	},
+	{
+		method: "POST",
+		path: "/api/transcriptions/test-id/summary/regenerate",
+		module: () =>
+			import(
+				"../../api/transcriptions/[transcriptionId]/summary/regenerate/route"
 			),
 	},
 	{
@@ -92,7 +104,7 @@ describe("Auth guard tests (#12)", () => {
 			});
 
 			const response =
-				method === "GET" && handler.length > 1
+				handler.length > 1
 					? await handler(request, {
 							params: Promise.resolve({ transcriptionId: "test-id" }),
 						})

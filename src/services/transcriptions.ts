@@ -250,6 +250,15 @@ export class TranscriptionsService {
 		});
 	}
 
+	async markSummaryPending(transcriptionId: string): Promise<Transcription> {
+		return this.update(transcriptionId, {
+			summaryStatus: SummaryStatus.PENDING,
+			summaryData: null,
+			summaryError: null,
+			summaryUpdatedAt: new Date().toISOString(),
+		});
+	}
+
 	async findByStatus(
 		status: TranscriptionStatusType,
 		limit = 100,

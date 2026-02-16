@@ -201,7 +201,6 @@ export class AiService {
 		try {
 			const completion = await this.getSummaryClient().chat.completions.create({
 				model: this.summaryModel,
-				temperature: 0.2,
 				response_format: { type: "json_object" },
 				messages: [
 					{
