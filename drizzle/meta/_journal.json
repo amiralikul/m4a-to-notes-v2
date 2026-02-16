@@ -57,6 +57,20 @@
       "when": 1771072791537,
       "tag": "0007_material_nick_fury",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1771233201206,
+      "tag": "0008_spicy_metal_master",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1771233215415,
+      "tag": "0009_many_luckman",
+      "breakpoints": true
     }
   ]
 }

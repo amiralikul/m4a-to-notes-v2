@@ -1,7 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { createTestDb } from "@/test/db";
 import { createTestLogger } from "@/test/setup";
-import { TranscriptionsService, TranscriptionStatus } from "../transcriptions";
+import {
+	SummaryStatus,
+	TranscriptionStatus,
+	TranscriptionsService,
+} from "../transcriptions";
 
 describe("TranscriptionsService", () => {
 	let service: TranscriptionsService;
@@ -29,6 +33,7 @@ describe("TranscriptionsService", () => {
 			expect(transcription!.progress).toBe(0);
 			expect(transcription!.filename).toBe("test.m4a");
 			expect(transcription!.source).toBe("web");
+			expect(transcription!.summaryStatus).toBeNull();
 		});
 
 		it("creates a telegram-source transcription", async () => {
@@ -75,6 +80,7 @@ describe("TranscriptionsService", () => {
 			expect(t!.progress).toBe(100);
 			expect(t!.transcriptText).toBe("Full transcript text here");
 			expect(t!.preview).toBe("Preview text...");
+			expect(t!.summaryStatus).toBe(SummaryStatus.PENDING);
 			expect(t!.completedAt).toBeDefined();
 		});
 
@@ -113,6 +119,67 @@ describe("TranscriptionsService", () => {
 		it("returns null for non-existent transcription", async () => {
 			const status = await service.getStatus("non-existent");
 			expect(status).toBeNull();
+		});
+	});
+
+	describe("summary status transitions", () => {
+		it("transitions pending -> processing -> completed", async () => {
+			const id = await service.create({
+				audioKey: "blob://test.m4a",
+				filename: "summary-test.m4a",
+			});
+
+			await service.markCompleted(id, "Preview", "Transcript text");
+			await service.markSummaryStarted(id, "openai", "gpt-5-mini");
+			let t = await service.findById(id);
+			expect(t!.summaryStatus).toBe(SummaryStatus.PROCESSING);
+			expect(t!.summaryProvider).toBe("openai");
+			expect(t!.summaryModel).toBe("gpt-5-mini");
+
+			await service.markSummaryCompleted(
+				id,
+				{
+					summary: "Summary text",
+					keyPoints: ["A"],
+					actionItems: [{ task: "Follow up" }],
+					keyTakeaways: ["B"],
+				},
+				"openai",
+				"gpt-5-mini",
+			);
+
+			t = await service.findById(id);
+			expect(t!.summaryStatus).toBe(SummaryStatus.COMPLETED);
+			expect(t!.summaryData).toEqual({
+				summary: "Summary text",
+				keyPoints: ["A"],
+				actionItems: [{ task: "Follow up" }],
+				keyTakeaways: ["B"],
+			});
+			expect(t!.summaryUpdatedAt).toBeDefined();
+		});
+
+		it("marks summary as failed", async () => {
+			const id = await service.create({
+				audioKey: "blob://test.m4a",
+				filename: "summary-fail.m4a",
+			});
+			await service.markCompleted(id, "Preview", "Transcript text");
+
+			await service.markSummaryFailed(
+				id,
+				"SUMMARY_API_ERROR",
+				"Rate limited",
+				"openai",
+				"gpt-5-mini",
+			);
+
+			const t = await service.findById(id);
+			expect(t!.summaryStatus).toBe(SummaryStatus.FAILED);
+			expect(t!.summaryError).toEqual({
+				code: "SUMMARY_API_ERROR",
+				message: "Rate limited",
+			});
 		});
 	});
 

@@ -46,6 +46,12 @@ export class TranscriptionError extends AppError {
 	}
 }
 
+export class SummaryError extends AppError {
+	constructor(message: string) {
+		super(message, 500);
+	}
+}
+
 export class StorageError extends AppError {
 	constructor(message: string) {
 		super(message, 500);
