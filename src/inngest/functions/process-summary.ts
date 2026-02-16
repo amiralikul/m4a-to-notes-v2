@@ -16,7 +16,7 @@ export const processSummary = inngest.createFunction(
 	{
 		id: "process-summary",
 		retries: 3,
-		concurrency: { limit: 10 },
+		concurrency: { limit: 5 },
 		onFailure: async ({ event, error }) => {
 			const transcriptionId =
 				event.data.event.data.transcriptionId;
