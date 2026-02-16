@@ -9,6 +9,7 @@ import {
 	parseSummaryProvider,
 } from "./ai.service";
 import { StorageService } from "./storage";
+import { WorkflowService } from "./workflow";
 
 export const transcriptionsService = new TranscriptionsService(db, logger);
 export const usersService = new UsersService(db, logger);
@@ -28,3 +29,4 @@ export const aiService = new AiService(
 );
 
 export const storageService = new StorageService();
+export const workflowService = new WorkflowService(logger);

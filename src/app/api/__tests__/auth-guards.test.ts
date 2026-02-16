@@ -14,10 +14,10 @@ vi.mock("@/services", () => ({
 		markSummaryPending: vi.fn(),
 	},
 	usersService: { getWithDefaults: vi.fn() },
-}));
-
-vi.mock("@/inngest/client", () => ({
-	inngest: { send: vi.fn() },
+	workflowService: {
+		startTranscription: vi.fn(),
+		regenerateSummary: vi.fn(),
+	},
 }));
 
 vi.mock("@/lib/logger", () => ({

@@ -1,9 +1,11 @@
 import { Bot, type Context, webhookCallback } from "grammy";
-import { inngest } from "@/inngest/client";
-import { INNGEST_EVENTS } from "@/inngest/events";
-import { transcriptionsService, conversationService } from "@/services";
+import {
+	transcriptionsService,
+	conversationService,
+	storageService,
+	workflowService,
+} from "@/services";
 import { getChatCompletion } from "@/services/chat";
-import { storageService } from "@/services";
 import { getErrorMessage } from "@/lib/errors";
 import { AUDIO_LIMITS } from "@/lib/validation";
 import { logger } from "@/lib/logger";
@@ -132,7 +134,7 @@ export async function POST(request: Request) {
 	return handler(request);
 }
 
-// (#1) Rewritten: upload to Blob → create DB record → send Inngest event
+// (#1) Rewritten: upload to Blob → create DB record → trigger workflow
 async function handleFileProcessing(
 	ctx: Context,
 	fileInfo: { file_id: string; file_size?: number; file_name?: string },
@@ -176,11 +178,8 @@ async function handleFileProcessing(
 			userMetadata: { chatId },
 		});
 
-		// Send Inngest event (notify-telegram step will send the result back)
-		await inngest.send({
-			name: INNGEST_EVENTS.TRANSCRIPTION_REQUESTED,
-			data: { transcriptionId },
-		});
+		// notify-telegram step will send the result back
+		await workflowService.startTranscription(transcriptionId);
 
 		logger.info("Telegram file queued for transcription", {
 			transcriptionId,

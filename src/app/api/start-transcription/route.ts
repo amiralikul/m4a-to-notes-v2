@@ -1,7 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
-import { inngest } from "@/inngest/client";
-import { INNGEST_EVENTS } from "@/inngest/events";
-import { transcriptionsService } from "@/services";
+import { transcriptionsService, workflowService } from "@/services";
 import { getErrorMessage } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 
@@ -32,10 +30,7 @@ export async function POST(request: Request) {
 			userMetadata: { userId },
 		});
 
-		await inngest.send({
-			name: INNGEST_EVENTS.TRANSCRIPTION_REQUESTED,
-			data: { transcriptionId },
-		});
+		await workflowService.startTranscription(transcriptionId);
 
 		logger.info("Transcription started", {
 			transcriptionId,
