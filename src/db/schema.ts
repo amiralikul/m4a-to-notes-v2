@@ -57,6 +57,19 @@ export const transcriptions = sqliteTable(
 		startedAt: text("started_at"),
 		completedAt: text("completed_at"),
 		userId: text("user_id"),
+		summaryStatus: text("summary_status", {
+			enum: ["pending", "processing", "completed", "failed"],
+		}),
+		summaryData: text("summary_data", { mode: "json" }).$type<
+			TranscriptionSummaryData
+		>(),
+		summaryError: text("summary_error", { mode: "json" }).$type<{
+			code?: string;
+			message?: string;
+		}>(),
+		summaryProvider: text("summary_provider"),
+		summaryModel: text("summary_model"),
+		summaryUpdatedAt: text("summary_updated_at"),
 		updatedAt: text("updated_at")
 			.notNull()
 			.default(sql`(CURRENT_TIMESTAMP)`)
@@ -148,6 +161,19 @@ export interface ConversationData {
 	}>;
 	createdAt: string;
 	updatedAt: string;
+}
+
+export interface TranscriptionSummaryActionItem {
+	task: string;
+	owner?: string;
+	dueDate?: string;
+}
+
+export interface TranscriptionSummaryData {
+	summary: string;
+	keyPoints: string[];
+	actionItems: TranscriptionSummaryActionItem[];
+	keyTakeaways: string[];
 }
 
 // Type inference exports

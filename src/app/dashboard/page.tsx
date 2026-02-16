@@ -2,6 +2,8 @@
 
 import { useUser } from "@clerk/nextjs";
 import {
+	ChevronDown,
+	ChevronUp,
 	Download,
 	FileAudio,
 	FileText,
@@ -27,16 +29,78 @@ interface TranscriptionItem {
 	status: "pending" | "processing" | "completed" | "failed";
 	progress: number;
 	preview: string | null;
+	summaryStatus:
+		| "pending"
+		| "processing"
+		| "completed"
+		| "failed"
+		| null;
+	summaryUpdatedAt: string | null;
 	createdAt: string;
 	completedAt: string | null;
 	audioKey: string;
 }
 
+interface SummaryActionItem {
+	task: string;
+	owner?: string;
+	dueDate?: string;
+}
+
+interface SummaryData {
+	summary: string;
+	keyPoints: string[];
+	actionItems: SummaryActionItem[];
+	keyTakeaways: string[];
+}
+
+interface SummaryPayload {
+	transcriptionId: string;
+	summaryStatus: "pending" | "processing" | "completed" | "failed";
+	summaryData: SummaryData | null;
+	summaryError?: {
+		code?: string;
+		message?: string;
+	} | null;
+	summaryProvider?: string | null;
+	summaryModel?: string | null;
+	summaryUpdatedAt?: string | null;
+}
+
 const statusConfig = {
 	pending: { label: "Pending", className: "bg-yellow-100 text-yellow-800" },
-	processing: { label: "Processing", className: "bg-blue-100 text-blue-800" },
-	completed: { label: "Completed", className: "bg-green-100 text-green-800" },
+	processing: {
+		label: "Processing",
+		className: "bg-blue-100 text-blue-800",
+	},
+	completed: {
+		label: "Completed",
+		className: "bg-green-100 text-green-800",
+	},
 	failed: { label: "Failed", className: "bg-red-100 text-red-800" },
+} as const;
+
+const summaryStatusConfig = {
+	not_generated: {
+		label: "Summary: Not generated",
+		className: "bg-gray-100 text-gray-700",
+	},
+	pending: {
+		label: "Summary: Pending",
+		className: "bg-yellow-100 text-yellow-800",
+	},
+	processing: {
+		label: "Summary: Generating",
+		className: "bg-blue-100 text-blue-800",
+	},
+	completed: {
+		label: "Summary: Ready",
+		className: "bg-green-100 text-green-800",
+	},
+	failed: {
+		label: "Summary: Failed",
+		className: "bg-red-100 text-red-800",
+	},
 } as const;
 
 export default function DashboardPage() {
@@ -48,11 +112,25 @@ export default function DashboardPage() {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+	const [expandedSummaryIds, setExpandedSummaryIds] = useState<Set<string>>(
+		new Set(),
+	);
+	const [summaryLoadingIds, setSummaryLoadingIds] = useState<Set<string>>(
+		new Set(),
+	);
+	const [summaryById, setSummaryById] = useState<
+		Record<string, SummaryPayload>
+	>({});
+	const [summaryErrors, setSummaryErrors] = useState<Record<string, string>>(
+		{},
+	);
 	const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
 	const fetchTranscriptions = useCallback(async () => {
 		try {
-			const res = await fetch("/api/me/transcriptions");
+			const res = await fetch("/api/me/transcriptions", {
+				cache: "no-store",
+			});
 			if (!res.ok) {
 				setError("Failed to fetch transcriptions");
 				return;
@@ -68,16 +146,97 @@ export default function DashboardPage() {
 		}
 	}, []);
 
+	const fetchSummary = useCallback(async (transcriptionId: string) => {
+		setSummaryLoadingIds((prev) => {
+			const next = new Set(prev);
+			next.add(transcriptionId);
+			return next;
+		});
+
+		try {
+			const res = await fetch(`/api/transcriptions/${transcriptionId}/summary`, {
+				cache: "no-store",
+			});
+
+			if (!res.ok) {
+				if (res.status === 404) {
+					setSummaryErrors((prev) => ({
+						...prev,
+						[transcriptionId]: "Summary is not available yet.",
+					}));
+					return;
+				}
+
+				setSummaryErrors((prev) => ({
+					...prev,
+					[transcriptionId]: `Failed to fetch summary (${res.status})`,
+				}));
+				return;
+			}
+
+			const payload = (await res.json()) as SummaryPayload;
+			setSummaryById((prev) => ({
+				...prev,
+				[transcriptionId]: payload,
+			}));
+			setSummaryErrors((prev) => {
+				const next = { ...prev };
+				delete next[transcriptionId];
+				return next;
+			});
+		} catch {
+			setSummaryErrors((prev) => ({
+				...prev,
+				[transcriptionId]: "Failed to fetch summary. Please try again.",
+			}));
+		} finally {
+			setSummaryLoadingIds((prev) => {
+				const next = new Set(prev);
+				next.delete(transcriptionId);
+				return next;
+			});
+		}
+	}, []);
+
 	useEffect(() => {
 		if (isLoaded && user) {
 			fetchTranscriptions();
 		}
 	}, [isLoaded, user, fetchTranscriptions]);
 
-	// Poll while any transcription is in-progress
+	useEffect(() => {
+		for (const transcription of transcriptions) {
+			const id = transcription.id;
+			const shouldFetch =
+				expandedSummaryIds.has(id) &&
+				(transcription.summaryStatus === "completed" ||
+					transcription.summaryStatus === "failed") &&
+				!summaryById[id] &&
+				!summaryErrors[id] &&
+				!summaryLoadingIds.has(id);
+
+			if (shouldFetch) {
+				void fetchSummary(id);
+			}
+		}
+	}, [
+		transcriptions,
+		expandedSummaryIds,
+		summaryById,
+		summaryErrors,
+		summaryLoadingIds,
+		fetchSummary,
+	]);
+
+	// Poll while any transcription or summary generation is in-progress.
 	useEffect(() => {
 		const hasInProgress = transcriptions.some(
-			(t) => t.status === "pending" || t.status === "processing",
+			(t) =>
+				t.status === "pending" ||
+				t.status === "processing" ||
+				(t.status === "completed" &&
+					(t.summaryStatus === "pending" ||
+						t.summaryStatus === "processing")),
 		);
 
 		if (hasInProgress) {
@@ -103,6 +262,26 @@ export default function DashboardPage() {
 			});
 			if (!res.ok) throw new Error("Failed to delete");
 			setTranscriptions((prev) => prev.filter((t) => t.id !== id));
+			setExpandedSummaryIds((prev) => {
+				const next = new Set(prev);
+				next.delete(id);
+				return next;
+			});
+			setSummaryLoadingIds((prev) => {
+				const next = new Set(prev);
+				next.delete(id);
+				return next;
+			});
+			setSummaryById((prev) => {
+				const next = { ...prev };
+				delete next[id];
+				return next;
+			});
+			setSummaryErrors((prev) => {
+				const next = { ...prev };
+				delete next[id];
+				return next;
+			});
 			setTotal((prev) => prev - 1);
 		} catch {
 			setError("Failed to delete transcription");
@@ -113,6 +292,117 @@ export default function DashboardPage() {
 				return next;
 			});
 		}
+	};
+
+	const handleToggleSummary = (transcription: TranscriptionItem) => {
+		const id = transcription.id;
+		const isExpanded = expandedSummaryIds.has(id);
+
+		setExpandedSummaryIds((prev) => {
+			const next = new Set(prev);
+			if (isExpanded) {
+				next.delete(id);
+			} else {
+				next.add(id);
+			}
+			return next;
+		});
+
+		if (
+			!isExpanded &&
+			(transcription.summaryStatus === "completed" ||
+				transcription.summaryStatus === "failed") &&
+			!summaryById[id] &&
+			!summaryLoadingIds.has(id)
+		) {
+			void fetchSummary(id);
+		}
+	};
+
+	const renderSummarySection = (transcription: TranscriptionItem) => {
+		const id = transcription.id;
+		if (!expandedSummaryIds.has(id)) {
+			return null;
+		}
+
+		const summary = summaryById[id];
+		const summaryErrorMessage =
+			summaryErrors[id] || summary?.summaryError?.message;
+
+		return (
+			<div className="mt-4 border-t pt-4 space-y-3">
+				{summaryLoadingIds.has(id) && (
+					<div className="flex items-center gap-2 text-sm text-gray-600">
+						<Loader2 className="w-4 h-4 animate-spin" />
+						Loading summary...
+					</div>
+				)}
+
+				{!summaryLoadingIds.has(id) && summary?.summaryData && (
+					<div className="space-y-3 text-sm">
+						<div>
+							<p className="font-semibold text-gray-900">Summary</p>
+							<p className="text-gray-700 mt-1">
+								{summary.summaryData.summary}
+							</p>
+						</div>
+
+						<div>
+							<p className="font-semibold text-gray-900">Key Points</p>
+							<ul className="list-disc pl-5 mt-1 text-gray-700 space-y-1">
+								{summary.summaryData.keyPoints.map((point, index) => (
+									<li key={`${id}-point-${index}`}>{point}</li>
+								))}
+							</ul>
+						</div>
+
+						<div>
+							<p className="font-semibold text-gray-900">Action Items</p>
+							{summary.summaryData.actionItems.length === 0 ? (
+								<p className="text-gray-600 mt-1">
+									No action items found.
+								</p>
+							) : (
+								<ul className="list-disc pl-5 mt-1 text-gray-700 space-y-1">
+									{summary.summaryData.actionItems.map((item, index) => (
+										<li key={`${id}-action-${index}`}>
+											{item.task}
+											{item.owner && ` (Owner: ${item.owner})`}
+											{item.dueDate && ` (Due: ${item.dueDate})`}
+										</li>
+									))}
+								</ul>
+							)}
+						</div>
+
+						<div>
+							<p className="font-semibold text-gray-900">
+								Key Takeaways
+							</p>
+							<ul className="list-disc pl-5 mt-1 text-gray-700 space-y-1">
+								{summary.summaryData.keyTakeaways.map(
+									(takeaway, index) => (
+										<li key={`${id}-takeaway-${index}`}>{takeaway}</li>
+									),
+								)}
+							</ul>
+						</div>
+					</div>
+				)}
+
+				{!summaryLoadingIds.has(id) && !summary?.summaryData && (
+					<div className="text-sm text-gray-600">
+						{summaryErrorMessage ||
+							(transcription.summaryStatus === "failed"
+								? "Summary generation failed."
+								: transcription.summaryStatus === "pending" ||
+									  transcription.summaryStatus === "processing"
+									? "Summary is being generated. Check back in a few seconds."
+									: "Summary was not generated for this transcription.")}
+					</div>
+				)}
+			</div>
+		);
 	};
 
 	if (!isLoaded) {
@@ -204,9 +494,7 @@ export default function DashboardPage() {
 					<CardContent className="pt-6">
 						<div className="text-center py-12 text-gray-500">
 							<FileAudio className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-							<p className="text-lg font-medium">
-								No transcriptions yet
-							</p>
+							<p className="text-lg font-medium">No transcriptions yet</p>
 							<p className="text-sm mt-1">
 								Upload an audio file to get started
 							</p>
@@ -220,20 +508,31 @@ export default function DashboardPage() {
 							<CardContent className="py-4">
 								<div className="flex items-center justify-between gap-4">
 									<div className="min-w-0 flex-1">
-										<div className="flex items-center gap-3 mb-1">
+										<div className="flex items-center gap-3 mb-1 flex-wrap">
 											<span className="font-medium truncate">
 												{t.filename}
 											</span>
-											<Badge
-												className={
-													statusConfig[t.status].className
-												}
-											>
+											<Badge className={statusConfig[t.status].className}>
 												{statusConfig[t.status].label}
 												{(t.status === "processing" ||
 													t.status === "pending") &&
 													` ${t.progress}%`}
 											</Badge>
+											{t.status === "completed" && (
+												<Badge
+													className={
+														summaryStatusConfig[
+															t.summaryStatus ?? "not_generated"
+														].className
+													}
+												>
+													{
+														summaryStatusConfig[
+																t.summaryStatus ?? "not_generated"
+															].label
+													}
+												</Badge>
+											)}
 										</div>
 										<div className="text-sm text-gray-500">
 											{new Date(t.createdAt).toLocaleDateString(
@@ -254,52 +553,64 @@ export default function DashboardPage() {
 										)}
 									</div>
 
-									<div className="flex items-center gap-2 shrink-0">
-										{t.status === "completed" && (
-											<Button
-												variant="outline"
-												size="sm"
-												asChild
-											>
-												<a
-													href={`/api/transcriptions/${t.id}/transcript`}
+										<div className="flex items-center gap-2 shrink-0">
+											{t.status === "completed" && (
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={() =>
+														handleToggleSummary(t)
+													}
 												>
-													<FileText className="w-4 h-4 mr-1" />
-													Transcript
-												</a>
-											</Button>
-										)}
-										{t.audioKey && (
-											<Button
-												variant="outline"
-												size="sm"
-												asChild
-											>
-												<a
-													href={t.audioKey}
-													target="_blank"
-													rel="noopener noreferrer"
-												>
-													<Download className="w-4 h-4 mr-1" />
-													Audio
-												</a>
-											</Button>
-										)}
-										<Button
-											variant="outline"
-											size="sm"
-											onClick={() => handleDelete(t.id)}
-											disabled={deletingIds.has(t.id)}
-											className="text-red-600 hover:text-red-700 hover:bg-red-50"
-										>
-											{deletingIds.has(t.id) ? (
-												<Loader2 className="w-4 h-4 animate-spin" />
-											) : (
-												<Trash2 className="w-4 h-4" />
+													{expandedSummaryIds.has(t.id) ? (
+														<>
+															<ChevronUp className="w-4 h-4 mr-1" />
+															Hide Summary
+														</>
+													) : (
+														<>
+															<ChevronDown className="w-4 h-4 mr-1" />
+															View Summary
+														</>
+													)}
+												</Button>
 											)}
-										</Button>
-									</div>
+											{t.status === "completed" && (
+												<Button variant="outline" size="sm" asChild>
+													<a href={`/api/transcriptions/${t.id}/transcript`}>
+														<FileText className="w-4 h-4 mr-1" />
+														Transcript
+													</a>
+												</Button>
+											)}
+											{t.audioKey && (
+												<Button variant="outline" size="sm" asChild>
+													<a
+														href={t.audioKey}
+														target="_blank"
+														rel="noopener noreferrer"
+													>
+														<Download className="w-4 h-4 mr-1" />
+														Audio
+													</a>
+												</Button>
+											)}
+											<Button
+												variant="outline"
+												size="sm"
+												onClick={() => handleDelete(t.id)}
+												disabled={deletingIds.has(t.id)}
+												className="text-red-600 hover:text-red-700 hover:bg-red-50"
+											>
+												{deletingIds.has(t.id) ? (
+													<Loader2 className="w-4 h-4 animate-spin" />
+												) : (
+													<Trash2 className="w-4 h-4" />
+												)}
+											</Button>
+										</div>
 								</div>
+								{renderSummarySection(t)}
 							</CardContent>
 						</Card>
 					))}

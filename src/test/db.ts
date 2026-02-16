@@ -39,6 +39,12 @@ export function createTestDb() {
 			started_at TEXT,
 			completed_at TEXT,
 			user_id TEXT,
+			summary_status TEXT,
+			summary_data TEXT,
+			summary_error TEXT,
+			summary_provider TEXT,
+			summary_model TEXT,
+			summary_updated_at TEXT,
 			updated_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL
 		);
 

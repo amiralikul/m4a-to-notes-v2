@@ -112,7 +112,13 @@ export const processTranscription = inngest.createFunction(
 			);
 		});
 
-		// Step 5: Notify Telegram if source is telegram (#1)
+		// Step 5: Trigger summary generation in a separate pipeline.
+		await step.sendEvent("request-summary", {
+			name: INNGEST_EVENTS.TRANSCRIPTION_COMPLETED,
+			data: { transcriptionId },
+		});
+
+		// Step 6: Notify Telegram if source is telegram (#1)
 		if (t.source === "telegram" && t.userMetadata) {
 			await step.run("notify-telegram", async () => {
 				const chatId = (t.userMetadata as Record<string, unknown>)

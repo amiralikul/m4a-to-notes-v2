@@ -1,11 +1,32 @@
 import OpenAI from "openai";
-import { TranscriptionError, getErrorMessage } from "@/lib/errors";
+import { z } from "zod";
+import {
+	SummaryError,
+	TranscriptionError,
+	getErrorMessage,
+} from "@/lib/errors";
 import type { Logger } from "@/lib/logger";
 
 export type TranscriptionProvider = "groq" | "openai";
+export type SummaryProvider = "openai";
+
+export interface SummaryActionItem {
+	task: string;
+	owner?: string;
+	dueDate?: string;
+}
+
+export interface SummaryResult {
+	summary: string;
+	keyPoints: string[];
+	actionItems: SummaryActionItem[];
+	keyTakeaways: string[];
+}
 
 export interface AiServiceConfig {
 	provider: TranscriptionProvider;
+	summaryProvider: SummaryProvider;
+	summaryModel?: string;
 	groqKey: string;
 	openaiKey: string;
 }
@@ -21,7 +42,29 @@ const PROVIDER_CONFIG = {
 	},
 } as const;
 
+const SUMMARY_PROVIDER_CONFIG = {
+	openai: {
+		baseURL: undefined,
+		model: "gpt-5-mini",
+	},
+} as const;
+
 const VALID_PROVIDERS: TranscriptionProvider[] = ["groq", "openai"];
+const VALID_SUMMARY_PROVIDERS: SummaryProvider[] = ["openai"];
+const MAX_SUMMARY_TRANSCRIPT_CHARS = 120_000;
+
+const summarySchema = z.object({
+	summary: z.string().min(1),
+	keyPoints: z.array(z.string().min(1)).min(1),
+	actionItems: z.array(
+		z.object({
+			task: z.string().min(1),
+			owner: z.string().optional(),
+			dueDate: z.string().optional(),
+		}),
+	),
+	keyTakeaways: z.array(z.string().min(1)).min(1),
+});
 
 export function parseProvider(
 	value: string | undefined,
@@ -35,15 +78,36 @@ export function parseProvider(
 	);
 }
 
+export function parseSummaryProvider(
+	value: string | undefined,
+): SummaryProvider {
+	if (!value) return "openai";
+	if (VALID_SUMMARY_PROVIDERS.includes(value as SummaryProvider)) {
+		return value as SummaryProvider;
+	}
+	throw new Error(
+		`Invalid SUMMARY_PROVIDER "${value}". Must be one of: ${VALID_SUMMARY_PROVIDERS.join(", ")}`,
+	);
+}
+
 export class AiService {
 	private readonly client: OpenAI;
+	private summaryClient: OpenAI | null = null;
 	private readonly logger: Logger;
+	private readonly openaiKey: string;
 	readonly provider: TranscriptionProvider;
 	readonly model: string;
+	readonly summaryProvider: SummaryProvider;
+	readonly summaryModel: string;
 
 	constructor(config: AiServiceConfig, logger: Logger) {
 		this.provider = config.provider;
 		this.model = PROVIDER_CONFIG[config.provider].model;
+		this.summaryProvider = config.summaryProvider;
+		this.summaryModel =
+			config.summaryModel ||
+			SUMMARY_PROVIDER_CONFIG[config.summaryProvider].model;
+		this.openaiKey = config.openaiKey;
 		this.logger = logger;
 
 		const apiKey =
@@ -114,5 +178,105 @@ export class AiService {
 				`Failed to transcribe audio: ${errorMsg}`,
 			);
 		}
+	}
+
+	async generateSummary(transcriptText: string): Promise<SummaryResult> {
+		if (!transcriptText.trim()) {
+			throw new SummaryError("Cannot generate summary for empty transcript");
+		}
+
+		const promptTranscript =
+			transcriptText.length > MAX_SUMMARY_TRANSCRIPT_CHARS
+				? `${transcriptText.slice(0, MAX_SUMMARY_TRANSCRIPT_CHARS)}\n\n[Transcript truncated for summarization.]`
+				: transcriptText;
+
+		const startTime = Date.now();
+		this.logger.info("Starting summary generation", {
+			provider: this.summaryProvider,
+			model: this.summaryModel,
+			transcriptLength: transcriptText.length,
+			truncated: transcriptText.length > MAX_SUMMARY_TRANSCRIPT_CHARS,
+		});
+
+		try {
+			const completion = await this.getSummaryClient().chat.completions.create({
+				model: this.summaryModel,
+				response_format: { type: "json_object" },
+				messages: [
+					{
+						role: "system",
+						content:
+							"You summarize meeting transcripts. Return valid JSON with keys: summary (string), keyPoints (string[]), actionItems ({task:string, owner?:string, dueDate?:string}[]), keyTakeaways (string[]). Keep content concise and factual.",
+					},
+					{
+						role: "user",
+						content: `Summarize this transcript:\n\n${promptTranscript}`,
+					},
+				],
+			});
+
+			const responseText = completion.choices[0]?.message?.content;
+			if (!responseText) {
+				throw new SummaryError("Summary response was empty");
+			}
+
+			let parsed: unknown;
+			try {
+				parsed = JSON.parse(responseText);
+			} catch (parseError) {
+				throw new SummaryError(
+					`Failed to parse summary JSON: ${getErrorMessage(parseError)}`,
+				);
+			}
+
+			const result = summarySchema.parse(parsed);
+
+			this.logger.info("Summary generation completed", {
+				provider: this.summaryProvider,
+				model: this.summaryModel,
+				duration: `${Date.now() - startTime}ms`,
+				summaryLength: result.summary.length,
+				keyPoints: result.keyPoints.length,
+				actionItems: result.actionItems.length,
+				keyTakeaways: result.keyTakeaways.length,
+			});
+
+			return result;
+		} catch (error) {
+			const errorMsg = getErrorMessage(error);
+			this.logger.error("Summary generation failed", {
+				provider: this.summaryProvider,
+				model: this.summaryModel,
+				duration: `${Date.now() - startTime}ms`,
+				error: errorMsg,
+			});
+			if (error instanceof SummaryError) {
+				throw error;
+			}
+			throw new SummaryError(`Failed to generate summary: ${errorMsg}`);
+		}
+	}
+
+	private getSummaryClient(): OpenAI {
+		if (this.summaryProvider !== "openai") {
+			throw new SummaryError(
+				`Summary provider "${this.summaryProvider}" is not implemented`,
+			);
+		}
+
+		if (!this.openaiKey) {
+			throw new SummaryError(
+				`Missing API key for summary provider "${this.summaryProvider}"`,
+			);
+		}
+
+		if (!this.summaryClient) {
+			this.summaryClient = new OpenAI({
+				apiKey: this.openaiKey,
+				baseURL: SUMMARY_PROVIDER_CONFIG[this.summaryProvider].baseURL,
+			});
+		}
+
+		return this.summaryClient;
 	}
 }

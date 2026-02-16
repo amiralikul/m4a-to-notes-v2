@@ -36,7 +36,10 @@ import {
 	storageService,
 	aiService,
 } from "@/services";
+import { INNGEST_EVENTS } from "@/inngest/events";
 import { sendTelegramMessage } from "@/services/telegram";
+
+const mockSendEvent = vi.fn();
 
 // Helper to simulate running the Inngest function handler directly
 async function runProcessTranscription(transcriptionId: string) {
@@ -46,7 +49,7 @@ async function runProcessTranscription(transcriptionId: string) {
 	// Extract the handler function from the Inngest function config
 	const fn = processTranscription as unknown as {
 		["~trigger"]: { event: string };
-		fn: (args: { event: { data: { transcriptionId: string } }; step: { run: <T>(name: string, fn: () => Promise<T>) => Promise<T> } }) => Promise<unknown>;
+		fn: (args: { event: { data: { transcriptionId: string } }; step: { run: <T>(name: string, fn: () => Promise<T>) => Promise<T>; sendEvent: (id: string, payload: unknown) => Promise<void> } }) => Promise<unknown>;
 	};
 
 	// Simple step.run that just executes the function
@@ -54,6 +57,7 @@ async function runProcessTranscription(transcriptionId: string) {
 		run: async <T>(_name: string, handler: () => Promise<T>): Promise<T> => {
 			return handler();
 		},
+		sendEvent: mockSendEvent,
 	};
 
 	return fn.fn({
@@ -65,6 +69,7 @@ async function runProcessTranscription(transcriptionId: string) {
 describe("process-transcription Inngest function", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		mockSendEvent.mockResolvedValue(undefined);
 	});
 
 	it("processes a pending transcription through completion", async () => {
@@ -108,6 +113,10 @@ describe("process-transcription Inngest function", () => {
 			expect.any(String),
 			"This is the transcribed text from the audio file.",
 		);
+		expect(mockSendEvent).toHaveBeenCalledWith("request-summary", {
+			name: INNGEST_EVENTS.TRANSCRIPTION_COMPLETED,
+			data: { transcriptionId: "tx-1" },
+		});
 		expect(storageService.deleteObject).not.toHaveBeenCalled();
 	});
 
@@ -127,6 +136,7 @@ describe("process-transcription Inngest function", () => {
 
 		expect(transcriptionsService.markStarted).not.toHaveBeenCalled();
 		expect(storageService.downloadContent).not.toHaveBeenCalled();
+		expect(mockSendEvent).not.toHaveBeenCalled();
 	});
 
 	it("skips already failed transcription", async () => {
