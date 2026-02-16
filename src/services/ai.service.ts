@@ -250,6 +250,9 @@ export class AiService {
 				duration: `${Date.now() - startTime}ms`,
 				error: errorMsg,
 			});
+			if (error instanceof SummaryError) {
+				throw error;
+			}
 			throw new SummaryError(`Failed to generate summary: ${errorMsg}`);
 		}
 	}
