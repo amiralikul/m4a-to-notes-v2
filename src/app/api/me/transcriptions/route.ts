@@ -28,6 +28,8 @@ export async function GET(request: Request) {
 				status: t.status,
 				progress: t.progress,
 				preview: t.preview,
+				summaryStatus: t.summaryStatus,
+				summaryUpdatedAt: t.summaryUpdatedAt,
 				createdAt: t.createdAt,
 				completedAt: t.completedAt,
 				audioKey: t.audioKey,

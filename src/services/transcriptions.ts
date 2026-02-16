@@ -2,6 +2,7 @@ import { count, desc, eq } from "drizzle-orm";
 import type {
 	InsertTranscription,
 	Transcription,
+	TranscriptionSummaryData,
 	UpdateTranscription,
 } from "@/db/schema";
 import { transcriptions } from "@/db/schema";
@@ -17,6 +18,16 @@ export const TranscriptionStatus = {
 
 export type TranscriptionStatusType =
 	(typeof TranscriptionStatus)[keyof typeof TranscriptionStatus];
+
+export const SummaryStatus = {
+	PENDING: "pending",
+	PROCESSING: "processing",
+	COMPLETED: "completed",
+	FAILED: "failed",
+} as const;
+
+export type SummaryStatusType =
+	(typeof SummaryStatus)[keyof typeof SummaryStatus];
 
 export const TranscriptionSource = {
 	WEB: "web",
@@ -167,6 +178,9 @@ export class TranscriptionsService {
 			progress: 100,
 			preview,
 			transcriptText,
+			summaryStatus: SummaryStatus.PENDING,
+			summaryError: null,
+			summaryUpdatedAt: new Date().toISOString(),
 			completedAt: new Date().toISOString(),
 		});
 	}
@@ -188,6 +202,52 @@ export class TranscriptionsService {
 		progress: number,
 	): Promise<Transcription> {
 		return this.update(transcriptionId, { progress });
+	}
+
+	async markSummaryStarted(
+		transcriptionId: string,
+		provider: string,
+		model: string,
+	): Promise<Transcription> {
+		return this.update(transcriptionId, {
+			summaryStatus: SummaryStatus.PROCESSING,
+			summaryProvider: provider,
+			summaryModel: model,
+			summaryError: null,
+			summaryUpdatedAt: new Date().toISOString(),
+		});
+	}
+
+	async markSummaryCompleted(
+		transcriptionId: string,
+		summaryData: TranscriptionSummaryData,
+		provider: string,
+		model: string,
+	): Promise<Transcription> {
+		return this.update(transcriptionId, {
+			summaryStatus: SummaryStatus.COMPLETED,
+			summaryData,
+			summaryError: null,
+			summaryProvider: provider,
+			summaryModel: model,
+			summaryUpdatedAt: new Date().toISOString(),
+		});
+	}
+
+	async markSummaryFailed(
+		transcriptionId: string,
+		errorCode: string,
+		errorMessage: string,
+		provider?: string,
+		model?: string,
+	): Promise<Transcription> {
+		return this.update(transcriptionId, {
+			summaryStatus: SummaryStatus.FAILED,
+			summaryError: { code: errorCode, message: errorMessage },
+			summaryProvider: provider,
+			summaryModel: model,
+			summaryUpdatedAt: new Date().toISOString(),
+		});
 	}
 
 	async findByStatus(
@@ -292,10 +352,18 @@ export class TranscriptionsService {
 			completedAt: transcription.completedAt,
 			updatedAt: transcription.updatedAt,
 			preview: transcription.preview,
+			summaryStatus: transcription.summaryStatus,
+			summaryUpdatedAt: transcription.summaryUpdatedAt,
 			error: transcription.errorDetails
 				? {
 						code: transcription.errorDetails.code,
 						message: transcription.errorDetails.message,
+					}
+				: undefined,
+			summaryError: transcription.summaryError
+				? {
+						code: transcription.summaryError.code,
+						message: transcription.summaryError.message,
 					}
 				: undefined,
 		};
