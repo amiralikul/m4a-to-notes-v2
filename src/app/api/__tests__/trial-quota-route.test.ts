@@ -3,7 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { TRIAL_ERROR_CODES } from "@/lib/trial-errors";
 import { getUtcDayKey, resolveActorIdentity } from "@/lib/trial-identity";
 import { actorsService, trialUsageService } from "@/services";
-import { GET as getTrialQuota } from "../../api/trial/quota/route";
+import { GET as getTrialQuota } from "@/app/api/trial/quota/route";
 
 vi.mock("@clerk/nextjs/server", () => ({
 	auth: vi.fn().mockResolvedValue({ userId: null }),

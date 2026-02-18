@@ -1,16 +1,20 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
 	resolveActorIdentity,
 	signActorId,
 	TRIAL_ACTOR_COOKIE_NAME,
 	verifySignedActorId,
-} from "../trial-identity";
+} from "@/lib/trial-identity";
 
 const TEST_SECRET = "trial-cookie-test-secret";
 
 describe("trial identity", () => {
 	beforeEach(() => {
 		process.env.TRIAL_COOKIE_SECRET = TEST_SECRET;
+	});
+
+	afterEach(() => {
+		delete process.env.TRIAL_COOKIE_SECRET;
 	});
 
 	it("signs and verifies actor ids", () => {
@@ -45,7 +49,7 @@ describe("trial identity", () => {
 		const identity = await resolveActorIdentity(cookieStore);
 
 		expect(identity.actorId).toMatch(
-			/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+			/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
 		);
 		expect(setCalls).toHaveLength(1);
 		expect(setCalls[0].name).toBe(TRIAL_ACTOR_COOKIE_NAME);

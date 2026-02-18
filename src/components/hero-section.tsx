@@ -1,5 +1,3 @@
-"use client";
-
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -72,7 +70,7 @@ export const HeroSection = () => {
 					<div className="flex flex-wrap justify-center items-center gap-6 pt-4 text-sm text-stone-400">
 						<span>No credit card required</span>
 						<span className="w-1 h-1 bg-stone-300 rounded-full hidden sm:block" />
-						<span>3 free transcriptions</span>
+						<span>3 free transcriptions/day</span>
 						<span className="w-1 h-1 bg-stone-300 rounded-full hidden sm:block" />
 						<span>Files auto-deleted</span>
 					</div>

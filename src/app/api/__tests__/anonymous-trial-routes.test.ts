@@ -26,6 +26,7 @@ vi.mock("@vercel/blob/client", () => ({
 vi.mock("@/lib/trial-identity", () => ({
 	resolveActorIdentity: vi.fn().mockResolvedValue({ actorId: "actor-1" }),
 	getUtcDayKey: vi.fn().mockReturnValue("2026-02-16"),
+	TRIAL_DAILY_LIMIT: 3,
 }));
 
 vi.mock("@/services", () => ({

@@ -19,16 +19,31 @@ export async function GET(request: Request) {
 			const identity = await resolveActorIdentity();
 			actorId = identity.actorId;
 			await actorsService.ensureActor(actorId);
+			const [transcriptions, total] = await Promise.all([
+				transcriptionsService.findByActorId(actorId, limit),
+				transcriptionsService.countByActorId(actorId),
+			]);
+
+			return Response.json({
+				transcriptions: transcriptions.map((t) => ({
+					id: t.id,
+					filename: t.filename,
+					status: t.status,
+					progress: t.progress,
+					preview: t.preview,
+					summaryStatus: t.summaryStatus,
+					summaryUpdatedAt: t.summaryUpdatedAt,
+					createdAt: t.createdAt,
+					completedAt: t.completedAt,
+					audioKey: t.audioKey,
+				})),
+				total,
+			});
 		}
-		const resolvedActorId = actorId as string;
 
 		const [transcriptions, total] = await Promise.all([
-			userId
-				? transcriptionsService.findByUserId(userId, limit)
-				: transcriptionsService.findByActorId(resolvedActorId, limit),
-			userId
-				? transcriptionsService.countByUserId(userId)
-				: transcriptionsService.countByActorId(resolvedActorId),
+			transcriptionsService.findByUserId(userId, limit),
+			transcriptionsService.countByUserId(userId),
 		]);
 
 		return Response.json({

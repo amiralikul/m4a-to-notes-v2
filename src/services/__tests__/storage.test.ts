@@ -78,6 +78,7 @@ describe("StorageService", () => {
 
 			expect(del).toHaveBeenCalledWith(
 				"https://blob.vercel-storage.com/test.m4a",
+				expect.objectContaining({ token: undefined }),
 			);
 		});
 	});

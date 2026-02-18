@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { auth } from "@clerk/nextjs/server";
 import { resolveActorIdentity } from "@/lib/trial-identity";
 import { actorsService, transcriptionsService } from "@/services";
-import { GET as listTranscriptions } from "../../api/me/transcriptions/route";
+import { GET as listTranscriptions } from "@/app/api/me/transcriptions/route";
 
 vi.mock("@clerk/nextjs/server", () => ({
 	auth: vi.fn().mockResolvedValue({ userId: null }),

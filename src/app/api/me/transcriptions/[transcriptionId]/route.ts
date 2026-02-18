@@ -10,16 +10,23 @@ export async function DELETE(
 ) {
 	const { userId } = await auth();
 	let actorId: string | null = null;
-
-	if (!userId) {
-		const identity = await resolveActorIdentity();
-		actorId = identity.actorId;
-		await actorsService.ensureActor(actorId);
-	}
-
-	const { transcriptionId } = await params;
+	let transcriptionId: string | null = null;
 
 	try {
+		const paramsPromise = params;
+		if (!userId) {
+			const [identity, resolvedParams] = await Promise.all([
+				resolveActorIdentity(),
+				paramsPromise,
+			]);
+			actorId = identity.actorId;
+			await actorsService.ensureActor(actorId);
+			transcriptionId = resolvedParams.transcriptionId;
+		} else {
+			const resolvedParams = await paramsPromise;
+			transcriptionId = resolvedParams.transcriptionId;
+		}
+
 		const transcription =
 			await transcriptionsService.findById(transcriptionId);
 		const transcriptionActorId =

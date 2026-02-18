@@ -10,7 +10,10 @@ export const SiteFooter = () => {
 							href="/"
 							className="inline-flex items-center gap-2.5 mb-4"
 						>
-							<div className="w-8 h-8 rounded-lg bg-stone-800 flex items-center justify-center">
+							<div
+								className="w-8 h-8 rounded-lg bg-stone-800 flex items-center justify-center"
+								aria-hidden="true"
+							>
 								<svg
 									width="16"
 									height="16"
@@ -42,7 +45,10 @@ export const SiteFooter = () => {
 						<h4 className="font-semibold mb-4 text-stone-200 text-sm uppercase tracking-wider">
 							Product
 						</h4>
-						<nav className="flex flex-col space-y-3">
+						<nav
+							className="flex flex-col space-y-3"
+							aria-label="Product links"
+						>
 							<Link
 								href="/features"
 								className="text-sm text-stone-500 hover:text-stone-200 transition-colors"
@@ -68,7 +74,10 @@ export const SiteFooter = () => {
 						<h4 className="font-semibold mb-4 text-stone-200 text-sm uppercase tracking-wider">
 							Support
 						</h4>
-						<nav className="flex flex-col space-y-3">
+						<nav
+							className="flex flex-col space-y-3"
+							aria-label="Support links"
+						>
 							<Link
 								href="/contact"
 								className="text-sm text-stone-500 hover:text-stone-200 transition-colors"
@@ -89,7 +98,7 @@ export const SiteFooter = () => {
 					<p className="text-sm text-stone-600">
 						&copy; {new Date().getFullYear()} AudioScribe
 					</p>
-					<nav className="flex gap-6">
+					<nav className="flex gap-6" aria-label="Legal links">
 						<Link
 							href="/terms"
 							className="text-sm text-stone-600 hover:text-stone-400 transition-colors"

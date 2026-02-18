@@ -14,6 +14,7 @@ import {
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { upload } from "@vercel/blob/client";
+import { logger } from "@/lib/logger";
 import { TRIAL_ERROR_CODES } from "@/lib/trial-errors";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -45,6 +46,7 @@ interface FileUploadProps {
 const DAILY_LIMIT_MESSAGE = "Daily free limit reached (3 files/day).";
 const DAILY_LIMIT_EXPLANATION =
 	"You have used all 3 free transcriptions for today. The limit resets daily (UTC). Upgrade to Pro to continue now.";
+const BLOB_RATE_LIMIT_CODE = "rate_limited";
 
 function isDailyLimitErrorMessage(message: string): boolean {
 	const normalized = message.toLowerCase();
@@ -65,10 +67,26 @@ function createCodedError(message: string, code?: string): ClientError {
 }
 
 function isDailyLimitError(error: unknown): boolean {
+	if (
+		typeof error === "object" &&
+		error !== null &&
+		"code" in error &&
+		typeof (error as { code?: unknown }).code === "string"
+	) {
+		const code = (error as { code?: string }).code;
+		if (
+			code === TRIAL_ERROR_CODES.DAILY_LIMIT_REACHED ||
+			code === BLOB_RATE_LIMIT_CODE
+		) {
+			return true;
+		}
+	}
+
 	if (error instanceof Error) {
 		const code = (error as ClientError).code;
 		return (
 			code === TRIAL_ERROR_CODES.DAILY_LIMIT_REACHED ||
+			code === BLOB_RATE_LIMIT_CODE ||
 			isDailyLimitErrorMessage(error.message)
 		);
 	}
@@ -371,7 +389,12 @@ export default function FileUpload({
 				void fetchPreviousTranscriptions();
 				pollTranscriptionStatus(fileId, result.transcriptionId);
 			} catch (error) {
-				console.error("Upload error:", error);
+				logger.error("Failed to process upload", {
+					error:
+						error instanceof Error
+							? error.message
+							: "Unknown upload error",
+				});
 				const errorMessage = isDailyLimitError(error)
 					? DAILY_LIMIT_EXPLANATION
 					: error instanceof Error
@@ -487,10 +510,6 @@ export default function FileUpload({
 
 	const handleDeletePreviousTranscription = useCallback(
 		async (transcriptionId: string) => {
-			if (!isSignedIn) {
-				return;
-			}
-
 			setDeletingPreviousIds((prev) => {
 				const next = new Set(prev);
 				next.add(transcriptionId);
@@ -524,7 +543,7 @@ export default function FileUpload({
 				});
 			}
 		},
-		[isSignedIn],
+		[],
 	);
 
 	const getStatusIcon = (status: UploadedFile["status"]) => {
@@ -553,6 +572,25 @@ export default function FileUpload({
 		}
 	};
 
+	const triggerTranscriptDownload = useCallback(
+		(text: string, downloadFilename: string) => {
+			const element = document.createElement("a");
+			const file = new Blob([text], { type: "text/plain" });
+			const objectUrl = URL.createObjectURL(file);
+
+			try {
+				element.href = objectUrl;
+				element.download = downloadFilename;
+				document.body.appendChild(element);
+				element.click();
+				document.body.removeChild(element);
+			} finally {
+				URL.revokeObjectURL(objectUrl);
+			}
+		},
+		[],
+	);
+
 	const downloadTranscript = useCallback(
 		async (transcriptionId: string, filename: string) => {
 			try {
@@ -563,15 +601,10 @@ export default function FileUpload({
 					throw new Error("Transcript not available yet");
 				}
 				const transcriptText = await response.text();
-				const element = document.createElement("a");
-				const file = new Blob([transcriptText], {
-					type: "text/plain",
-				});
-				element.href = URL.createObjectURL(file);
-				element.download = `${filename.replace(/\.[^.]+$/, "")}.txt`;
-				document.body.appendChild(element);
-				element.click();
-				document.body.removeChild(element);
+				triggerTranscriptDownload(
+					transcriptText,
+					`${filename.replace(/\.[^.]+$/, "")}.txt`,
+				);
 				setPreviousTranscriptionsError(null);
 			} catch {
 				setPreviousTranscriptionsError(
@@ -579,7 +612,7 @@ export default function FileUpload({
 				);
 			}
 		},
-		[],
+		[triggerTranscriptDownload],
 	);
 
 	return (
@@ -797,29 +830,9 @@ export default function FileUpload({
 												size="sm"
 												className="bg-white hover:bg-emerald-50 border-emerald-300 text-emerald-700 hover:text-emerald-800"
 												onClick={() => {
-													const element =
-														document.createElement(
-															"a",
-														);
-													const file = new Blob(
-														[
-															uploadedFile.transcription as string,
-														],
-														{
-															type: "text/plain",
-														},
-													);
-													element.href =
-														URL.createObjectURL(
-															file,
-														);
-													element.download = `${uploadedFile.file.name}_transcription.txt`;
-													document.body.appendChild(
-														element,
-													);
-													element.click();
-													document.body.removeChild(
-														element,
+													triggerTranscriptDownload(
+														uploadedFile.transcription as string,
+														`${uploadedFile.file.name}_transcription.txt`,
 													);
 												}}
 											>
@@ -945,29 +958,25 @@ export default function FileUpload({
 												Download
 											</Button>
 										)}
-										{isSignedIn && (
-											<Button
-												size="sm"
-												variant="outline"
-												onClick={() =>
-													void handleDeletePreviousTranscription(
-														item.id,
-													)
-												}
-												disabled={deletingPreviousIds.has(
+										<Button
+											size="sm"
+											variant="outline"
+											onClick={() =>
+												void handleDeletePreviousTranscription(
 													item.id,
-												)}
-												className="text-red-600 hover:text-red-700 hover:bg-red-50"
-											>
-												{deletingPreviousIds.has(
-													item.id,
-												) ? (
-													<Loader2 className="h-4 w-4 animate-spin" />
-												) : (
-													<Trash2 className="h-4 w-4" />
-												)}
-											</Button>
-										)}
+												)
+											}
+											disabled={deletingPreviousIds.has(
+												item.id,
+											)}
+											className="text-red-600 hover:text-red-700 hover:bg-red-50"
+										>
+											{deletingPreviousIds.has(item.id) ? (
+												<Loader2 className="h-4 w-4 animate-spin" />
+											) : (
+												<Trash2 className="h-4 w-4" />
+											)}
+										</Button>
 									</div>
 								</div>
 								{item.preview && (

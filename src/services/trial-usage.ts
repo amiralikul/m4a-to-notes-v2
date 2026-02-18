@@ -41,13 +41,8 @@ export class TrialUsageService {
 
 	async consumeSlot(actorId: string, dayKey: string): Promise<boolean> {
 		try {
-			const remaining = await this.getRemaining(actorId, dayKey);
-			if (remaining <= 0) {
-				return false;
-			}
-
 			const now = new Date().toISOString();
-			await this.db
+			const result = await this.db
 				.insert(trialDailyUsage)
 				.values({
 					actorId,
@@ -62,9 +57,11 @@ export class TrialUsageService {
 						usedCount: sql`${trialDailyUsage.usedCount} + 1`,
 						updatedAt: now,
 					},
-				});
+					setWhere: sql`${trialDailyUsage.usedCount} < ${TRIAL_DAILY_LIMIT}`,
+				})
+				.returning({ usedCount: trialDailyUsage.usedCount });
 
-			return true;
+			return result.length > 0;
 		} catch (error) {
 			this.logger.error("Failed to consume trial slot", {
 				actorId,

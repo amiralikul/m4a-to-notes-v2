@@ -10,6 +10,7 @@ import {
 import Link from "next/link";
 import { PricingSection } from "@/components/pricing-section";
 import { Button } from "@/components/ui/button";
+import { PRICING_PLANS } from "@/lib/pricing";
 
 const USE_CASES = [
 	{
@@ -64,6 +65,12 @@ const FAQS = [
 ];
 
 export default function PricingPage() {
+	const freeMonthlyPriceLabel =
+		PRICING_PLANS.FREE.monthlyPrice === 0
+			? "$0/month"
+			: `$${PRICING_PLANS.FREE.monthlyPrice.toFixed(2)}/month`;
+	const proMonthlyPriceLabel = `$${PRICING_PLANS.PRO.monthlyPrice.toFixed(2)}/month`;
+
 	return (
 		<div className="flex flex-col min-h-screen">
 			{/* Hero Section */}
@@ -145,13 +152,17 @@ export default function PricingPage() {
 								<h3 className="text-lg font-semibold text-stone-900 mb-2">
 									Free
 								</h3>
-								<p className="text-sm text-stone-500">$0/month</p>
+								<p className="text-sm text-stone-500">
+									{freeMonthlyPriceLabel}
+								</p>
 							</div>
 							<div className="text-center">
 								<h3 className="text-lg font-semibold text-stone-900 mb-2">
 									Unlimited
 								</h3>
-								<p className="text-sm text-stone-500">$9.90/month</p>
+								<p className="text-sm text-stone-500">
+									{proMonthlyPriceLabel}
+								</p>
 							</div>
 						</div>
 
@@ -159,7 +170,7 @@ export default function PricingPage() {
 							{[
 								{
 									feature: "Transcriptions",
-									free: "3 per month",
+									free: "3 per day",
 									pro: "Unlimited",
 								},
 								{

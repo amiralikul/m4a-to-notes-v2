@@ -58,23 +58,27 @@ export class ActorsService {
 	}
 
 	async getOrCreateForUser(userId: string): Promise<string> {
-		const existing = await this.findByUserId(userId);
-		if (existing) {
-			await this.ensureActor(existing.id);
-			return existing.id;
-		}
-
 		const actorId = crypto.randomUUID();
 		try {
 			const now = new Date().toISOString();
-			await this.db.insert(actors).values({
-				id: actorId,
-				userId,
-				lastSeenAt: now,
-				createdAt: now,
-				updatedAt: now,
-			});
-			return actorId;
+			await this.db
+				.insert(actors)
+				.values({
+					id: actorId,
+					userId,
+					lastSeenAt: now,
+					createdAt: now,
+					updatedAt: now,
+				})
+				.onConflictDoNothing({ target: actors.userId });
+
+			const resolvedActor = await this.findByUserId(userId);
+			if (!resolvedActor) {
+				throw new Error("Failed to resolve actor after upsert");
+			}
+
+			await this.ensureActor(resolvedActor.id);
+			return resolvedActor.id;
 		} catch (error) {
 			this.logger.error("Failed to create actor for user", {
 				userId,

@@ -1,6 +1,10 @@
 import { auth } from "@clerk/nextjs/server";
 import { TRIAL_ERROR_CODES } from "@/lib/trial-errors";
-import { getUtcDayKey, resolveActorIdentity } from "@/lib/trial-identity";
+import {
+	getUtcDayKey,
+	resolveActorIdentity,
+	TRIAL_DAILY_LIMIT,
+} from "@/lib/trial-identity";
 import {
 	actorsService,
 	transcriptionsService,
@@ -13,13 +17,22 @@ import { logger } from "@/lib/logger";
 export async function POST(request: Request) {
 	const { userId } = await auth();
 	let actorId: string | null = null;
+	let blobUrl: string;
+	let filename: string;
 
 	try {
-		const { blobUrl, filename } = (await request.json()) as {
+		({ blobUrl, filename } = (await request.json()) as {
 			blobUrl: string;
 			filename: string;
-		};
+		});
+	} catch {
+		return Response.json(
+			{ error: "Invalid JSON", code: TRIAL_ERROR_CODES.INVALID_REQUEST },
+			{ status: 400 },
+		);
+	}
 
+	try {
 		if (!blobUrl || !filename) {
 			return Response.json(
 				{ error: "blobUrl and filename are required" },
@@ -40,7 +53,7 @@ export async function POST(request: Request) {
 			if (!consumed) {
 				return Response.json(
 					{
-						error: "Daily free limit reached (3 files/day).",
+						error: `Daily free limit reached (${TRIAL_DAILY_LIMIT} files/day).`,
 						code: TRIAL_ERROR_CODES.DAILY_LIMIT_REACHED,
 					},
 					{ status: 429 },
