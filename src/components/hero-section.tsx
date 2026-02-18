@@ -1,12 +1,11 @@
 "use client";
 
-import { useClerk } from "@clerk/nextjs";
-import { CheckCircle, Sparkles, Star, Upload } from "lucide-react";
+import { CheckCircle, Sparkles, Upload } from "lucide-react";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 export const HeroSection = () => {
-	const { openSignIn, openSignUp } = useClerk();
 	return (
 		<section className="relative w-full py-20 md:py-32 lg:py-40 overflow-hidden">
 			{/* Background Elements (no motion) */}
@@ -38,13 +37,11 @@ export const HeroSection = () => {
 					</div>
 
 					<div className="flex flex-col sm:flex-row gap-4 pt-4">
-						<Button
-							size="lg"
-							className="btn-gradient h-14 px-8 rounded-xl"
-							onClick={() => openSignUp()}
-						>
-							<Upload className="mr-2 h-5 w-5" />
-							Start Converting Now
+						<Button size="lg" className="btn-gradient h-14 px-8 rounded-xl" asChild>
+							<Link href="/dashboard">
+								<Upload className="mr-2 h-5 w-5" />
+								Start Transcribing Free
+							</Link>
 						</Button>
 					</div>
 

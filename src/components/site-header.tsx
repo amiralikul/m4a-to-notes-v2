@@ -58,11 +58,14 @@ export function SiteHeader() {
 
 
 				<div className="ml-auto flex items-center gap-4">
+					<Link
+						href="/dashboard"
+						className="text-sm text-gray-700 hover:text-gray-900 transition-colors"
+					>
+						Dashboard
+					</Link>
 					{isSignedIn && (
 						<>
-							<Link href="/dashboard" className="text-sm text-gray-700 hover:text-gray-900 transition-colors">
-								Dashboard
-							</Link>
 							<Link href="/subscription" className="text-sm text-gray-700 hover:text-gray-900 transition-colors">
 								Subscription
 							</Link>

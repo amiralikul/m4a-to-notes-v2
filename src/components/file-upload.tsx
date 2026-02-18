@@ -1,4 +1,5 @@
 "use client";
+import { useUser } from "@clerk/nextjs";
 import {
 	AlertCircle,
 	CheckCircle,
@@ -6,11 +7,14 @@ import {
 	FileAudio,
 	Loader2,
 	RotateCcw,
+	Trash2,
 	Upload,
 	X,
 } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { upload } from "@vercel/blob/client";
+import { TRIAL_ERROR_CODES } from "@/lib/trial-errors";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -25,9 +29,68 @@ interface UploadedFile {
 	error?: string;
 }
 
-export default function FileUpload() {
+interface PreviousTranscription {
+	id: string;
+	filename: string;
+	status: "pending" | "processing" | "completed" | "failed";
+	progress: number;
+	preview: string | null;
+	createdAt: string;
+}
+
+interface FileUploadProps {
+	showHistory?: boolean;
+}
+
+const DAILY_LIMIT_MESSAGE = "Daily free limit reached (3 files/day).";
+const DAILY_LIMIT_EXPLANATION =
+	"You have used all 3 free transcriptions for today. The limit resets daily (UTC). Upgrade to Pro to continue now.";
+
+function isDailyLimitErrorMessage(message: string): boolean {
+	const normalized = message.toLowerCase();
+	return (
+		normalized.includes(TRIAL_ERROR_CODES.DAILY_LIMIT_REACHED.toLowerCase()) ||
+		normalized.includes("daily free limit") ||
+		normalized.includes("failed to retrieve the client token") ||
+		normalized.includes("status code: 429")
+	);
+}
+
+type ClientError = Error & { code?: string };
+
+function createCodedError(message: string, code?: string): ClientError {
+	const error = new Error(message) as ClientError;
+	error.code = code;
+	return error;
+}
+
+function isDailyLimitError(error: unknown): boolean {
+	if (error instanceof Error) {
+		const code = (error as ClientError).code;
+		return (
+			code === TRIAL_ERROR_CODES.DAILY_LIMIT_REACHED ||
+			isDailyLimitErrorMessage(error.message)
+		);
+	}
+	return false;
+}
+
+export default function FileUpload({
+	showHistory = true,
+}: FileUploadProps) {
+	const { isLoaded, isSignedIn } = useUser();
 	const [isDragOver, setIsDragOver] = useState(false);
 	const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+	const [previousTranscriptions, setPreviousTranscriptions] = useState<
+		PreviousTranscription[]
+	>([]);
+	const [loadingPreviousTranscriptions, setLoadingPreviousTranscriptions] =
+		useState(false);
+	const [previousTranscriptionsError, setPreviousTranscriptionsError] =
+		useState<string | null>(null);
+	const [deletingPreviousIds, setDeletingPreviousIds] = useState<Set<string>>(
+		new Set(),
+	);
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const abortControllerRef = useRef<AbortController | null>(null);
 	const pollTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
@@ -199,6 +262,33 @@ export default function FileUpload() {
 		[],
 	);
 
+	const fetchPreviousTranscriptions = useCallback(async () => {
+		if (!isLoaded || !showHistory) {
+			return;
+		}
+
+		setLoadingPreviousTranscriptions(true);
+		try {
+			const response = await fetch("/api/me/transcriptions?limit=10", {
+				cache: "no-store",
+			});
+			if (!response.ok) {
+				throw new Error("Failed to fetch transcriptions");
+			}
+			const data = (await response.json()) as {
+				transcriptions?: PreviousTranscription[];
+			};
+			setPreviousTranscriptions(data.transcriptions || []);
+			setPreviousTranscriptionsError(null);
+		} catch {
+			setPreviousTranscriptionsError(
+				"Could not load transcriptions right now.",
+			);
+		} finally {
+			setLoadingPreviousTranscriptions(false);
+		}
+	}, [isLoaded, showHistory]);
+
 	const processFileWithAPI = useCallback(
 		async (fileId: string, file: File) => {
 			try {
@@ -209,6 +299,21 @@ export default function FileUpload() {
 							: f,
 					),
 				);
+
+				const quotaResponse = await fetch("/api/trial/quota", {
+					method: "GET",
+					cache: "no-store",
+				});
+				if (quotaResponse.status === 429) {
+					const quotaPayload = (await quotaResponse.json()) as {
+						error?: string;
+						code?: string;
+					};
+					throw createCodedError(
+						quotaPayload.error || DAILY_LIMIT_EXPLANATION,
+						quotaPayload.code,
+					);
+				}
 
 				const blob = await upload(file.name, file, {
 					access: "public",
@@ -235,6 +340,16 @@ export default function FileUpload() {
 				const result = await response.json();
 
 				if (!response.ok) {
+					if (
+						response.status === 429 ||
+						result?.code === TRIAL_ERROR_CODES.DAILY_LIMIT_REACHED
+					) {
+						throw createCodedError(
+							result?.error || DAILY_LIMIT_EXPLANATION,
+							result?.code,
+						);
+					}
+
 					throw new Error(
 						result.error || "Failed to start transcription",
 					);
@@ -253,9 +368,16 @@ export default function FileUpload() {
 					),
 				);
 
+				void fetchPreviousTranscriptions();
 				pollTranscriptionStatus(fileId, result.transcriptionId);
 			} catch (error) {
 				console.error("Upload error:", error);
+				const errorMessage = isDailyLimitError(error)
+					? DAILY_LIMIT_EXPLANATION
+					: error instanceof Error
+						? error.message
+						: "Failed to upload file. Please try again.";
+
 				setUploadedFiles((prev) =>
 					prev.map((f) =>
 						f.id === fileId
@@ -263,17 +385,14 @@ export default function FileUpload() {
 									...f,
 									status: "error" as const,
 									progress: 0,
-									error:
-										error instanceof Error
-											? error.message
-											: "Failed to upload file. Please try again.",
+									error: errorMessage,
 								}
 							: f,
 					),
 				);
 			}
 		},
-		[pollTranscriptionStatus],
+		[pollTranscriptionStatus, fetchPreviousTranscriptions],
 	);
 
 	const processFiles = useCallback(
@@ -315,6 +434,10 @@ export default function FileUpload() {
 		e.target.value = "";
 	};
 
+	useEffect(() => {
+		void fetchPreviousTranscriptions();
+	}, [fetchPreviousTranscriptions]);
+
 	const removeFile = (fileId: string) => {
 		const timeout = pollTimeoutsRef.current.get(fileId);
 		if (timeout) {
@@ -349,6 +472,61 @@ export default function FileUpload() {
 		[uploadedFiles, processFileWithAPI],
 	);
 
+	const hasDailyLimitError = uploadedFiles.some(
+		(file) =>
+			file.status === "error" &&
+			file.error &&
+			isDailyLimitErrorMessage(file.error),
+	);
+	const shouldShowPreviousTranscriptions =
+		showHistory &&
+		isLoaded &&
+		(loadingPreviousTranscriptions ||
+			Boolean(previousTranscriptionsError) ||
+			previousTranscriptions.length > 0);
+
+	const handleDeletePreviousTranscription = useCallback(
+		async (transcriptionId: string) => {
+			if (!isSignedIn) {
+				return;
+			}
+
+			setDeletingPreviousIds((prev) => {
+				const next = new Set(prev);
+				next.add(transcriptionId);
+				return next;
+			});
+
+			try {
+				const response = await fetch(
+					`/api/me/transcriptions/${transcriptionId}`,
+					{
+						method: "DELETE",
+					},
+				);
+				if (!response.ok) {
+					throw new Error("Failed to delete transcription");
+				}
+
+				setPreviousTranscriptions((prev) =>
+					prev.filter((item) => item.id !== transcriptionId),
+				);
+				setPreviousTranscriptionsError(null);
+			} catch {
+				setPreviousTranscriptionsError(
+					"Could not delete transcription right now. Please try again.",
+				);
+			} finally {
+				setDeletingPreviousIds((prev) => {
+					const next = new Set(prev);
+					next.delete(transcriptionId);
+					return next;
+				});
+			}
+		},
+		[isSignedIn],
+	);
+
 	const getStatusIcon = (status: UploadedFile["status"]) => {
 		switch (status) {
 			case "completed":
@@ -374,6 +552,35 @@ export default function FileUpload() {
 				return "Preparing...";
 		}
 	};
+
+	const downloadTranscript = useCallback(
+		async (transcriptionId: string, filename: string) => {
+			try {
+				const response = await fetch(
+					`/api/transcriptions/${transcriptionId}/transcript`,
+				);
+				if (!response.ok) {
+					throw new Error("Transcript not available yet");
+				}
+				const transcriptText = await response.text();
+				const element = document.createElement("a");
+				const file = new Blob([transcriptText], {
+					type: "text/plain",
+				});
+				element.href = URL.createObjectURL(file);
+				element.download = `${filename.replace(/\.[^.]+$/, "")}.txt`;
+				document.body.appendChild(element);
+				element.click();
+				document.body.removeChild(element);
+				setPreviousTranscriptionsError(null);
+			} catch {
+				setPreviousTranscriptionsError(
+					"Could not download transcript right now. Please try again.",
+				);
+			}
+		},
+		[],
+	);
 
 	return (
 		<div className="w-full max-w-5xl mx-auto space-y-8">
@@ -534,18 +741,22 @@ export default function FileUpload() {
 											<div className="flex items-center">
 												<AlertCircle className="h-5 w-5 text-red-500 mr-2" />
 												<p className="font-semibold text-red-700">
-													Processing Error
+													{isDailyLimitErrorMessage(uploadedFile.error)
+														? DAILY_LIMIT_MESSAGE
+														: "Processing Error"}
 												</p>
 											</div>
-											<Button
-												variant="outline"
-												size="sm"
-												className="bg-white hover:bg-red-50 border-red-300 text-red-700 hover:text-red-800"
-												onClick={() => retryFile(uploadedFile.id)}
-											>
-												<RotateCcw className="w-4 h-4 mr-2" />
-												Retry
-											</Button>
+											{!isDailyLimitErrorMessage(uploadedFile.error) && (
+												<Button
+													variant="outline"
+													size="sm"
+													className="bg-white hover:bg-red-50 border-red-300 text-red-700 hover:text-red-800"
+													onClick={() => retryFile(uploadedFile.id)}
+												>
+													<RotateCcw className="w-4 h-4 mr-2" />
+													Retry
+												</Button>
+											)}
 										</div>
 										<p className="text-sm text-red-600 leading-relaxed">
 											{uploadedFile.error}
@@ -592,6 +803,120 @@ export default function FileUpload() {
 											</p>
 										</div>
 									</div>
+								)}
+							</CardContent>
+						</Card>
+					))}
+
+					{hasDailyLimitError && (
+						<Card className="overflow-hidden border-amber-200 bg-amber-50/70">
+							<CardContent className="p-6">
+								<div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+									<div className="space-y-1">
+										<p className="font-semibold text-amber-900">
+											Free daily limit reached
+										</p>
+										<p className="text-sm text-amber-800">
+											Upgrade your account to Pro for higher limits and uninterrupted transcriptions.
+										</p>
+									</div>
+									<div className="flex gap-3">
+										<Button asChild>
+											<Link href={isSignedIn ? "/subscription" : "/pricing"}>
+												Upgrade to Pro
+											</Link>
+										</Button>
+										<Button variant="outline" asChild>
+											<Link href="/pricing">View Plans</Link>
+										</Button>
+									</div>
+								</div>
+							</CardContent>
+						</Card>
+					)}
+				</div>
+			)}
+
+			{shouldShowPreviousTranscriptions && (
+				<div className="space-y-4">
+					<div className="flex items-center justify-between">
+						<h3 className="text-xl font-bold text-gray-900">
+							{isSignedIn
+								? "Recent Transcriptions"
+								: "Previous Transcriptions"}
+						</h3>
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => void fetchPreviousTranscriptions()}
+							disabled={loadingPreviousTranscriptions}
+						>
+							{loadingPreviousTranscriptions ? "Refreshing..." : "Refresh"}
+						</Button>
+					</div>
+
+					{previousTranscriptionsError && (
+						<p className="text-sm text-red-600">{previousTranscriptionsError}</p>
+					)}
+
+					{previousTranscriptions.map((item) => (
+						<Card
+							key={item.id}
+							className="overflow-hidden border border-gray-200 bg-white"
+						>
+							<CardContent className="p-4">
+								<div className="flex items-center justify-between gap-4">
+									<div className="min-w-0">
+										<p className="font-medium text-gray-900 truncate">
+											{item.filename}
+										</p>
+										<p className="text-xs text-gray-500">
+											{new Date(item.createdAt).toLocaleString()}
+										</p>
+									</div>
+									<div className="flex items-center gap-2">
+										<Badge variant="outline">
+											{item.status}
+											{item.status === "processing" ||
+											item.status === "pending"
+												? ` (${item.progress}%)`
+												: ""}
+										</Badge>
+										{item.status === "completed" && (
+											<Button
+												size="sm"
+												variant="outline"
+												onClick={() =>
+													void downloadTranscript(item.id, item.filename)
+												}
+											>
+												<Download className="h-4 w-4 mr-1" />
+												Download
+											</Button>
+										)}
+										{isSignedIn && (
+											<Button
+												size="sm"
+												variant="outline"
+												onClick={() =>
+													void handleDeletePreviousTranscription(item.id)
+												}
+												disabled={deletingPreviousIds.has(item.id)}
+												className="text-red-600 hover:text-red-700 hover:bg-red-50"
+											>
+												{deletingPreviousIds.has(item.id) ? (
+													<Loader2 className="h-4 w-4 animate-spin" />
+												) : (
+													<Trash2 className="h-4 w-4" />
+												)}
+											</Button>
+										)}
+									</div>
+								</div>
+								{item.preview && (
+									<p className="mt-2 text-sm text-gray-700 line-clamp-2">
+										{item.preview}
+									</p>
 								)}
 							</CardContent>
 						</Card>

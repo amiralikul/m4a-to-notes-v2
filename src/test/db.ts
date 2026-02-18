@@ -39,6 +39,7 @@ export function createTestDb() {
 			started_at TEXT,
 			completed_at TEXT,
 			user_id TEXT,
+			owner_id TEXT,
 			summary_status TEXT,
 			summary_data TEXT,
 			summary_error TEXT,
@@ -51,6 +52,29 @@ export function createTestDb() {
 		CREATE INDEX IF NOT EXISTS idx_transcriptions_status ON transcriptions(status);
 		CREATE INDEX IF NOT EXISTS idx_transcriptions_created_at ON transcriptions(created_at);
 		CREATE INDEX IF NOT EXISTS idx_transcriptions_user_id ON transcriptions(user_id);
+		CREATE INDEX IF NOT EXISTS idx_transcriptions_owner_id ON transcriptions(owner_id);
+
+		CREATE TABLE IF NOT EXISTS trial_daily_usage (
+			actor_id TEXT NOT NULL,
+			day_key TEXT NOT NULL,
+			used_count INTEGER DEFAULT 0 NOT NULL,
+			created_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
+			updated_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL
+		);
+
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_trial_daily_usage_actor_day
+		ON trial_daily_usage(actor_id, day_key);
+
+		CREATE TABLE IF NOT EXISTS actors (
+			id TEXT PRIMARY KEY NOT NULL,
+			user_id TEXT,
+			created_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
+			updated_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
+			last_seen_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL
+		);
+
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_actors_user_id ON actors(user_id);
+		CREATE INDEX IF NOT EXISTS idx_actors_last_seen_at ON actors(last_seen_at);
 
 		CREATE TABLE IF NOT EXISTS conversations (
 			chat_id TEXT PRIMARY KEY NOT NULL,

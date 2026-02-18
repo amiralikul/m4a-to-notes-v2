@@ -1,8 +1,4 @@
-"use client";
-
-import { useUser } from "@clerk/nextjs";
 import {
-	CheckCircle,
 	Clock,
 	Download,
 	FileAudio,
@@ -12,7 +8,6 @@ import {
 	Upload,
 	Zap,
 } from "lucide-react";
-import FileUpload from "@/components/file-upload";
 import { HeroSection } from "@/components/hero-section";
 import { PricingSection } from "@/components/pricing-section";
 import { Badge } from "@/components/ui/badge";
@@ -27,74 +22,30 @@ import {
 import { SiteFooter } from "@/components/site-footer";
 
 export default function HomePage() {
-	const { isSignedIn } = useUser();
-
 	return (
 		<div className="flex flex-col min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50 bg-grid-slate-100">
 			<main className="flex-1">
 				{/* Hero Section */}
-				{!isSignedIn && <HeroSection />}
-
-				{/* Interactive Upload Section */}
-				{isSignedIn && (
-					<section className="w-full py-16 md:py-24 bg-white relative">
-						<div className="absolute inset-0 bg-gradient-to-b from-gray-50/50 to-transparent"></div>
-						<div className="container px-4 md:px-6 relative z-10">
-							<div className="flex flex-col items-center justify-center space-y-8 text-center">
-								<div className="space-y-4">
-									<h2 className="text-3xl font-bold tracking-tight md:text-4xl bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-										Start Converting Your M4A Files
-									</h2>
-									<p className="mx-auto max-w-2xl text-lg text-gray-600 leading-relaxed">
-										Upload your audio files and watch them transform into
-										accurate text transcriptions in real-time.
-									</p>
-								</div>
-
-								<div className="w-full max-w-4xl rounded-2xl glass-card">
-									<FileUpload />
-								</div>
-
-								<div className="flex flex-wrap justify-center gap-4 text-xs text-gray-500 pt-4">
-									<span className="flex items-center">
-										<Shield className="mr-1 h-3 w-3" />
-										Files automatically deleted after processing
-									</span>
-									<span>•</span>
-									<span className="flex items-center">
-										<Zap className="mr-1 h-3 w-3" />
-										Lightning-fast AI processing
-									</span>
-									<span>•</span>
-									<span className="flex items-center">
-										<CheckCircle className="mr-1 h-3 w-3" />
-										95%+ accuracy rate
-									</span>
-								</div>
-							</div>
-						</div>
-					</section>
-				)}
+				<HeroSection />
 
 				{/* How It Works */}
 
-				{!isSignedIn && (
-					<section className="w-full py-20 md:py-32 bg-gradient-to-b from-gray-50 to-white">
-						<div className="container px-4 md:px-6">
-							<div className="flex flex-col items-center justify-center space-y-6 text-center mb-16">
-								<Badge
-									variant="outline"
-									className="bg-white border-gray-200 text-gray-700"
-								>
-									Simple Process
-								</Badge>
-								<h2 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-									How It Works
-								</h2>
-								<p className="max-w-2xl text-lg text-gray-600 leading-relaxed">
-									Convert your M4A files to text in just three simple steps
-								</p>
-							</div>
+				<section className="w-full py-20 md:py-32 bg-gradient-to-b from-gray-50 to-white">
+					<div className="container px-4 md:px-6">
+						<div className="flex flex-col items-center justify-center space-y-6 text-center mb-16">
+							<Badge
+								variant="outline"
+								className="bg-white border-gray-200 text-gray-700"
+							>
+								Simple Process
+							</Badge>
+							<h2 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+								How It Works
+							</h2>
+							<p className="max-w-2xl text-lg text-gray-600 leading-relaxed">
+								Convert your M4A files to text in just three simple steps
+							</p>
+						</div>
 
 							<div className="mx-auto grid max-w-6xl items-start gap-8 lg:grid-cols-3">
 								<Card className="text-center hover-lift border-0 shadow-lg bg-white/80 backdrop-blur-sm animate-fade-in-scale">
@@ -165,33 +116,31 @@ export default function HomePage() {
 									<div className="w-3 h-3 bg-purple-500 rounded-full animate-pulse-color delay-1000"></div>
 								</div>
 							</div>
-						</div>
-					</section>
-				)}
+					</div>
+				</section>
 
 				{/* Features */}
-				{!isSignedIn && (
-					<section
-						id="features"
-						className="w-full py-20 md:py-32 bg-white relative overflow-hidden"
-					>
-						<div className="absolute inset-0 bg-gradient-to-r from-blue-50/30 via-indigo-50/20 to-purple-50/30"></div>
-						<div className="container px-4 md:px-6 relative z-10">
-							<div className="flex flex-col items-center justify-center space-y-6 text-center mb-16">
-								<Badge
-									variant="outline"
-									className="bg-white border-blue-200 text-blue-700"
-								>
-									Key Benefits
-								</Badge>
-								<h2 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-									Why Choose AudioScribe?
-								</h2>
-								<p className="max-w-2xl text-lg text-gray-600 leading-relaxed">
-									Powerful features designed to make audio transcription
-									effortless and accurate
-								</p>
-							</div>
+				<section
+					id="features"
+					className="w-full py-20 md:py-32 bg-white relative overflow-hidden"
+				>
+					<div className="absolute inset-0 bg-gradient-to-r from-blue-50/30 via-indigo-50/20 to-purple-50/30"></div>
+					<div className="container px-4 md:px-6 relative z-10">
+						<div className="flex flex-col items-center justify-center space-y-6 text-center mb-16">
+							<Badge
+								variant="outline"
+								className="bg-white border-blue-200 text-blue-700"
+							>
+								Key Benefits
+							</Badge>
+							<h2 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+								Why Choose AudioScribe?
+							</h2>
+							<p className="max-w-2xl text-lg text-gray-600 leading-relaxed">
+								Powerful features designed to make audio transcription
+								effortless and accurate
+							</p>
+						</div>
 
 							<div className="mx-auto grid max-w-7xl items-start gap-12 lg:grid-cols-2">
 								<div className="flex flex-col justify-center space-y-8">
@@ -288,12 +237,11 @@ export default function HomePage() {
 									</div>
 								</div>
 							</div>
-						</div>
-					</section>
-				)}
+					</div>
+				</section>
 
 				{/* Pricing Section */}
-				{!isSignedIn && <PricingSection />}
+				<PricingSection />
 			</main>
 			{/* Footer */}
 			<SiteFooter />

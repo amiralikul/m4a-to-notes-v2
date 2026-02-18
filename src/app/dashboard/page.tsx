@@ -18,9 +18,6 @@ import { Button } from "@/components/ui/button";
 import {
 	Card,
 	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
 } from "@/components/ui/card";
 
 interface TranscriptionItem {
@@ -104,7 +101,7 @@ const summaryStatusConfig = {
 } as const;
 
 export default function DashboardPage() {
-	const { user, isLoaded } = useUser();
+	const { isLoaded, isSignedIn } = useUser();
 	const [transcriptions, setTranscriptions] = useState<TranscriptionItem[]>(
 		[],
 	);
@@ -199,12 +196,16 @@ export default function DashboardPage() {
 	}, []);
 
 	useEffect(() => {
-		if (isLoaded && user) {
+		if (isLoaded) {
 			fetchTranscriptions();
 		}
-	}, [isLoaded, user, fetchTranscriptions]);
+	}, [isLoaded, fetchTranscriptions]);
 
 	useEffect(() => {
+		if (!isSignedIn) {
+			return;
+		}
+
 		for (const transcription of transcriptions) {
 			const id = transcription.id;
 			const shouldFetch =
@@ -226,6 +227,7 @@ export default function DashboardPage() {
 		summaryErrors,
 		summaryLoadingIds,
 		fetchSummary,
+		isSignedIn,
 	]);
 
 	// Poll while any transcription or summary generation is in-progress.
@@ -295,6 +297,10 @@ export default function DashboardPage() {
 	};
 
 	const handleToggleSummary = (transcription: TranscriptionItem) => {
+		if (!isSignedIn) {
+			return;
+		}
+
 		const id = transcription.id;
 		const isExpanded = expandedSummaryIds.has(id);
 
@@ -320,6 +326,10 @@ export default function DashboardPage() {
 	};
 
 	const renderSummarySection = (transcription: TranscriptionItem) => {
+		if (!isSignedIn) {
+			return null;
+		}
+
 		const id = transcription.id;
 		if (!expandedSummaryIds.has(id)) {
 			return null;
@@ -413,21 +423,6 @@ export default function DashboardPage() {
 		);
 	}
 
-	if (!user) {
-		return (
-			<div className="min-h-screen flex items-center justify-center">
-				<Card className="w-96">
-					<CardHeader>
-						<CardTitle>Authentication Required</CardTitle>
-						<CardDescription>
-							Please sign in to view your transcriptions
-						</CardDescription>
-					</CardHeader>
-				</Card>
-			</div>
-		);
-	}
-
 	if (loading) {
 		return (
 			<div className="container mx-auto py-8">
@@ -466,7 +461,7 @@ export default function DashboardPage() {
 				</Button>
 			</div>
 
-			<FileUpload />
+			<FileUpload showHistory={false} />
 
 			{error && (
 				<Card className="border-red-200 bg-red-50">
@@ -518,7 +513,7 @@ export default function DashboardPage() {
 													t.status === "pending") &&
 													` ${t.progress}%`}
 											</Badge>
-											{t.status === "completed" && (
+											{isSignedIn && t.status === "completed" && (
 												<Badge
 													className={
 														summaryStatusConfig[
@@ -554,7 +549,7 @@ export default function DashboardPage() {
 									</div>
 
 										<div className="flex items-center gap-2 shrink-0">
-											{t.status === "completed" && (
+											{isSignedIn && t.status === "completed" && (
 												<Button
 													variant="outline"
 													size="sm"

@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
-import { transcriptionsService, storageService } from "@/services";
+import { resolveActorIdentity } from "@/lib/trial-identity";
+import { actorsService, transcriptionsService, storageService } from "@/services";
 import { getErrorMessage } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 
@@ -8,8 +9,12 @@ export async function DELETE(
 	{ params }: { params: Promise<{ transcriptionId: string }> },
 ) {
 	const { userId } = await auth();
+	let actorId: string | null = null;
+
 	if (!userId) {
-		return Response.json({ error: "Unauthorized" }, { status: 401 });
+		const identity = await resolveActorIdentity();
+		actorId = identity.actorId;
+		await actorsService.ensureActor(actorId);
 	}
 
 	const { transcriptionId } = await params;
@@ -17,10 +22,17 @@ export async function DELETE(
 	try {
 		const transcription =
 			await transcriptionsService.findById(transcriptionId);
+		const transcriptionActorId =
+			typeof transcription?.ownerId === "string"
+				? transcription.ownerId
+				: null;
+		const isOwner = userId
+			? transcription?.userId === userId
+			: transcription?.userId === null && transcriptionActorId === actorId;
 
 		if (
 			!transcription ||
-			transcription.userId !== userId
+			!isOwner
 		) {
 			return Response.json(
 				{ error: "Transcription not found" },
@@ -46,6 +58,7 @@ export async function DELETE(
 	} catch (error) {
 		logger.error("Failed to delete transcription", {
 			userId,
+			actorId,
 			transcriptionId,
 			error: getErrorMessage(error),
 		});

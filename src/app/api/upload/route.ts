@@ -1,11 +1,29 @@
 import { type HandleUploadBody, handleUpload } from "@vercel/blob/client";
 import { auth } from "@clerk/nextjs/server";
+import { TRIAL_ERROR_CODES } from "@/lib/trial-errors";
 import { AUDIO_LIMITS } from "@/lib/validation";
+import { getUtcDayKey, resolveActorIdentity } from "@/lib/trial-identity";
+import { actorsService, trialUsageService } from "@/services";
 
 export async function POST(request: Request) {
 	const { userId } = await auth();
+
 	if (!userId) {
-		return Response.json({ error: "Unauthorized" }, { status: 401 });
+		const { actorId } = await resolveActorIdentity();
+		await actorsService.ensureActor(actorId);
+		const remaining = await trialUsageService.getRemaining(
+			actorId,
+			getUtcDayKey(),
+		);
+		if (remaining <= 0) {
+			return Response.json(
+				{
+					error: "Daily free limit reached (3 files/day).",
+					code: TRIAL_ERROR_CODES.DAILY_LIMIT_REACHED,
+				},
+				{ status: 429 },
+			);
+		}
 	}
 
 	const body = (await request.json()) as HandleUploadBody;
