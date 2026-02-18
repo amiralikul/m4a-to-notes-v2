@@ -1,4 +1,4 @@
-import { count, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, isNull } from "drizzle-orm";
 import type {
 	InsertTranscription,
 	Transcription,
@@ -54,12 +54,14 @@ export class TranscriptionsService {
 		source = TranscriptionSource.WEB,
 		userMetadata = {},
 		userId,
+		ownerId,
 	}: {
 		audioKey: string;
 		filename: string;
 		source?: TranscriptionSourceType;
 		userMetadata?: Record<string, unknown>;
 		userId?: string;
+		ownerId?: string;
 	}): Promise<string> {
 		try {
 			const transcriptionId = crypto.randomUUID();
@@ -74,6 +76,7 @@ export class TranscriptionsService {
 				filename,
 				userMetadata,
 				userId,
+				ownerId,
 				createdAt: now,
 				updatedAt: now,
 			};
@@ -311,6 +314,28 @@ export class TranscriptionsService {
 		}
 	}
 
+	async findByActorId(actorId: string, limit = 50): Promise<Transcription[]> {
+		try {
+			return await this.db
+				.select()
+				.from(transcriptions)
+				.where(
+					and(
+						isNull(transcriptions.userId),
+						eq(transcriptions.ownerId, actorId),
+					),
+				)
+				.orderBy(desc(transcriptions.createdAt))
+				.limit(limit);
+		} catch (error) {
+			this.logger.error("Failed to find transcriptions by actorId", {
+				actorId,
+				error: getErrorMessage(error),
+			});
+			throw error;
+		}
+	}
+
 	async countByUserId(userId: string): Promise<number> {
 		try {
 			const result = await this.db
@@ -321,6 +346,27 @@ export class TranscriptionsService {
 		} catch (error) {
 			this.logger.error("Failed to count transcriptions by userId", {
 				userId,
+				error: getErrorMessage(error),
+			});
+			throw error;
+		}
+	}
+
+	async countByActorId(actorId: string): Promise<number> {
+		try {
+			const result = await this.db
+				.select({ count: count() })
+				.from(transcriptions)
+				.where(
+					and(
+						isNull(transcriptions.userId),
+						eq(transcriptions.ownerId, actorId),
+					),
+				);
+			return result[0]?.count ?? 0;
+		} catch (error) {
+			this.logger.error("Failed to count transcriptions by actorId", {
+				actorId,
 				error: getErrorMessage(error),
 			});
 			throw error;

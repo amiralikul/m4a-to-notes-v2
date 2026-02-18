@@ -18,9 +18,6 @@ import { Button } from "@/components/ui/button";
 import {
 	Card,
 	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
 } from "@/components/ui/card";
 
 interface TranscriptionItem {
@@ -68,14 +65,14 @@ interface SummaryPayload {
 }
 
 const statusConfig = {
-	pending: { label: "Pending", className: "bg-yellow-100 text-yellow-800" },
+	pending: { label: "Pending", className: "bg-amber-100 text-amber-800" },
 	processing: {
 		label: "Processing",
-		className: "bg-blue-100 text-blue-800",
+		className: "bg-sky-100 text-sky-800",
 	},
 	completed: {
 		label: "Completed",
-		className: "bg-green-100 text-green-800",
+		className: "bg-emerald-100 text-emerald-800",
 	},
 	failed: { label: "Failed", className: "bg-red-100 text-red-800" },
 } as const;
@@ -83,19 +80,19 @@ const statusConfig = {
 const summaryStatusConfig = {
 	not_generated: {
 		label: "Summary: Not generated",
-		className: "bg-gray-100 text-gray-700",
+		className: "bg-stone-100 text-stone-700",
 	},
 	pending: {
 		label: "Summary: Pending",
-		className: "bg-yellow-100 text-yellow-800",
+		className: "bg-amber-100 text-amber-800",
 	},
 	processing: {
 		label: "Summary: Generating",
-		className: "bg-blue-100 text-blue-800",
+		className: "bg-sky-100 text-sky-800",
 	},
 	completed: {
 		label: "Summary: Ready",
-		className: "bg-green-100 text-green-800",
+		className: "bg-emerald-100 text-emerald-800",
 	},
 	failed: {
 		label: "Summary: Failed",
@@ -104,7 +101,7 @@ const summaryStatusConfig = {
 } as const;
 
 export default function DashboardPage() {
-	const { user, isLoaded } = useUser();
+	const { isLoaded, isSignedIn } = useUser();
 	const [transcriptions, setTranscriptions] = useState<TranscriptionItem[]>(
 		[],
 	);
@@ -199,12 +196,16 @@ export default function DashboardPage() {
 	}, []);
 
 	useEffect(() => {
-		if (isLoaded && user) {
+		if (isLoaded) {
 			fetchTranscriptions();
 		}
-	}, [isLoaded, user, fetchTranscriptions]);
+	}, [isLoaded, fetchTranscriptions]);
 
 	useEffect(() => {
+		if (!isSignedIn) {
+			return;
+		}
+
 		for (const transcription of transcriptions) {
 			const id = transcription.id;
 			const shouldFetch =
@@ -226,9 +227,9 @@ export default function DashboardPage() {
 		summaryErrors,
 		summaryLoadingIds,
 		fetchSummary,
+		isSignedIn,
 	]);
 
-	// Poll while any transcription or summary generation is in-progress.
 	useEffect(() => {
 		const hasInProgress = transcriptions.some(
 			(t) =>
@@ -295,6 +296,10 @@ export default function DashboardPage() {
 	};
 
 	const handleToggleSummary = (transcription: TranscriptionItem) => {
+		if (!isSignedIn) {
+			return;
+		}
+
 		const id = transcription.id;
 		const isExpanded = expandedSummaryIds.has(id);
 
@@ -320,6 +325,10 @@ export default function DashboardPage() {
 	};
 
 	const renderSummarySection = (transcription: TranscriptionItem) => {
+		if (!isSignedIn) {
+			return null;
+		}
+
 		const id = transcription.id;
 		if (!expandedSummaryIds.has(id)) {
 			return null;
@@ -330,9 +339,9 @@ export default function DashboardPage() {
 			summaryErrors[id] || summary?.summaryError?.message;
 
 		return (
-			<div className="mt-4 border-t pt-4 space-y-3">
+			<div className="mt-4 border-t border-stone-200 pt-4 space-y-3">
 				{summaryLoadingIds.has(id) && (
-					<div className="flex items-center gap-2 text-sm text-gray-600">
+					<div className="flex items-center gap-2 text-sm text-stone-600">
 						<Loader2 className="w-4 h-4 animate-spin" />
 						Loading summary...
 					</div>
@@ -341,15 +350,15 @@ export default function DashboardPage() {
 				{!summaryLoadingIds.has(id) && summary?.summaryData && (
 					<div className="space-y-3 text-sm">
 						<div>
-							<p className="font-semibold text-gray-900">Summary</p>
-							<p className="text-gray-700 mt-1">
+							<p className="font-semibold text-stone-900">Summary</p>
+							<p className="text-stone-600 mt-1">
 								{summary.summaryData.summary}
 							</p>
 						</div>
 
 						<div>
-							<p className="font-semibold text-gray-900">Key Points</p>
-							<ul className="list-disc pl-5 mt-1 text-gray-700 space-y-1">
+							<p className="font-semibold text-stone-900">Key Points</p>
+							<ul className="list-disc pl-5 mt-1 text-stone-600 space-y-1">
 								{summary.summaryData.keyPoints.map((point, index) => (
 									<li key={`${id}-point-${index}`}>{point}</li>
 								))}
@@ -357,13 +366,13 @@ export default function DashboardPage() {
 						</div>
 
 						<div>
-							<p className="font-semibold text-gray-900">Action Items</p>
+							<p className="font-semibold text-stone-900">Action Items</p>
 							{summary.summaryData.actionItems.length === 0 ? (
-								<p className="text-gray-600 mt-1">
+								<p className="text-stone-500 mt-1">
 									No action items found.
 								</p>
 							) : (
-								<ul className="list-disc pl-5 mt-1 text-gray-700 space-y-1">
+								<ul className="list-disc pl-5 mt-1 text-stone-600 space-y-1">
 									{summary.summaryData.actionItems.map((item, index) => (
 										<li key={`${id}-action-${index}`}>
 											{item.task}
@@ -376,10 +385,10 @@ export default function DashboardPage() {
 						</div>
 
 						<div>
-							<p className="font-semibold text-gray-900">
+							<p className="font-semibold text-stone-900">
 								Key Takeaways
 							</p>
-							<ul className="list-disc pl-5 mt-1 text-gray-700 space-y-1">
+							<ul className="list-disc pl-5 mt-1 text-stone-600 space-y-1">
 								{summary.summaryData.keyTakeaways.map(
 									(takeaway, index) => (
 										<li key={`${id}-takeaway-${index}`}>{takeaway}</li>
@@ -391,7 +400,7 @@ export default function DashboardPage() {
 				)}
 
 				{!summaryLoadingIds.has(id) && !summary?.summaryData && (
-					<div className="text-sm text-gray-600">
+					<div className="text-sm text-stone-500">
 						{summaryErrorMessage ||
 							(transcription.summaryStatus === "failed"
 								? "Summary generation failed."
@@ -408,22 +417,7 @@ export default function DashboardPage() {
 	if (!isLoaded) {
 		return (
 			<div className="min-h-screen flex items-center justify-center">
-				<Loader2 className="w-6 h-6 animate-spin text-gray-400" />
-			</div>
-		);
-	}
-
-	if (!user) {
-		return (
-			<div className="min-h-screen flex items-center justify-center">
-				<Card className="w-96">
-					<CardHeader>
-						<CardTitle>Authentication Required</CardTitle>
-						<CardDescription>
-							Please sign in to view your transcriptions
-						</CardDescription>
-					</CardHeader>
-				</Card>
+				<Loader2 className="w-6 h-6 animate-spin text-stone-400" />
 			</div>
 		);
 	}
@@ -432,11 +426,11 @@ export default function DashboardPage() {
 		return (
 			<div className="container mx-auto py-8">
 				<div className="space-y-4 animate-pulse">
-					<div className="h-8 bg-gray-200 rounded w-64" />
-					<div className="h-4 bg-gray-200 rounded w-48" />
+					<div className="h-8 bg-stone-200 rounded w-64" />
+					<div className="h-4 bg-stone-200 rounded w-48" />
 					<div className="space-y-3 mt-6">
 						{[1, 2, 3].map((i) => (
-							<div key={i} className="h-24 bg-gray-200 rounded" />
+							<div key={i} className="h-24 bg-stone-200 rounded-xl" />
 						))}
 					</div>
 				</div>
@@ -448,8 +442,10 @@ export default function DashboardPage() {
 		<div className="container mx-auto py-8 space-y-6">
 			<div className="flex items-center justify-between">
 				<div>
-					<h1 className="text-3xl font-bold">Dashboard</h1>
-					<p className="text-gray-600">
+					<h1 className="text-3xl font-display italic text-stone-900">
+						Dashboard
+					</h1>
+					<p className="text-stone-500">
 						{total} transcription{total !== 1 ? "s" : ""}
 					</p>
 				</div>
@@ -466,7 +462,7 @@ export default function DashboardPage() {
 				</Button>
 			</div>
 
-			<FileUpload />
+			<FileUpload showHistory={false} />
 
 			{error && (
 				<Card className="border-red-200 bg-red-50">
@@ -492,8 +488,8 @@ export default function DashboardPage() {
 			{transcriptions.length === 0 && !error ? (
 				<Card>
 					<CardContent className="pt-6">
-						<div className="text-center py-12 text-gray-500">
-							<FileAudio className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+						<div className="text-center py-12 text-stone-500">
+							<FileAudio className="w-12 h-12 mx-auto mb-4 text-stone-300" />
 							<p className="text-lg font-medium">No transcriptions yet</p>
 							<p className="text-sm mt-1">
 								Upload an audio file to get started
@@ -504,12 +500,12 @@ export default function DashboardPage() {
 			) : (
 				<div className="space-y-3">
 					{transcriptions.map((t) => (
-						<Card key={t.id}>
+						<Card key={t.id} className="border border-stone-200">
 							<CardContent className="py-4">
 								<div className="flex items-center justify-between gap-4">
 									<div className="min-w-0 flex-1">
 										<div className="flex items-center gap-3 mb-1 flex-wrap">
-											<span className="font-medium truncate">
+											<span className="font-medium truncate text-stone-900">
 												{t.filename}
 											</span>
 											<Badge className={statusConfig[t.status].className}>
@@ -518,7 +514,7 @@ export default function DashboardPage() {
 													t.status === "pending") &&
 													` ${t.progress}%`}
 											</Badge>
-											{t.status === "completed" && (
+											{isSignedIn && t.status === "completed" && (
 												<Badge
 													className={
 														summaryStatusConfig[
@@ -534,7 +530,7 @@ export default function DashboardPage() {
 												</Badge>
 											)}
 										</div>
-										<div className="text-sm text-gray-500">
+										<div className="text-sm text-stone-500">
 											{new Date(t.createdAt).toLocaleDateString(
 												undefined,
 												{
@@ -547,14 +543,14 @@ export default function DashboardPage() {
 											)}
 										</div>
 										{t.preview && (
-											<p className="text-sm text-gray-600 mt-1 line-clamp-2">
+											<p className="text-sm text-stone-500 mt-1 line-clamp-2">
 												{t.preview}
 											</p>
 										)}
 									</div>
 
 										<div className="flex items-center gap-2 shrink-0">
-											{t.status === "completed" && (
+											{isSignedIn && t.status === "completed" && (
 												<Button
 													variant="outline"
 													size="sm"

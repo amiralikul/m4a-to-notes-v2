@@ -1,19 +1,28 @@
 import { auth } from "@clerk/nextjs/server";
-import { transcriptionsService } from "@/services";
+import { resolveActorIdentity } from "@/lib/trial-identity";
+import { actorsService, transcriptionsService } from "@/services";
 
 export async function GET(
 	_request: Request,
 	{ params }: { params: Promise<{ transcriptionId: string }> },
 ) {
 	const { userId } = await auth();
-	if (!userId) {
-		return Response.json({ error: "Unauthorized" }, { status: 401 });
+	const actorId = userId ? null : (await resolveActorIdentity()).actorId;
+	if (actorId) {
+		await actorsService.ensureActor(actorId);
 	}
 
 	const { transcriptionId } = await params;
 	const transcription = await transcriptionsService.findById(transcriptionId);
+	const transcriptionActorId =
+		typeof transcription?.ownerId === "string"
+			? transcription.ownerId
+			: null;
+	const isOwner = userId
+		? transcription?.userId === userId
+		: transcriptionActorId === actorId;
 
-	if (!transcription || transcription.userId !== userId) {
+	if (!transcription || !isOwner) {
 		return Response.json(
 			{ error: "Transcription not found" },
 			{ status: 404 },
