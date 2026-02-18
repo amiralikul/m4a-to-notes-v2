@@ -129,6 +129,12 @@ export default function DashboardPage() {
 				cache: "no-store",
 			});
 			if (!res.ok) {
+				if (!isSignedIn) {
+					setTranscriptions([]);
+					setTotal(0);
+					setError(null);
+					return;
+				}
 				setError("Failed to fetch transcriptions");
 				return;
 			}
@@ -137,11 +143,17 @@ export default function DashboardPage() {
 			setTotal(data.total);
 			setError(null);
 		} catch {
+			if (!isSignedIn) {
+				setTranscriptions([]);
+				setTotal(0);
+				setError(null);
+				return;
+			}
 			setError("Something went wrong");
 		} finally {
 			setLoading(false);
 		}
-	}, []);
+	}, [isSignedIn]);
 
 	const fetchSummary = useCallback(async (transcriptionId: string) => {
 		setSummaryLoadingIds((prev) => {
