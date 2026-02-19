@@ -56,7 +56,7 @@ const STEPS = [
 	{
 		step: "01",
 		title: "Upload Your M4A File",
-		desc: "Simply drag and drop your M4A audio file or click to browse and select from your device. Files up to 25MB supported.",
+		desc: "Simply drag and drop your M4A audio file or click to browse and select from your device. Files up to 100MB supported.",
 		icon: Upload,
 	},
 	{

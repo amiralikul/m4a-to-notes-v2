@@ -34,7 +34,7 @@ export interface AiServiceConfig {
 const PROVIDER_CONFIG = {
 	groq: {
 		baseURL: "https://api.groq.com/openai/v1",
-		model: "whisper-large-v3-turbo",
+		model: "whisper-large-v3",
 	},
 	openai: {
 		baseURL: undefined,
@@ -91,10 +91,11 @@ export function parseSummaryProvider(
 }
 
 export class AiService {
-	private readonly client: OpenAI;
+	private client: OpenAI | null = null;
 	private summaryClient: OpenAI | null = null;
 	private readonly logger: Logger;
 	private readonly openaiKey: string;
+	private readonly groqKey: string;
 	readonly provider: TranscriptionProvider;
 	readonly model: string;
 	readonly summaryProvider: SummaryProvider;
@@ -108,20 +109,8 @@ export class AiService {
 			config.summaryModel ||
 			SUMMARY_PROVIDER_CONFIG[config.summaryProvider].model;
 		this.openaiKey = config.openaiKey;
+		this.groqKey = config.groqKey;
 		this.logger = logger;
-
-		const apiKey =
-			config.provider === "groq" ? config.groqKey : config.openaiKey;
-		if (!apiKey) {
-			throw new Error(
-				`Missing API key for transcription provider "${config.provider}"`,
-			);
-		}
-
-		this.client = new OpenAI({
-			apiKey,
-			baseURL: PROVIDER_CONFIG[config.provider].baseURL,
-		});
 	}
 
 	async transcribeAudio(audioBuffer: ArrayBuffer): Promise<string> {
@@ -135,9 +124,8 @@ export class AiService {
 		const startTime = Date.now();
 
 		try {
-			// Groq rate limits (whisper-large-v3-turbo): 20 req/min, 2M audio-sec/day.
-			// Handled by Inngest's built-in retry with backoff (4 retries).
-			const transcription = await this.client.audio.transcriptions.create({
+			// Groq rate limits are handled by Inngest's built-in retry with backoff (4 retries).
+			const transcription = await this.getTranscriptionClient().audio.transcriptions.create({
 				file: new File([audioBuffer], "audio.m4a", { type: "audio/m4a" }),
 				model: this.model,
 			});
@@ -174,6 +162,85 @@ export class AiService {
 			}
 
 			this.logger.error("Transcription failed", errorDetails);
+			throw new TranscriptionError(
+				`Failed to transcribe audio: ${errorMsg}`,
+			);
+		}
+	}
+
+	async transcribeAudioFromUrl(audioUrl: string): Promise<string> {
+		if (this.provider !== "groq") {
+			throw new TranscriptionError(
+				'URL-based transcription is only supported for "groq" provider',
+			);
+		}
+		if (!this.groqKey) {
+			throw new TranscriptionError(
+				`Missing API key for transcription provider "${this.provider}"`,
+			);
+		}
+
+		this.logger.info("Starting transcription", {
+			provider: this.provider,
+			mode: "url",
+			model: this.model,
+			audioUrl,
+		});
+
+		const startTime = Date.now();
+
+		try {
+			const formData = new FormData();
+			formData.append("model", this.model);
+			formData.append("url", audioUrl);
+
+			const response = await fetch(
+				`${PROVIDER_CONFIG.groq.baseURL}/audio/transcriptions`,
+				{
+					method: "POST",
+					headers: {
+						Authorization: `Bearer ${this.groqKey}`,
+					},
+					body: formData,
+				},
+			);
+
+			if (!response.ok) {
+				const errorBody = await response.text();
+				throw new Error(
+					`Groq API error (${response.status}): ${errorBody.slice(0, 300)}`,
+				);
+			}
+
+			const payload = (await response.json()) as { text?: unknown };
+			if (typeof payload.text !== "string") {
+				throw new Error("Groq response missing transcription text");
+			}
+
+			const duration = Date.now() - startTime;
+
+			this.logger.info("Transcription completed", {
+				provider: this.provider,
+				mode: "url",
+				model: this.model,
+				duration: `${duration}ms`,
+				transcriptionLength: payload.text.length,
+				transcriptionPreview: `${payload.text.substring(0, 100)}...`,
+			});
+
+			return payload.text;
+		} catch (error) {
+			const duration = Date.now() - startTime;
+			const errorMsg = getErrorMessage(error);
+
+			this.logger.error("Transcription failed", {
+				error: errorMsg,
+				provider: this.provider,
+				mode: "url",
+				model: this.model,
+				duration: `${duration}ms`,
+				audioUrl,
+			});
 			throw new TranscriptionError(
 				`Failed to transcribe audio: ${errorMsg}`,
 			);
@@ -278,5 +345,24 @@ export class AiService {
 		}
 
 		return this.summaryClient;
+	}
+
+	private getTranscriptionClient(): OpenAI {
+		const apiKey =
+			this.provider === "groq" ? this.groqKey : this.openaiKey;
+		if (!apiKey) {
+			throw new TranscriptionError(
+				`Missing API key for transcription provider "${this.provider}"`,
+			);
+		}
+
+		if (!this.client) {
+			this.client = new OpenAI({
+				apiKey,
+				baseURL: PROVIDER_CONFIG[this.provider].baseURL,
+			});
+		}
+
+		return this.client;
 	}
 }

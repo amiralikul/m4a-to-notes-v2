@@ -113,14 +113,16 @@ export default function FileUpload({
 	const abortControllerRef = useRef<AbortController | null>(null);
 	const pollTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
-	useEffect(() => {
-		return () => {
-			abortControllerRef.current?.abort();
-			for (const timeout of pollTimeoutsRef.current.values()) {
-				clearTimeout(timeout);
-			}
-		};
+	const cleanupPendingWork = useCallback(() => {
+		abortControllerRef.current?.abort();
+		for (const timeout of pollTimeoutsRef.current.values()) {
+			clearTimeout(timeout);
+		}
 	}, []);
+
+	useEffect(() => {
+		return cleanupPendingWork;
+	}, [cleanupPendingWork]);
 
 	const handleDragOver = useCallback((e: React.DragEvent) => {
 		e.preventDefault();
@@ -134,7 +136,7 @@ export default function FileUpload({
 
 	const validateFile = useCallback((file: File) => {
 		const validTypes = ["audio/m4a", "audio/mp4", "audio/x-m4a"];
-		const maxSize = 25 * 1024 * 1024;
+		const maxSize = 100 * 1024 * 1024;
 		if (
 			!validTypes.includes(file.type) &&
 			!file.name.toLowerCase().endsWith(".m4a")
@@ -144,7 +146,7 @@ export default function FileUpload({
 		}
 
 		if (file.size > maxSize) {
-			alert("File size must be less than 25MB (OpenAI Whisper API limit).");
+			alert("File size must be less than 100MB.");
 			return false;
 		}
 
@@ -336,6 +338,7 @@ export default function FileUpload({
 				const blob = await upload(file.name, file, {
 					access: "public",
 					handleUploadUrl: "/api/upload",
+					multipart: true,
 				});
 
 				setUploadedFiles((prev) =>
@@ -674,7 +677,7 @@ export default function FileUpload({
 							className="bg-white border-stone-200 text-stone-600 px-4 py-2"
 						>
 							<CheckCircle className="w-3 h-3 mr-2" />
-							Max 25MB per file
+							Max 100MB per file
 						</Badge>
 						<Badge
 							variant="outline"

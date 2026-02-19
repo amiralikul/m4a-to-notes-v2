@@ -71,33 +71,36 @@ export const processTranscription = inngest.createFunction(
 
 		const { transcription: t } = transcription;
 
-		// Step 2: Download audio and transcribe with Whisper
-		const transcriptText = await step.run(
-			"download-and-transcribe",
-			async () => {
-				logger.info("Downloading audio file", {
-					transcriptionId,
-					audioKey: t.audioKey,
-				});
-				const audioBuffer = await storageService.downloadContent(
-					t.audioKey,
-				);
-				await transcriptionsService.updateProgress(transcriptionId, 20);
+		// Step 2: Transcribe audio
+		const transcriptText = await step.run("transcribe-audio", async () => {
+			await transcriptionsService.updateProgress(transcriptionId, 20);
 
-				logger.info("Starting Whisper transcription", {
-					transcriptionId,
-					fileSize: audioBuffer.byteLength,
-				});
-				const text = await aiService.transcribeAudio(audioBuffer);
+			const text =
+				aiService.provider === "groq"
+					? await aiService.transcribeAudioFromUrl(t.audioKey)
+					: await (async () => {
+							logger.info("Downloading audio file", {
+								transcriptionId,
+								audioKey: t.audioKey,
+							});
+							const audioBuffer = await storageService.downloadContent(
+								t.audioKey,
+							);
 
-				if (!text.trim()) {
-					throw new NonRetriableError("No speech detected in audio");
-				}
+							logger.info("Starting Whisper transcription", {
+								transcriptionId,
+								fileSize: audioBuffer.byteLength,
+							});
+							return aiService.transcribeAudio(audioBuffer);
+						})();
 
-				await transcriptionsService.updateProgress(transcriptionId, 90);
-				return text;
-			},
-		);
+			if (!text.trim()) {
+				throw new NonRetriableError("No speech detected in audio");
+			}
+
+			await transcriptionsService.updateProgress(transcriptionId, 90);
+			return text;
+		});
 
 		// Step 4: Save result
 		await step.run("save-result", async () => {

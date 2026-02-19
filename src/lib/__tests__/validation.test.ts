@@ -36,12 +36,12 @@ describe("validateAudioFile", () => {
 
 	it("rejects file exceeding size limit", () => {
 		const result = validateAudioFile({
-			size: 26 * 1024 * 1024, // 26MB
+			size: 101 * 1024 * 1024, // 101MB
 			type: "audio/mp4",
 			name: "large.m4a",
 		});
 		expect(result.valid).toBe(false);
-		expect(result.error).toContain("25MB");
+		expect(result.error).toContain("100MB");
 	});
 
 	it("accepts file at exact size limit", () => {
