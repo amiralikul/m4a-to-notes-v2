@@ -1,5 +1,5 @@
 export const AUDIO_LIMITS = {
-	MAX_FILE_SIZE: 25 * 1024 * 1024, // 25MB (Whisper API limit)
+	MAX_FILE_SIZE: 100 * 1024 * 1024, // 100MB (Groq URL transcription limit on paid tier)
 	MAX_FILENAME_LENGTH: 255,
 	VALID_MIME_TYPES: [
 		"audio/mp4",

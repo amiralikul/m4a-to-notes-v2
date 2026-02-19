@@ -34,7 +34,7 @@ export interface AiServiceConfig {
 const PROVIDER_CONFIG = {
 	groq: {
 		baseURL: "https://api.groq.com/openai/v1",
-		model: "whisper-large-v3-turbo",
+		model: "whisper-large-v3",
 	},
 	openai: {
 		baseURL: undefined,
@@ -95,6 +95,7 @@ export class AiService {
 	private summaryClient: OpenAI | null = null;
 	private readonly logger: Logger;
 	private readonly openaiKey: string;
+	private readonly groqKey: string;
 	readonly provider: TranscriptionProvider;
 	readonly model: string;
 	readonly summaryProvider: SummaryProvider;
@@ -108,6 +109,7 @@ export class AiService {
 			config.summaryModel ||
 			SUMMARY_PROVIDER_CONFIG[config.summaryProvider].model;
 		this.openaiKey = config.openaiKey;
+		this.groqKey = config.groqKey;
 		this.logger = logger;
 
 		const apiKey =
@@ -174,6 +176,80 @@ export class AiService {
 			}
 
 			this.logger.error("Transcription failed", errorDetails);
+			throw new TranscriptionError(
+				`Failed to transcribe audio: ${errorMsg}`,
+			);
+		}
+	}
+
+	async transcribeAudioFromUrl(audioUrl: string): Promise<string> {
+		if (this.provider !== "groq") {
+			throw new TranscriptionError(
+				'URL-based transcription is only supported for "groq" provider',
+			);
+		}
+
+		this.logger.info("Starting transcription", {
+			provider: this.provider,
+			mode: "url",
+			model: this.model,
+			audioUrl,
+		});
+
+		const startTime = Date.now();
+
+		try {
+			const formData = new FormData();
+			formData.append("model", this.model);
+			formData.append("url", audioUrl);
+
+			const response = await fetch(
+				`${PROVIDER_CONFIG.groq.baseURL}/audio/transcriptions`,
+				{
+					method: "POST",
+					headers: {
+						Authorization: `Bearer ${this.groqKey}`,
+					},
+					body: formData,
+				},
+			);
+
+			if (!response.ok) {
+				const errorBody = await response.text();
+				throw new Error(
+					`Groq API error (${response.status}): ${errorBody.slice(0, 300)}`,
+				);
+			}
+
+			const payload = (await response.json()) as { text?: unknown };
+			if (typeof payload.text !== "string") {
+				throw new Error("Groq response missing transcription text");
+			}
+
+			const duration = Date.now() - startTime;
+
+			this.logger.info("Transcription completed", {
+				provider: this.provider,
+				mode: "url",
+				model: this.model,
+				duration: `${duration}ms`,
+				transcriptionLength: payload.text.length,
+				transcriptionPreview: `${payload.text.substring(0, 100)}...`,
+			});
+
+			return payload.text;
+		} catch (error) {
+			const duration = Date.now() - startTime;
+			const errorMsg = getErrorMessage(error);
+
+			this.logger.error("Transcription failed", {
+				error: errorMsg,
+				provider: this.provider,
+				mode: "url",
+				model: this.model,
+				duration: `${duration}ms`,
+				audioUrl,
+			});
 			throw new TranscriptionError(
 				`Failed to transcribe audio: ${errorMsg}`,
 			);
