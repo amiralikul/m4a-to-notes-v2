@@ -91,7 +91,7 @@ export function parseSummaryProvider(
 }
 
 export class AiService {
-	private readonly client: OpenAI;
+	private client: OpenAI | null = null;
 	private summaryClient: OpenAI | null = null;
 	private readonly logger: Logger;
 	private readonly openaiKey: string;
@@ -111,19 +111,6 @@ export class AiService {
 		this.openaiKey = config.openaiKey;
 		this.groqKey = config.groqKey;
 		this.logger = logger;
-
-		const apiKey =
-			config.provider === "groq" ? config.groqKey : config.openaiKey;
-		if (!apiKey) {
-			throw new Error(
-				`Missing API key for transcription provider "${config.provider}"`,
-			);
-		}
-
-		this.client = new OpenAI({
-			apiKey,
-			baseURL: PROVIDER_CONFIG[config.provider].baseURL,
-		});
 	}
 
 	async transcribeAudio(audioBuffer: ArrayBuffer): Promise<string> {
@@ -137,9 +124,8 @@ export class AiService {
 		const startTime = Date.now();
 
 		try {
-			// Groq rate limits (whisper-large-v3-turbo): 20 req/min, 2M audio-sec/day.
-			// Handled by Inngest's built-in retry with backoff (4 retries).
-			const transcription = await this.client.audio.transcriptions.create({
+			// Groq rate limits are handled by Inngest's built-in retry with backoff (4 retries).
+			const transcription = await this.getTranscriptionClient().audio.transcriptions.create({
 				file: new File([audioBuffer], "audio.m4a", { type: "audio/m4a" }),
 				model: this.model,
 			});
@@ -186,6 +172,11 @@ export class AiService {
 		if (this.provider !== "groq") {
 			throw new TranscriptionError(
 				'URL-based transcription is only supported for "groq" provider',
+			);
+		}
+		if (!this.groqKey) {
+			throw new TranscriptionError(
+				`Missing API key for transcription provider "${this.provider}"`,
 			);
 		}
 
@@ -354,5 +345,24 @@ export class AiService {
 		}
 
 		return this.summaryClient;
+	}
+
+	private getTranscriptionClient(): OpenAI {
+		const apiKey =
+			this.provider === "groq" ? this.groqKey : this.openaiKey;
+		if (!apiKey) {
+			throw new TranscriptionError(
+				`Missing API key for transcription provider "${this.provider}"`,
+			);
+		}
+
+		if (!this.client) {
+			this.client = new OpenAI({
+				apiKey,
+				baseURL: PROVIDER_CONFIG[this.provider].baseURL,
+			});
+		}
+
+		return this.client;
 	}
 }
