@@ -17,7 +17,7 @@
 - `npm run type-check`: strict TypeScript check without emit.
 - `npm run test`: run Vitest once.
 - `npm run test:watch`: run Vitest in watch mode.
-- `npm run db:generate` / `npm run db:migrate`: generate/apply Drizzle migrations.
+- `npm run db:generate` / `npm run db:migrate`: generate/apply Drizzle migrations. **Always use `npx drizzle-kit generate --name <descriptive_name>` instead of `npm run db:generate`** so migration files have readable names (e.g. `0013_add_translations_table.sql`).
 
 ## Coding Style & Naming Conventions
 - Language: TypeScript with `strict` mode.
