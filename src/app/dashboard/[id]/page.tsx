@@ -9,6 +9,7 @@ import {
 	Loader2,
 	Trash2,
 } from "lucide-react";
+import { CopyButton } from "@/components/copy-button";
 import { useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -140,6 +141,8 @@ export default function TranscriptionDetailPage() {
 	const { isLoaded, isSignedIn } = useUser();
 	const queryClient = useQueryClient();
 	const [selectedLanguage, setSelectedLanguage] = useState<string>("");
+	const transcriptRef = useRef<HTMLDivElement>(null);
+	const summaryRef = useRef<HTMLDivElement>(null);
 	const [viewingTranslation, setViewingTranslation] =
 		useState<TranslationItem | null>(null);
 	const pollingStartRef = useRef<number | null>(null);
@@ -316,13 +319,16 @@ export default function TranscriptionDetailPage() {
 			{/* Transcript Preview */}
 			{transcription.preview && (
 				<Card>
-					<CardHeader>
+					<CardHeader className="flex flex-row items-center justify-between">
 						<CardTitle className="text-lg">Transcript Preview</CardTitle>
+						<CopyButton contentRef={transcriptRef} />
 					</CardHeader>
 					<CardContent>
+						<div ref={transcriptRef}>
 						<p className="text-stone-600 whitespace-pre-wrap">
 							{viewingTranslation?.translatedText ?? transcription.preview}
 						</p>
+						</div>
 						{viewingTranslation?.translatedText && (
 							<p className="text-xs text-stone-400 mt-2">
 								Showing {displayData.label} translation
@@ -335,7 +341,7 @@ export default function TranscriptionDetailPage() {
 			{/* Summary */}
 			{displayData.summaryData && (
 				<Card>
-					<CardHeader>
+					<CardHeader className="flex flex-row items-center justify-between">
 						<CardTitle className="text-lg">
 							Summary
 							{viewingTranslation && (
@@ -344,8 +350,10 @@ export default function TranscriptionDetailPage() {
 								</span>
 							)}
 						</CardTitle>
+						<CopyButton contentRef={summaryRef} />
 					</CardHeader>
-					<CardContent className="space-y-4">
+					<CardContent>
+						<div ref={summaryRef} className="space-y-4">
 						<div>
 							<p className="font-semibold text-stone-900 text-sm">
 								Overview
@@ -402,6 +410,7 @@ export default function TranscriptionDetailPage() {
 									),
 								)}
 							</ul>
+						</div>
 						</div>
 					</CardContent>
 				</Card>

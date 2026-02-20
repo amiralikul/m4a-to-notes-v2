@@ -12,6 +12,7 @@ import {
 	RefreshCw,
 	Trash2,
 } from "lucide-react";
+import { CopyButton } from "@/components/copy-button";
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -458,6 +459,7 @@ export default function DashboardPage() {
 
 function SummarySection({ transcription }: { transcription: TranscriptionItem }) {
 	const id = transcription.id;
+	const summaryContentRef = useRef<HTMLDivElement>(null);
 
 	const { data: summary, isLoading, error } = useQuery({
 		queryKey: transcriptionKeys.summary(id),
@@ -482,8 +484,12 @@ function SummarySection({ transcription }: { transcription: TranscriptionItem })
 
 			{!isLoading && summary?.summaryData && (
 				<div className="space-y-3 text-sm">
-					<div>
+					<div className="flex items-center justify-between">
 						<p className="font-semibold text-stone-900">Summary</p>
+						<CopyButton contentRef={summaryContentRef} />
+					</div>
+					<div ref={summaryContentRef}>
+					<div>
 						<p className="text-stone-600 mt-1">
 							{summary.summaryData.summary}
 						</p>
@@ -528,6 +534,7 @@ function SummarySection({ transcription }: { transcription: TranscriptionItem })
 								),
 							)}
 						</ul>
+					</div>
 					</div>
 				</div>
 			)}
