@@ -52,7 +52,7 @@ const SUMMARY_PROVIDER_CONFIG = {
 
 const VALID_PROVIDERS: TranscriptionProvider[] = ["groq", "openai"];
 const VALID_SUMMARY_PROVIDERS: SummaryProvider[] = ["openai"];
-const MAX_SUMMARY_TRANSCRIPT_CHARS = 120_000;
+const MAX_SUMMARY_TRANSCRIPT_CHARS = 500_000;
 
 const summarySchema = z.object({
 	summary: z.string().min(1),
