@@ -3,6 +3,7 @@ import { DM_Sans, Instrument_Serif, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import { LemonSqueezyProvider } from "@/components/lemonsqueezy-provider";
+import { QueryProvider } from "@/components/query-provider";
 import { SiteHeader } from "@/components/site-header";
 
 const dmSans = DM_Sans({
@@ -23,9 +24,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-	title: "AudioScribe - M4A to Text Transcription",
+	title: "AudioScribe - Audio to Text Transcription",
 	description:
-		"Convert your M4A audio files to accurate text transcriptions using AI-powered speech recognition.",
+		"Convert your audio files to accurate text transcriptions using AI-powered speech recognition.",
 };
 
 export default function RootLayout({
@@ -66,10 +67,12 @@ export default function RootLayout({
 				<body
 					className={`${dmSans.variable} ${instrumentSerif.variable} ${geistMono.variable} antialiased`}
 				>
-					<LemonSqueezyProvider>
-						<SiteHeader />
-						{children}
-					</LemonSqueezyProvider>
+					<QueryProvider>
+						<LemonSqueezyProvider>
+							<SiteHeader />
+							{children}
+						</LemonSqueezyProvider>
+					</QueryProvider>
 				</body>
 			</html>
 		</ClerkProvider>

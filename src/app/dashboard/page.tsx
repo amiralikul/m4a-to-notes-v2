@@ -11,7 +11,8 @@ import {
 	RefreshCw,
 	Trash2,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import FileUpload from "@/components/file-upload";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -64,6 +65,11 @@ interface SummaryPayload {
 	summaryUpdatedAt?: string | null;
 }
 
+interface TranscriptionsResponse {
+	transcriptions: TranscriptionItem[];
+	total: number;
+}
+
 const statusConfig = {
 	pending: { label: "Pending", className: "bg-amber-100 text-amber-800" },
 	processing: {
@@ -100,330 +106,151 @@ const summaryStatusConfig = {
 	},
 } as const;
 
+const MAX_POLLING_MS = 10 * 60 * 1000; // 10 minutes
+
+const transcriptionKeys = {
+	all: ["transcriptions"] as const,
+	list: () => [...transcriptionKeys.all, "list"] as const,
+	detail: (id: string) => [...transcriptionKeys.all, id] as const,
+	summary: (id: string) => [...transcriptionKeys.detail(id), "summary"] as const,
+};
+
+async function fetchTranscriptionsApi(): Promise<TranscriptionsResponse> {
+	const res = await fetch("/api/me/transcriptions", { cache: "no-store" });
+	if (!res.ok) throw new Error("Failed to fetch transcriptions");
+	return res.json();
+}
+
+async function fetchSummaryApi(transcriptionId: string): Promise<SummaryPayload> {
+	const res = await fetch(`/api/transcriptions/${transcriptionId}/summary`, {
+		cache: "no-store",
+	});
+	if (!res.ok) {
+		if (res.status === 404) throw new Error("Summary is not available yet.");
+		throw new Error(`Failed to fetch summary (${res.status})`);
+	}
+	return res.json();
+}
+
+async function deleteTranscriptionApi(id: string): Promise<void> {
+	const res = await fetch(`/api/me/transcriptions/${id}`, { method: "DELETE" });
+	if (!res.ok) throw new Error("Failed to delete");
+}
+
 export default function DashboardPage() {
 	const { isLoaded, isSignedIn } = useUser();
-	const [transcriptions, setTranscriptions] = useState<TranscriptionItem[]>(
-		[],
-	);
-	const [total, setTotal] = useState(0);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
-	const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+	const queryClient = useQueryClient();
 	const [expandedSummaryIds, setExpandedSummaryIds] = useState<Set<string>>(
 		new Set(),
 	);
-	const [summaryLoadingIds, setSummaryLoadingIds] = useState<Set<string>>(
-		new Set(),
-	);
-	const [summaryById, setSummaryById] = useState<
-		Record<string, SummaryPayload>
-	>({});
-	const [summaryErrors, setSummaryErrors] = useState<Record<string, string>>(
-		{},
-	);
-	const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+	const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+	const pollingStartRef = useRef<number | null>(null);
 
-	const fetchTranscriptions = useCallback(async () => {
-		try {
-			const res = await fetch("/api/me/transcriptions", {
-				cache: "no-store",
-			});
-			if (!res.ok) {
-				if (!isSignedIn) {
-					setTranscriptions([]);
-					setTotal(0);
-					setError(null);
-					return;
-				}
-				setError("Failed to fetch transcriptions");
-				return;
-			}
-			const data = await res.json();
-			setTranscriptions(data.transcriptions);
-			setTotal(data.total);
-			setError(null);
-		} catch {
-			if (!isSignedIn) {
-				setTranscriptions([]);
-				setTotal(0);
-				setError(null);
-				return;
-			}
-			setError("Something went wrong");
-		} finally {
-			setLoading(false);
-		}
-	}, [isSignedIn]);
+	const {
+		data,
+		isLoading,
+		error,
+	} = useQuery({
+		queryKey: transcriptionKeys.list(),
+		queryFn: fetchTranscriptionsApi,
+		enabled: isLoaded,
+		refetchInterval: (query) => {
+			const transcriptions = query.state.data?.transcriptions;
+			if (!transcriptions) return false;
 
-	const fetchSummary = useCallback(async (transcriptionId: string) => {
-		setSummaryLoadingIds((prev) => {
-			const next = new Set(prev);
-			next.add(transcriptionId);
-			return next;
-		});
+			const hasInProgress = transcriptions.some(
+				(t) =>
+					t.status === "pending" ||
+					t.status === "processing" ||
+					(t.status === "completed" &&
+						(t.summaryStatus === "pending" ||
+							t.summaryStatus === "processing")),
+			);
 
-		try {
-			const res = await fetch(`/api/transcriptions/${transcriptionId}/summary`, {
-				cache: "no-store",
-			});
-
-			if (!res.ok) {
-				if (res.status === 404) {
-					setSummaryErrors((prev) => ({
-						...prev,
-						[transcriptionId]: "Summary is not available yet.",
-					}));
-					return;
-				}
-
-				setSummaryErrors((prev) => ({
-					...prev,
-					[transcriptionId]: `Failed to fetch summary (${res.status})`,
-				}));
-				return;
+			if (!hasInProgress) {
+				pollingStartRef.current = null;
+				return false;
 			}
 
-			const payload = (await res.json()) as SummaryPayload;
-			setSummaryById((prev) => ({
-				...prev,
-				[transcriptionId]: payload,
-			}));
-			setSummaryErrors((prev) => {
-				const next = { ...prev };
-				delete next[transcriptionId];
-				return next;
-			});
-		} catch {
-			setSummaryErrors((prev) => ({
-				...prev,
-				[transcriptionId]: "Failed to fetch summary. Please try again.",
-			}));
-		} finally {
-			setSummaryLoadingIds((prev) => {
-				const next = new Set(prev);
-				next.delete(transcriptionId);
-				return next;
-			});
-		}
-	}, []);
-
-	useEffect(() => {
-		if (isLoaded) {
-			fetchTranscriptions();
-		}
-	}, [isLoaded, fetchTranscriptions]);
-
-	useEffect(() => {
-		if (!isSignedIn) {
-			return;
-		}
-
-		for (const transcription of transcriptions) {
-			const id = transcription.id;
-			const shouldFetch =
-				expandedSummaryIds.has(id) &&
-				(transcription.summaryStatus === "completed" ||
-					transcription.summaryStatus === "failed") &&
-				!summaryById[id] &&
-				!summaryErrors[id] &&
-				!summaryLoadingIds.has(id);
-
-			if (shouldFetch) {
-				void fetchSummary(id);
+			if (!pollingStartRef.current) {
+				pollingStartRef.current = Date.now();
 			}
-		}
-	}, [
-		transcriptions,
-		expandedSummaryIds,
-		summaryById,
-		summaryErrors,
-		summaryLoadingIds,
-		fetchSummary,
-		isSignedIn,
-	]);
 
-	useEffect(() => {
-		const hasInProgress = transcriptions.some(
-			(t) =>
-				t.status === "pending" ||
-				t.status === "processing" ||
-				(t.status === "completed" &&
-					(t.summaryStatus === "pending" ||
-						t.summaryStatus === "processing")),
-		);
+			const elapsed = Date.now() - pollingStartRef.current;
+			if (elapsed > MAX_POLLING_MS) return false;
 
-		if (hasInProgress) {
-			intervalRef.current = setInterval(fetchTranscriptions, 3000);
-		} else if (intervalRef.current) {
-			clearInterval(intervalRef.current);
-			intervalRef.current = null;
-		}
+			return elapsed < 60_000 ? 5_000 : 15_000;
+		},
+	});
 
-		return () => {
-			if (intervalRef.current) {
-				clearInterval(intervalRef.current);
-				intervalRef.current = null;
-			}
-		};
-	}, [transcriptions, fetchTranscriptions]);
+	const transcriptions = data?.transcriptions ?? [];
+	const total = data?.total ?? 0;
 
-	const handleDelete = async (id: string) => {
-		setDeletingIds((prev) => new Set(prev).add(id));
-		try {
-			const res = await fetch(`/api/me/transcriptions/${id}`, {
-				method: "DELETE",
-			});
-			if (!res.ok) throw new Error("Failed to delete");
-			setTranscriptions((prev) => prev.filter((t) => t.id !== id));
+	const deleteMutation = useMutation({
+		mutationFn: deleteTranscriptionApi,
+		onMutate: async (id) => {
+			await queryClient.cancelQueries({ queryKey: transcriptionKeys.list() });
+
+			const previous = queryClient.getQueryData<TranscriptionsResponse>(
+				transcriptionKeys.list(),
+			);
+
+			queryClient.setQueryData<TranscriptionsResponse>(
+				transcriptionKeys.list(),
+				(old) => {
+					if (!old) return old;
+					return {
+						transcriptions: old.transcriptions.filter((t) => t.id !== id),
+						total: old.total - 1,
+					};
+				},
+			);
+
+			setDeletingIds((prev) => new Set(prev).add(id));
 			setExpandedSummaryIds((prev) => {
 				const next = new Set(prev);
 				next.delete(id);
 				return next;
 			});
-			setSummaryLoadingIds((prev) => {
-				const next = new Set(prev);
-				next.delete(id);
-				return next;
-			});
-			setSummaryById((prev) => {
-				const next = { ...prev };
-				delete next[id];
-				return next;
-			});
-			setSummaryErrors((prev) => {
-				const next = { ...prev };
-				delete next[id];
-				return next;
-			});
-			setTotal((prev) => prev - 1);
-		} catch {
-			setError("Failed to delete transcription");
-		} finally {
+
+			return { previous };
+		},
+		onError: (_error, _id, context) => {
+			if (context?.previous) {
+				queryClient.setQueryData(transcriptionKeys.list(), context.previous);
+			}
+		},
+		onSettled: (_data, _error, id) => {
 			setDeletingIds((prev) => {
 				const next = new Set(prev);
 				next.delete(id);
 				return next;
 			});
-		}
-	};
+			queryClient.removeQueries({ queryKey: transcriptionKeys.detail(id) });
+			queryClient.invalidateQueries({ queryKey: transcriptionKeys.list() });
+		},
+	});
 
 	const handleToggleSummary = (transcription: TranscriptionItem) => {
-		if (!isSignedIn) {
-			return;
-		}
+		if (!isSignedIn) return;
 
 		const id = transcription.id;
-		const isExpanded = expandedSummaryIds.has(id);
-
 		setExpandedSummaryIds((prev) => {
 			const next = new Set(prev);
-			if (isExpanded) {
+			if (next.has(id)) {
 				next.delete(id);
 			} else {
 				next.add(id);
 			}
 			return next;
 		});
-
-		if (
-			!isExpanded &&
-			(transcription.summaryStatus === "completed" ||
-				transcription.summaryStatus === "failed") &&
-			!summaryById[id] &&
-			!summaryLoadingIds.has(id)
-		) {
-			void fetchSummary(id);
-		}
 	};
 
 	const renderSummarySection = (transcription: TranscriptionItem) => {
-		if (!isSignedIn) {
-			return null;
-		}
+		if (!isSignedIn) return null;
+		if (!expandedSummaryIds.has(transcription.id)) return null;
 
-		const id = transcription.id;
-		if (!expandedSummaryIds.has(id)) {
-			return null;
-		}
-
-		const summary = summaryById[id];
-		const summaryErrorMessage =
-			summaryErrors[id] || summary?.summaryError?.message;
-
-		return (
-			<div className="mt-4 border-t border-stone-200 pt-4 space-y-3">
-				{summaryLoadingIds.has(id) && (
-					<div className="flex items-center gap-2 text-sm text-stone-600">
-						<Loader2 className="w-4 h-4 animate-spin" />
-						Loading summary...
-					</div>
-				)}
-
-				{!summaryLoadingIds.has(id) && summary?.summaryData && (
-					<div className="space-y-3 text-sm">
-						<div>
-							<p className="font-semibold text-stone-900">Summary</p>
-							<p className="text-stone-600 mt-1">
-								{summary.summaryData.summary}
-							</p>
-						</div>
-
-						<div>
-							<p className="font-semibold text-stone-900">Key Points</p>
-							<ul className="list-disc pl-5 mt-1 text-stone-600 space-y-1">
-								{summary.summaryData.keyPoints.map((point, index) => (
-									<li key={`${id}-point-${index}`}>{point}</li>
-								))}
-							</ul>
-						</div>
-
-						<div>
-							<p className="font-semibold text-stone-900">Action Items</p>
-							{summary.summaryData.actionItems.length === 0 ? (
-								<p className="text-stone-500 mt-1">
-									No action items found.
-								</p>
-							) : (
-								<ul className="list-disc pl-5 mt-1 text-stone-600 space-y-1">
-									{summary.summaryData.actionItems.map((item, index) => (
-										<li key={`${id}-action-${index}`}>
-											{item.task}
-											{item.owner && ` (Owner: ${item.owner})`}
-											{item.dueDate && ` (Due: ${item.dueDate})`}
-										</li>
-									))}
-								</ul>
-							)}
-						</div>
-
-						<div>
-							<p className="font-semibold text-stone-900">
-								Key Takeaways
-							</p>
-							<ul className="list-disc pl-5 mt-1 text-stone-600 space-y-1">
-								{summary.summaryData.keyTakeaways.map(
-									(takeaway, index) => (
-										<li key={`${id}-takeaway-${index}`}>{takeaway}</li>
-									),
-								)}
-							</ul>
-						</div>
-					</div>
-				)}
-
-				{!summaryLoadingIds.has(id) && !summary?.summaryData && (
-					<div className="text-sm text-stone-500">
-						{summaryErrorMessage ||
-							(transcription.summaryStatus === "failed"
-								? "Summary generation failed."
-								: transcription.summaryStatus === "pending" ||
-									  transcription.summaryStatus === "processing"
-									? "Summary is being generated. Check back in a few seconds."
-									: "Summary was not generated for this transcription.")}
-					</div>
-				)}
-			</div>
-		);
+		return <SummarySection transcription={transcription} />;
 	};
 
 	if (!isLoaded) {
@@ -434,7 +261,7 @@ export default function DashboardPage() {
 		);
 	}
 
-	if (loading) {
+	if (isLoading) {
 		return (
 			<div className="container mx-auto py-8">
 				<div className="space-y-4 animate-pulse">
@@ -465,8 +292,7 @@ export default function DashboardPage() {
 					variant="outline"
 					size="sm"
 					onClick={() => {
-						setLoading(true);
-						fetchTranscriptions();
+						queryClient.invalidateQueries({ queryKey: transcriptionKeys.all });
 					}}
 				>
 					<RefreshCw className="w-4 h-4 mr-2" />
@@ -480,12 +306,10 @@ export default function DashboardPage() {
 				<Card className="border-red-200 bg-red-50">
 					<CardContent className="pt-6">
 						<div className="flex items-center justify-between text-red-600">
-							<span>{error}</span>
+							<span>{error.message}</span>
 							<Button
 								onClick={() => {
-									setError(null);
-									setLoading(true);
-									fetchTranscriptions();
+									queryClient.invalidateQueries({ queryKey: transcriptionKeys.all });
 								}}
 								size="sm"
 								variant="outline"
@@ -606,7 +430,7 @@ export default function DashboardPage() {
 											<Button
 												variant="outline"
 												size="sm"
-												onClick={() => handleDelete(t.id)}
+												onClick={() => deleteMutation.mutate(t.id)}
 												disabled={deletingIds.has(t.id)}
 												className="text-red-600 hover:text-red-700 hover:bg-red-50"
 											>
@@ -622,6 +446,97 @@ export default function DashboardPage() {
 							</CardContent>
 						</Card>
 					))}
+				</div>
+			)}
+		</div>
+	);
+}
+
+function SummarySection({ transcription }: { transcription: TranscriptionItem }) {
+	const id = transcription.id;
+
+	const { data: summary, isLoading, error } = useQuery({
+		queryKey: transcriptionKeys.summary(id),
+		queryFn: () => fetchSummaryApi(id),
+		enabled:
+			transcription.summaryStatus === "completed" ||
+			transcription.summaryStatus === "failed",
+		staleTime: Infinity,
+	});
+
+	const summaryErrorMessage =
+		error?.message || summary?.summaryError?.message;
+
+	return (
+		<div className="mt-4 border-t border-stone-200 pt-4 space-y-3">
+			{isLoading && (
+				<div className="flex items-center gap-2 text-sm text-stone-600">
+					<Loader2 className="w-4 h-4 animate-spin" />
+					Loading summary...
+				</div>
+			)}
+
+			{!isLoading && summary?.summaryData && (
+				<div className="space-y-3 text-sm">
+					<div>
+						<p className="font-semibold text-stone-900">Summary</p>
+						<p className="text-stone-600 mt-1">
+							{summary.summaryData.summary}
+						</p>
+					</div>
+
+					<div>
+						<p className="font-semibold text-stone-900">Key Points</p>
+						<ul className="list-disc pl-5 mt-1 text-stone-600 space-y-1">
+							{summary.summaryData.keyPoints.map((point, index) => (
+								<li key={`${id}-point-${index}`}>{point}</li>
+							))}
+						</ul>
+					</div>
+
+					<div>
+						<p className="font-semibold text-stone-900">Action Items</p>
+						{summary.summaryData.actionItems.length === 0 ? (
+							<p className="text-stone-500 mt-1">
+								No action items found.
+							</p>
+						) : (
+							<ul className="list-disc pl-5 mt-1 text-stone-600 space-y-1">
+								{summary.summaryData.actionItems.map((item, index) => (
+									<li key={`${id}-action-${index}`}>
+										{item.task}
+										{item.owner && ` (Owner: ${item.owner})`}
+										{item.dueDate && ` (Due: ${item.dueDate})`}
+									</li>
+								))}
+							</ul>
+						)}
+					</div>
+
+					<div>
+						<p className="font-semibold text-stone-900">
+							Key Takeaways
+						</p>
+						<ul className="list-disc pl-5 mt-1 text-stone-600 space-y-1">
+							{summary.summaryData.keyTakeaways.map(
+								(takeaway, index) => (
+									<li key={`${id}-takeaway-${index}`}>{takeaway}</li>
+								),
+							)}
+						</ul>
+					</div>
+				</div>
+			)}
+
+			{!isLoading && !summary?.summaryData && (
+				<div className="text-sm text-stone-500">
+					{summaryErrorMessage ||
+						(transcription.summaryStatus === "failed"
+							? "Summary generation failed."
+							: transcription.summaryStatus === "pending" ||
+								  transcription.summaryStatus === "processing"
+								? "Summary is being generated. Check back in a few seconds."
+								: "Summary was not generated for this transcription.")}
 				</div>
 			)}
 		</div>

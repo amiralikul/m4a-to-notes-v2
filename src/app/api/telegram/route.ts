@@ -7,7 +7,7 @@ import {
 } from "@/services";
 import { getChatCompletion } from "@/services/chat";
 import { getErrorMessage } from "@/lib/errors";
-import { AUDIO_LIMITS } from "@/lib/validation";
+import { AUDIO_LIMITS, SUPPORTED_AUDIO_FORMATS_TEXT } from "@/lib/validation";
 import { logger } from "@/lib/logger";
 
 // Cache botInfo on globalThis to avoid getMe() on every request (#4)
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
 	bot.command("start", async (ctx) => {
 		await ctx.reply(
 			"Welcome to AudioScribe! Send me an audio file and I'll transcribe it for you.\n\n" +
-				"Supported formats: M4A, MP3, WAV, OGG, AAC, WebM\n" +
+				`Supported formats: ${SUPPORTED_AUDIO_FORMATS_TEXT}\n` +
 				`Max file size: ${AUDIO_LIMITS.MAX_FILE_SIZE / 1024 / 1024}MB`,
 		);
 	});
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
 				"1. Send me an audio file\n" +
 				"2. Wait for the transcription\n" +
 				"3. Ask me questions about the transcription\n\n" +
-				"Supported formats: M4A, MP3, WAV, OGG, AAC, WebM\n" +
+				`Supported formats: ${SUPPORTED_AUDIO_FORMATS_TEXT}\n` +
 				`Max file size: ${AUDIO_LIMITS.MAX_FILE_SIZE / 1024 / 1024}MB`,
 		);
 	});
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
 			await handleFileProcessing(ctx, doc);
 		} else {
 			await ctx.reply(
-				"Please send an audio file. Supported formats: M4A, MP3, WAV, OGG, AAC, WebM",
+				`Please send an audio file. Supported formats: ${SUPPORTED_AUDIO_FORMATS_TEXT}`,
 			);
 		}
 	});
