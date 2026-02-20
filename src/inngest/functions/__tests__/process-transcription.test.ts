@@ -51,7 +51,7 @@ async function runProcessTranscription(transcriptionId: string) {
 	// Extract the handler function from the Inngest function config
 	const fn = processTranscription as unknown as {
 		["~trigger"]: { event: string };
-		fn: (args: { event: { data: { transcriptionId: string } }; step: { run: <T>(name: string, fn: () => Promise<T>) => Promise<T>; sendEvent: (id: string, payload: unknown) => Promise<void> } }) => Promise<unknown>;
+		fn: (args: { event: { data: { transcriptionId: string } }; step: { run: <T>(name: string, fn: () => Promise<T>) => Promise<T>; sendEvent: (id: string, payload: unknown) => Promise<void> }; logger: { info: typeof vi.fn; warn: typeof vi.fn; error: typeof vi.fn; debug: typeof vi.fn } }) => Promise<unknown>;
 	};
 
 	// Simple step.run that just executes the function
@@ -62,9 +62,17 @@ async function runProcessTranscription(transcriptionId: string) {
 		sendEvent: mockSendEvent,
 	};
 
+	const logger = {
+		info: vi.fn(),
+		warn: vi.fn(),
+		error: vi.fn(),
+		debug: vi.fn(),
+	};
+
 	return fn.fn({
 		event: { data: { transcriptionId } },
 		step,
+		logger,
 	});
 }
 
@@ -120,6 +128,7 @@ describe("process-transcription Inngest function", () => {
 		expect(mockSendEvent).toHaveBeenCalledWith("request-summary", {
 			name: INNGEST_EVENTS.TRANSCRIPTION_COMPLETED,
 			data: { transcriptionId: "tx-1" },
+			id: "summary-requested-tx-1",
 		});
 		expect(storageService.deleteObject).not.toHaveBeenCalled();
 	});
