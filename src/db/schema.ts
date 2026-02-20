@@ -247,3 +247,42 @@ export type UpdateUserEntitlement = Partial<Omit<UserEntitlement, "userId">>;
 
 export type BillingSubscription = typeof billingSubscriptions.$inferSelect;
 export type InsertBillingSubscription = typeof billingSubscriptions.$inferInsert;
+
+// Translations table - stores translated versions of transcriptions
+export const translations = sqliteTable(
+	"translations",
+	{
+		id: text("id").primaryKey(),
+		transcriptionId: text("transcription_id").notNull(),
+		language: text("language").notNull(),
+		status: text("status", {
+			enum: ["pending", "processing", "completed", "failed"],
+		}).notNull(),
+		translatedText: text("translated_text"),
+		translatedSummary: text("translated_summary", {
+			mode: "json",
+		}).$type<TranscriptionSummaryData>(),
+		errorDetails: text("error_details", { mode: "json" }).$type<{
+			code?: string;
+			message: string;
+		}>(),
+		createdAt: text("created_at")
+			.notNull()
+			.default(sql`(CURRENT_TIMESTAMP)`),
+		completedAt: text("completed_at"),
+		updatedAt: text("updated_at")
+			.notNull()
+			.default(sql`(CURRENT_TIMESTAMP)`)
+			.$onUpdate(() => sql`(CURRENT_TIMESTAMP)`),
+	},
+	(table) => [
+		uniqueIndex("translations_transcription_language_idx").on(
+			table.transcriptionId,
+			table.language,
+		),
+	],
+);
+
+export type Translation = typeof translations.$inferSelect;
+export type InsertTranslation = typeof translations.$inferInsert;
+export type UpdateTranslation = Partial<Omit<Translation, "id">>;

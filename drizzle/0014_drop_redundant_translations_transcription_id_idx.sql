@@ -1,0 +1,1 @@
+DROP INDEX `translations_transcription_id_idx`;

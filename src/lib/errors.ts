@@ -58,6 +58,12 @@ export class StorageError extends AppError {
 	}
 }
 
+export class TranslationError extends AppError {
+	constructor(message: string) {
+		super(message, 500);
+	}
+}
+
 export function isAppError(error: unknown): error is AppError {
 	return error instanceof AppError;
 }

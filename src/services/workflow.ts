@@ -24,4 +24,20 @@ export class WorkflowService {
 			transcriptionId,
 		});
 	}
+
+	async requestTranslation(
+		translationId: string,
+		transcriptionId: string,
+		language: string,
+	) {
+		await inngest.send({
+			name: INNGEST_EVENTS.TRANSLATION_REQUESTED,
+			data: { translationId, transcriptionId, language },
+		});
+		this.logger.info("Workflow: translation requested", {
+			translationId,
+			transcriptionId,
+			language,
+		});
+	}
 }

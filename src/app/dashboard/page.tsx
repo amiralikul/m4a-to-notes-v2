@@ -5,13 +5,16 @@ import {
 	ChevronDown,
 	ChevronUp,
 	Download,
+	ExternalLink,
 	FileAudio,
 	FileText,
 	Loader2,
 	RefreshCw,
 	Trash2,
 } from "lucide-react";
+import { CopyButton } from "@/components/copy-button";
 import { useRef, useState } from "react";
+import Link from "next/link";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import FileUpload from "@/components/file-upload";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +23,7 @@ import {
 	Card,
 	CardContent,
 } from "@/components/ui/card";
+import { transcriptionKeys } from "@/lib/query-keys";
 
 interface TranscriptionItem {
 	id: string;
@@ -107,13 +111,6 @@ const summaryStatusConfig = {
 } as const;
 
 const MAX_POLLING_MS = 10 * 60 * 1000; // 10 minutes
-
-const transcriptionKeys = {
-	all: ["transcriptions"] as const,
-	list: () => [...transcriptionKeys.all, "list"] as const,
-	detail: (id: string) => [...transcriptionKeys.all, id] as const,
-	summary: (id: string) => [...transcriptionKeys.detail(id), "summary"] as const,
-};
 
 async function fetchTranscriptionsApi(): Promise<TranscriptionsResponse> {
 	const res = await fetch("/api/me/transcriptions", { cache: "no-store" });
@@ -387,6 +384,14 @@ export default function DashboardPage() {
 
 										<div className="flex items-center gap-2 shrink-0">
 											{isSignedIn && t.status === "completed" && (
+												<Button variant="outline" size="sm" asChild>
+													<Link href={`/dashboard/${t.id}`}>
+														<ExternalLink className="w-4 h-4 mr-1" />
+														Details
+													</Link>
+												</Button>
+											)}
+											{isSignedIn && t.status === "completed" && (
 												<Button
 													variant="outline"
 													size="sm"
@@ -454,6 +459,7 @@ export default function DashboardPage() {
 
 function SummarySection({ transcription }: { transcription: TranscriptionItem }) {
 	const id = transcription.id;
+	const summaryContentRef = useRef<HTMLDivElement>(null);
 
 	const { data: summary, isLoading, error } = useQuery({
 		queryKey: transcriptionKeys.summary(id),
@@ -478,8 +484,12 @@ function SummarySection({ transcription }: { transcription: TranscriptionItem })
 
 			{!isLoading && summary?.summaryData && (
 				<div className="space-y-3 text-sm">
-					<div>
+					<div className="flex items-center justify-between">
 						<p className="font-semibold text-stone-900">Summary</p>
+						<CopyButton contentRef={summaryContentRef} />
+					</div>
+					<div ref={summaryContentRef}>
+					<div>
 						<p className="text-stone-600 mt-1">
 							{summary.summaryData.summary}
 						</p>
@@ -524,6 +534,7 @@ function SummarySection({ transcription }: { transcription: TranscriptionItem })
 								),
 							)}
 						</ul>
+					</div>
 					</div>
 				</div>
 			)}
