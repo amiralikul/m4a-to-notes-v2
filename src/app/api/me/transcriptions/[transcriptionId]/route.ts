@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { resolveActorIdentity } from "@/lib/trial-identity";
-import { actorsService, transcriptionsService, storageService } from "@/services";
+import { actorsService, transcriptionsService, translationsService, storageService } from "@/services";
 import { getErrorMessage } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 
@@ -59,6 +59,7 @@ export async function DELETE(
 			}
 		}
 
+		await translationsService.deleteByTranscriptionId(transcriptionId);
 		await transcriptionsService.delete(transcriptionId);
 
 		return new Response(null, { status: 204 });

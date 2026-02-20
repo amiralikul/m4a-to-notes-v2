@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
 	SummaryError,
 	TranscriptionError,
+	TranslationError,
 	getErrorMessage,
 } from "@/lib/errors";
 import type { Logger } from "@/lib/logger";
@@ -321,6 +322,134 @@ export class AiService {
 				throw error;
 			}
 			throw new SummaryError(`Failed to generate summary: ${errorMsg}`);
+		}
+	}
+
+	async translateText(text: string, targetLanguage: string): Promise<string> {
+		if (!text.trim()) {
+			throw new TranslationError("Cannot translate empty text");
+		}
+
+		const promptText =
+			text.length > MAX_SUMMARY_TRANSCRIPT_CHARS
+				? `${text.slice(0, MAX_SUMMARY_TRANSCRIPT_CHARS)}\n\n[Text truncated for translation.]`
+				: text;
+
+		const startTime = Date.now();
+		this.logger.info("Starting text translation", {
+			provider: this.summaryProvider,
+			model: this.summaryModel,
+			targetLanguage,
+			textLength: text.length,
+		});
+
+		try {
+			const completion = await this.getSummaryClient().chat.completions.create({
+				model: this.summaryModel,
+				messages: [
+					{
+						role: "system",
+						content: `You are a professional translator. Translate the following text to ${targetLanguage}. Preserve the original formatting, paragraph breaks, and tone. Output only the translated text, nothing else.`,
+					},
+					{
+						role: "user",
+						content: promptText,
+					},
+				],
+			});
+
+			const responseText = completion.choices[0]?.message?.content;
+			if (!responseText) {
+				throw new TranslationError("Translation response was empty");
+			}
+
+			this.logger.info("Text translation completed", {
+				provider: this.summaryProvider,
+				model: this.summaryModel,
+				targetLanguage,
+				duration: `${Date.now() - startTime}ms`,
+				outputLength: responseText.length,
+			});
+
+			return responseText;
+		} catch (error) {
+			const errorMsg = getErrorMessage(error);
+			this.logger.error("Text translation failed", {
+				provider: this.summaryProvider,
+				model: this.summaryModel,
+				targetLanguage,
+				duration: `${Date.now() - startTime}ms`,
+				error: errorMsg,
+			});
+			if (error instanceof TranslationError) throw error;
+			throw new TranslationError(`Failed to translate text: ${errorMsg}`);
+		}
+	}
+
+	async translateSummary(
+		summary: SummaryResult,
+		targetLanguage: string,
+	): Promise<SummaryResult> {
+		const startTime = Date.now();
+		this.logger.info("Starting summary translation", {
+			provider: this.summaryProvider,
+			model: this.summaryModel,
+			targetLanguage,
+		});
+
+		try {
+			const completion = await this.getSummaryClient().chat.completions.create({
+				model: this.summaryModel,
+				response_format: { type: "json_object" },
+				messages: [
+					{
+						role: "system",
+						content: `You are a professional translator. Translate the following JSON summary to ${targetLanguage}. Preserve the exact JSON structure with keys: summary (string), keyPoints (string[]), actionItems ({task:string, owner?:string, dueDate?:string}[]), keyTakeaways (string[]). Only translate the text values, not the JSON keys. Return valid JSON.`,
+					},
+					{
+						role: "user",
+						content: JSON.stringify(summary),
+					},
+				],
+			});
+
+			const responseText = completion.choices[0]?.message?.content;
+			if (!responseText) {
+				throw new TranslationError("Summary translation response was empty");
+			}
+
+			let parsed: unknown;
+			try {
+				parsed = JSON.parse(responseText);
+			} catch (parseError) {
+				throw new TranslationError(
+					`Failed to parse translated summary JSON: ${getErrorMessage(parseError)}`,
+				);
+			}
+
+			const result = summarySchema.parse(parsed);
+
+			this.logger.info("Summary translation completed", {
+				provider: this.summaryProvider,
+				model: this.summaryModel,
+				targetLanguage,
+				duration: `${Date.now() - startTime}ms`,
+			});
+
+			return result;
+		} catch (error) {
+			const errorMsg = getErrorMessage(error);
+			this.logger.error("Summary translation failed", {
+				provider: this.summaryProvider,
+				model: this.summaryModel,
+				targetLanguage,
+				duration: `${Date.now() - startTime}ms`,
+				error: errorMsg,
+			});
+			if (error instanceof TranslationError) throw error;
+			throw new TranslationError(
+				`Failed to translate summary: ${errorMsg}`,
+			);
 		}
 	}
 

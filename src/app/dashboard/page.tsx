@@ -5,6 +5,7 @@ import {
 	ChevronDown,
 	ChevronUp,
 	Download,
+	ExternalLink,
 	FileAudio,
 	FileText,
 	Loader2,
@@ -12,6 +13,7 @@ import {
 	Trash2,
 } from "lucide-react";
 import { useRef, useState } from "react";
+import Link from "next/link";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import FileUpload from "@/components/file-upload";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +22,7 @@ import {
 	Card,
 	CardContent,
 } from "@/components/ui/card";
+import { transcriptionKeys } from "@/lib/query-keys";
 
 interface TranscriptionItem {
 	id: string;
@@ -107,13 +110,6 @@ const summaryStatusConfig = {
 } as const;
 
 const MAX_POLLING_MS = 10 * 60 * 1000; // 10 minutes
-
-const transcriptionKeys = {
-	all: ["transcriptions"] as const,
-	list: () => [...transcriptionKeys.all, "list"] as const,
-	detail: (id: string) => [...transcriptionKeys.all, id] as const,
-	summary: (id: string) => [...transcriptionKeys.detail(id), "summary"] as const,
-};
 
 async function fetchTranscriptionsApi(): Promise<TranscriptionsResponse> {
 	const res = await fetch("/api/me/transcriptions", { cache: "no-store" });
@@ -386,6 +382,14 @@ export default function DashboardPage() {
 									</div>
 
 										<div className="flex items-center gap-2 shrink-0">
+											{isSignedIn && t.status === "completed" && (
+												<Button variant="outline" size="sm" asChild>
+													<Link href={`/dashboard/${t.id}`}>
+														<ExternalLink className="w-4 h-4 mr-1" />
+														Details
+													</Link>
+												</Button>
+											)}
 											{isSignedIn && t.status === "completed" && (
 												<Button
 													variant="outline"
