@@ -56,8 +56,8 @@ describe("validateAudioFile", () => {
 	it("rejects unsupported format", () => {
 		const result = validateAudioFile({
 			size: 1024,
-			type: "video/mp4",
-			name: "video.mp4",
+			type: "application/pdf",
+			name: "notes.pdf",
 		});
 		expect(result.valid).toBe(false);
 		expect(result.error).toContain("Unsupported");

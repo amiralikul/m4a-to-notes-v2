@@ -16,6 +16,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { upload } from "@vercel/blob/client";
 import { logger } from "@/lib/logger";
 import { TRIAL_ERROR_CODES } from "@/lib/trial-errors";
+import {
+	AUDIO_LIMITS,
+	SUPPORTED_AUDIO_FORMATS_TEXT,
+	validateAudioFile,
+} from "@/lib/validation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -135,18 +140,17 @@ export default function FileUpload({
 	}, []);
 
 	const validateFile = useCallback((file: File) => {
-		const validTypes = ["audio/m4a", "audio/mp4", "audio/x-m4a"];
-		const maxSize = 100 * 1024 * 1024;
-		if (
-			!validTypes.includes(file.type) &&
-			!file.name.toLowerCase().endsWith(".m4a")
-		) {
-			alert("Please upload only M4A audio files.");
-			return false;
-		}
-
-		if (file.size > maxSize) {
-			alert("File size must be less than 100MB.");
+		const result = validateAudioFile({
+			size: file.size,
+			type: file.type,
+			name: file.name,
+		});
+		if (!result.valid) {
+			if (result.error === "Unsupported audio format") {
+				alert(`Supported formats: ${SUPPORTED_AUDIO_FORMATS_TEXT}.`);
+				return false;
+			}
+			alert(result.error || "Invalid file.");
 			return false;
 		}
 
@@ -646,13 +650,15 @@ export default function FileUpload({
 
 					<h3 className="text-2xl font-semibold mb-3 text-stone-900">
 						{isDragOver
-							? "Drop your M4A files here"
-							: "Upload M4A Audio Files"}
+							? "Drop your audio files here"
+							: "Upload Audio Files"}
 					</h3>
 
 					<p className="text-stone-500 mb-8 max-w-lg leading-relaxed text-lg">
-						Drag and drop your M4A files here, or click to browse
-						and select files from your device.
+						Drag and drop your audio files here, or click to browse
+						and select files from your device. Supported formats:
+						{" "}
+						{SUPPORTED_AUDIO_FORMATS_TEXT}.
 					</p>
 
 					<Button
@@ -670,7 +676,7 @@ export default function FileUpload({
 							className="bg-white border-stone-200 text-stone-600 px-4 py-2"
 						>
 							<FileAudio className="w-3 h-3 mr-2" />
-							M4A files only
+							9 formats supported
 						</Badge>
 						<Badge
 							variant="outline"
@@ -691,10 +697,10 @@ export default function FileUpload({
 					<input
 						ref={fileInputRef}
 						type="file"
-						accept=".m4a,audio/m4a,audio/mp4,audio/x-m4a"
+						accept={AUDIO_LIMITS.VALID_EXTENSIONS.join(",")}
 						multiple
 						onChange={handleFileSelect}
-						className="hidden"
+						className="sr-only"
 					/>
 				</CardContent>
 			</Card>

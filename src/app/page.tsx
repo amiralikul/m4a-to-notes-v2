@@ -17,7 +17,7 @@ const STEPS = [
 	{
 		step: "01",
 		title: "Upload",
-		desc: "Drag and drop your M4A audio file or click to browse. Files up to 100MB supported.",
+		desc: "Drag and drop your audio file or click to browse. Supports FLAC, MP3, MP4, MPEG, MPGA, M4A, OGG, WAV, and WebM up to 100MB.",
 		icon: Upload,
 	},
 	{
@@ -136,7 +136,7 @@ export default function HomePage() {
 										<div className="w-3 h-3 rounded-full bg-stone-700" />
 										<div className="w-3 h-3 rounded-full bg-stone-700" />
 										<span className="ml-auto text-xs text-stone-600 font-mono">
-											meeting-recording.m4a
+											meeting-recording.mp3
 										</span>
 									</div>
 

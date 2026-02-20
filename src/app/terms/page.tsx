@@ -58,7 +58,7 @@ export default function TermsOfServicePage() {
 								</h2>
 								<p className="text-gray-700 mb-6">
 									AudioScribe is an AI-powered transcription service that
-									converts audio files (including M4A format) into text. The
+									converts audio files (including FLAC, MP3, MP4, MPEG, MPGA, M4A, OGG, WAV, and WebM formats) into text. The
 									Service is provided through our website and may include
 									additional features such as file management, editing tools,
 									and export options.

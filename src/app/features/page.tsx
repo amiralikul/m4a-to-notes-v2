@@ -55,8 +55,8 @@ const ADVANCED_FEATURES = [
 const STEPS = [
 	{
 		step: "01",
-		title: "Upload Your M4A File",
-		desc: "Simply drag and drop your M4A audio file or click to browse and select from your device. Files up to 100MB supported.",
+		title: "Upload Your Audio File",
+		desc: "Simply drag and drop your audio file or click to browse and select from your device. Supports FLAC, MP3, MP4, MPEG, MPGA, M4A, OGG, WAV, and WebM up to 100MB.",
 		icon: Upload,
 	},
 	{
@@ -107,7 +107,7 @@ export default function FeaturesPage() {
 
 						<p className="max-w-2xl text-lg md:text-xl text-stone-500 leading-relaxed">
 							Discover the features that make AudioScribe the best
-							choice for converting your M4A files to accurate
+							choice for converting your audio files to accurate
 							text.
 						</p>
 

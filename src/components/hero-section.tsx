@@ -47,7 +47,7 @@ export const HeroSection = () => {
 
 					{/* Subtitle */}
 					<p className="max-w-2xl text-lg md:text-xl text-stone-500 leading-relaxed">
-						Transform your M4A recordings into accurate text in
+						Transform your audio recordings into accurate text in
 						minutes. Built for meetings, interviews, podcasts, and
 						voice memos.
 					</p>
