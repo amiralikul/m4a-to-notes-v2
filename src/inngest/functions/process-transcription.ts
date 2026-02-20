@@ -9,14 +9,14 @@ import {
 import { sendTelegramMessage } from "@/services/telegram";
 import { TranscriptionStatus } from "@/services/transcriptions";
 import { getErrorMessage } from "@/lib/errors";
-import { logger } from "@/lib/logger";
-
 export const processTranscription = inngest.createFunction(
 	{
 		id: "process-transcription",
 		retries: 4,
 		concurrency: { limit: 5 },
-		onFailure: async ({ event, error }) => {
+		idempotency: "event.data.transcriptionId",
+		timeouts: { finish: "15m" },
+		onFailure: async ({ event, error, logger }) => {
 			const transcriptionId =
 				event.data.event.data.transcriptionId;
 			logger.error("Transcription failed after all retries (DLQ)", {
@@ -39,7 +39,7 @@ export const processTranscription = inngest.createFunction(
 		},
 	},
 	{ event: INNGEST_EVENTS.TRANSCRIPTION_REQUESTED },
-	async ({ event, step }) => {
+	async ({ event, step, logger }) => {
 		const { transcriptionId } = event.data;
 
 		// Step 1: Fetch transcription and check idempotency
@@ -102,7 +102,7 @@ export const processTranscription = inngest.createFunction(
 			return text;
 		});
 
-		// Step 4: Save result
+		// Step 3: Save result
 		await step.run("save-result", async () => {
 			const preview =
 				transcriptText.substring(0, 150) +
@@ -115,13 +115,14 @@ export const processTranscription = inngest.createFunction(
 			);
 		});
 
-		// Step 5: Trigger summary generation in a separate pipeline.
+		// Step 4: Trigger summary generation in a separate pipeline.
 		await step.sendEvent("request-summary", {
+			id: `summary-requested-${transcriptionId}`,
 			name: INNGEST_EVENTS.TRANSCRIPTION_COMPLETED,
 			data: { transcriptionId },
 		});
 
-		// Step 6: Notify Telegram if source is telegram (#1)
+		// Step 5: Notify Telegram if source is telegram
 		if (t.source === "telegram" && t.userMetadata) {
 			await step.run("notify-telegram", async () => {
 				const chatId = (t.userMetadata as Record<string, unknown>)
