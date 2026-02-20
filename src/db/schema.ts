@@ -280,7 +280,6 @@ export const translations = sqliteTable(
 			table.transcriptionId,
 			table.language,
 		),
-		index("translations_transcription_id_idx").on(table.transcriptionId),
 	],
 );
 

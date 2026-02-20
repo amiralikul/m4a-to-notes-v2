@@ -99,6 +99,13 @@
       "when": 1771589480709,
       "tag": "0013_outstanding_professor_monster",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1771600364966,
+      "tag": "0014_drop_redundant_translations_transcription_id_idx",
+      "breakpoints": true
     }
   ]
 }
