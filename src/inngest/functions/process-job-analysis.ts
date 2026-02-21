@@ -2,8 +2,8 @@ import { NonRetriableError } from "inngest";
 import { getErrorMessage } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import {
-	anthropicService,
 	brightDataService,
+	jobFitAiService,
 	jobAnalysesService,
 } from "@/services";
 import { inngest } from "../client";
@@ -136,7 +136,7 @@ export const processJobAnalysis = inngest.createFunction(
 		}
 
 		const result = await step.run("analyze-resume-fit", async () =>
-			anthropicService.analyzeResumeMatch({
+			jobFitAiService.analyzeResumeMatch({
 				resumeText: analysis.resumeText,
 				jobDescription: resolvedJobDescription as string,
 			}),
@@ -146,8 +146,8 @@ export const processJobAnalysis = inngest.createFunction(
 			await jobAnalysesService.markCompleted(
 				analysisId,
 				result,
-				anthropicService.provider,
-				anthropicService.model,
+				jobFitAiService.provider,
+				jobFitAiService.model,
 			);
 		});
 

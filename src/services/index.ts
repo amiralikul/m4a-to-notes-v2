@@ -3,32 +3,42 @@ import { logger } from "@/lib/logger";
 import { TranscriptionsService } from "./transcriptions";
 import { UsersService } from "./users";
 import { ConversationService } from "./conversation";
-import {
-	AiService,
-	parseProvider,
-	parseSummaryProvider,
-} from "./ai.service";
 import { StorageService } from "./storage";
 import { WorkflowService } from "./workflow";
 import { TrialUsageService } from "./trial-usage";
 import { ActorsService } from "./actors";
 import { JobAnalysesService } from "./job-analyses";
 import { BrightDataService } from "./brightdata.service";
-import { AnthropicService } from "./anthropic.service";
+import {
+	JobFitAiService,
+	parseTextAiProvider,
+	parseTranscriptionProvider,
+	TextAiService,
+	TranscriptionAiService,
+} from "./ai";
 import { TranslationsService } from "./translations";
 
 export const transcriptionsService = new TranscriptionsService(db, logger);
 export const usersService = new UsersService(db, logger);
 export const conversationService = new ConversationService(db, logger);
 
-const provider = parseProvider(process.env.TRANSCRIPTION_PROVIDER);
-const summaryProvider = parseSummaryProvider(process.env.SUMMARY_PROVIDER);
-export const aiService = new AiService(
+const transcriptionProvider = parseTranscriptionProvider(
+	process.env.TRANSCRIPTION_PROVIDER,
+);
+const textAiProvider = parseTextAiProvider(process.env.SUMMARY_PROVIDER);
+
+export const transcriptionAiService = new TranscriptionAiService(
 	{
-		provider,
-		summaryProvider,
-		summaryModel: process.env.SUMMARY_MODEL,
+		provider: transcriptionProvider,
 		groqKey: process.env.GROQ_API_KEY || "",
+		openaiKey: process.env.OPENAI_API_KEY || "",
+	},
+	logger,
+);
+export const textAiService = new TextAiService(
+	{
+		provider: textAiProvider,
+		model: process.env.SUMMARY_MODEL,
 		openaiKey: process.env.OPENAI_API_KEY || "",
 	},
 	logger,
@@ -47,7 +57,7 @@ export const brightDataService = new BrightDataService(
 	},
 	logger,
 );
-export const anthropicService = new AnthropicService(
+export const jobFitAiService = new JobFitAiService(
 	{
 		apiKey: process.env.ANTHROPIC_API_KEY || "",
 		model: process.env.ANTHROPIC_MODEL || "claude-haiku-4-5",
