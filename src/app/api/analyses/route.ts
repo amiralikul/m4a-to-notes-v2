@@ -1,3 +1,4 @@
+import { auth } from "@clerk/nextjs/server";
 import { z } from "zod";
 import { getErrorMessage } from "@/lib/errors";
 import { logger } from "@/lib/logger";
@@ -10,7 +11,7 @@ import { JobSourceType } from "@/services/job-analyses";
 
 const createAnalysisSchema = z
 	.object({
-		resumeText: z.string().trim().min(50),
+		resumeText: z.string().trim().min(50).max(20_000),
 		jobUrl: z.string().trim().url().optional(),
 		jobDescription: z.string().trim().min(80).optional(),
 	})
@@ -25,6 +26,11 @@ const createAnalysisSchema = z
 	);
 
 export async function POST(request: Request) {
+	const { userId } = await auth();
+	if (!userId) {
+		return Response.json({ error: "Unauthorized" }, { status: 401 });
+	}
+
 	let payload: z.infer<typeof createAnalysisSchema>;
 
 	try {
@@ -51,13 +57,30 @@ export async function POST(request: Request) {
 		}
 
 		const analysisId = await jobAnalysesService.create({
+			userId,
 			resumeText: payload.resumeText,
 			jobSourceType: payload.jobUrl ? JobSourceType.URL : JobSourceType.TEXT,
 			jobUrl: payload.jobUrl,
 			jobDescriptionInput: payload.jobDescription,
 		});
 
-		await workflowService.requestJobAnalysis(analysisId);
+		try {
+			await workflowService.requestJobAnalysis(analysisId);
+		} catch (workflowError) {
+			try {
+				await jobAnalysesService.markFailed(
+					analysisId,
+					"WORKFLOW_TRIGGER_FAILED",
+					getErrorMessage(workflowError),
+				);
+			} catch (markFailedError) {
+				logger.error("Failed to mark analysis as failed after trigger error", {
+					analysisId,
+					error: getErrorMessage(markFailedError),
+				});
+			}
+			throw workflowError;
+		}
 
 		return Response.json(
 			{

@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import type {
 	InsertJobAnalysis,
 	JobAnalysis,
@@ -38,6 +38,7 @@ export class JobAnalysesService {
 	) {}
 
 	async create(input: {
+		userId: string;
 		resumeText: string;
 		jobSourceType: JobSourceTypeValue;
 		jobUrl?: string;
@@ -47,6 +48,7 @@ export class JobAnalysesService {
 		const now = new Date().toISOString();
 		const payload: InsertJobAnalysis = {
 			id: analysisId,
+			userId: input.userId,
 			status: JobAnalysisStatus.QUEUED,
 			jobSourceType: input.jobSourceType,
 			jobUrl: input.jobUrl,
@@ -60,6 +62,7 @@ export class JobAnalysesService {
 			await this.db.insert(jobAnalyses).values(payload);
 			this.logger.info("Job analysis created", {
 				analysisId,
+				userId: input.userId,
 				jobSourceType: input.jobSourceType,
 				hasJobUrl: Boolean(input.jobUrl),
 			});
@@ -83,6 +86,27 @@ export class JobAnalysesService {
 		} catch (error) {
 			this.logger.error("Failed to find job analysis", {
 				id,
+				error: getErrorMessage(error),
+			});
+			throw error;
+		}
+	}
+
+	async findByIdForUser(
+		id: string,
+		userId: string,
+	): Promise<JobAnalysis | null> {
+		try {
+			const rows = await this.db
+				.select()
+				.from(jobAnalyses)
+				.where(and(eq(jobAnalyses.id, id), eq(jobAnalyses.userId, userId)))
+				.limit(1);
+			return rows[0] ?? null;
+		} catch (error) {
+			this.logger.error("Failed to find user-scoped job analysis", {
+				id,
+				userId,
 				error: getErrorMessage(error),
 			});
 			throw error;

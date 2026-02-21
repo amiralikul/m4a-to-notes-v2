@@ -242,6 +242,7 @@ export const jobAnalyses = sqliteTable(
 	"job_analyses",
 	{
 		id: text("id").primaryKey(),
+		userId: text("user_id"),
 		status: text("status", {
 			enum: ["queued", "processing", "completed", "failed"],
 		}).notNull(),
@@ -273,6 +274,7 @@ export const jobAnalyses = sqliteTable(
 			.$onUpdate(() => sql`(CURRENT_TIMESTAMP)`),
 	},
 	(table) => [
+		index("idx_job_analyses_user_id").on(table.userId),
 		index("idx_job_analyses_status").on(table.status),
 		index("idx_job_analyses_created_at").on(table.createdAt),
 	],

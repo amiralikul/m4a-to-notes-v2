@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { auth } from "@clerk/nextjs/server";
 import { POST as createAnalysis } from "@/app/api/analyses/route";
 import { GET as getAnalysis } from "@/app/api/analyses/[analysisId]/route";
 import { JobSourceType } from "@/services/job-analyses";
@@ -8,13 +9,18 @@ import {
 	workflowService,
 } from "@/services";
 
+vi.mock("@clerk/nextjs/server", () => ({
+	auth: vi.fn(),
+}));
+
 vi.mock("@/services", () => ({
 	brightDataService: {
 		isSupportedLinkedinJobUrl: vi.fn(),
 	},
 	jobAnalysesService: {
 		create: vi.fn(),
-		findById: vi.fn(),
+		findByIdForUser: vi.fn(),
+		markFailed: vi.fn(),
 	},
 	workflowService: {
 		requestJobAnalysis: vi.fn(),
@@ -28,8 +34,10 @@ vi.mock("@/lib/logger", () => ({
 describe("Job analyses API", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		vi.mocked(auth).mockResolvedValue({ userId: "user_1" } as never);
 		vi.mocked(brightDataService.isSupportedLinkedinJobUrl).mockReturnValue(true);
 		vi.mocked(jobAnalysesService.create).mockResolvedValue("analysis-1");
+		vi.mocked(jobAnalysesService.markFailed).mockResolvedValue({} as never);
 		vi.mocked(workflowService.requestJobAnalysis).mockResolvedValue(undefined);
 	});
 
@@ -48,10 +56,53 @@ describe("Job analyses API", () => {
 		expect(response.status).toBe(202);
 		expect(jobAnalysesService.create).toHaveBeenCalledWith(
 			expect.objectContaining({
+				userId: "user_1",
 				jobSourceType: JobSourceType.TEXT,
 			}),
 		);
 		expect(workflowService.requestJobAnalysis).toHaveBeenCalledWith("analysis-1");
+	});
+
+	it("returns 401 when unauthenticated", async () => {
+		vi.mocked(auth).mockResolvedValue({ userId: null } as never);
+
+		const response = await createAnalysis(
+			new Request("http://localhost:3000/api/analyses", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					resumeText: "A".repeat(120),
+					jobDescription: "B".repeat(120),
+				}),
+			}),
+		);
+
+		expect(response.status).toBe(401);
+		expect(jobAnalysesService.create).not.toHaveBeenCalled();
+	});
+
+	it("marks analysis failed when workflow trigger fails", async () => {
+		vi.mocked(workflowService.requestJobAnalysis).mockRejectedValue(
+			new Error("trigger failed"),
+		);
+
+		const response = await createAnalysis(
+			new Request("http://localhost:3000/api/analyses", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					resumeText: "A".repeat(120),
+					jobDescription: "B".repeat(120),
+				}),
+			}),
+		);
+
+		expect(response.status).toBe(500);
+		expect(jobAnalysesService.markFailed).toHaveBeenCalledWith(
+			"analysis-1",
+			"WORKFLOW_TRIGGER_FAILED",
+			"trigger failed",
+		);
 	});
 
 	it("rejects non-LinkedIn job URLs", async () => {
@@ -73,7 +124,7 @@ describe("Job analyses API", () => {
 	});
 
 	it("returns analysis payload by id", async () => {
-		vi.mocked(jobAnalysesService.findById).mockResolvedValue({
+		vi.mocked(jobAnalysesService.findByIdForUser).mockResolvedValue({
 			id: "analysis-1",
 			status: "completed",
 			jobSourceType: "text",
@@ -113,5 +164,15 @@ describe("Job analyses API", () => {
 		expect(body.analysisId).toBe("analysis-1");
 		expect(body.status).toBe("completed");
 		expect(body.compatibilityScore).toBe(84);
+	});
+
+	it("returns 404 for missing user-scoped analysis", async () => {
+		vi.mocked(jobAnalysesService.findByIdForUser).mockResolvedValue(null);
+
+		const response = await getAnalysis(new Request("http://localhost:3000"), {
+			params: Promise.resolve({ analysisId: "missing-analysis" }),
+		});
+
+		expect(response.status).toBe(404);
 	});
 });
