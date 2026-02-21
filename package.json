@@ -19,6 +19,7 @@
     "inngest:dev": "npx inngest-cli@latest dev"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.46",
     "@clerk/nextjs": "^6.37.3",
     "@hookform/resolvers": "^5.2.2",
     "@lemonsqueezy/lemonsqueezy.js": "^4.0.0",
@@ -51,6 +52,7 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "@tanstack/react-query": "^5.90.21",
     "@vercel/blob": "^2.2.0",
+    "ai": "^6.0.97",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",

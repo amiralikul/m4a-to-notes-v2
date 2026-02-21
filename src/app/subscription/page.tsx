@@ -37,8 +37,9 @@ export default function SubscriptionPage() {
 		error,
 		refetch: fetchEntitlements,
 		canUpgradeTo,
-		hasActiveSubscription,
 	} = useEntitlements();
+
+	console.log({user})
 	const [cancellationSuccess, setCancellationSuccess] = useState<string | null>(null);
 
 	const getPlanDetails = (planKey: string | undefined) => {

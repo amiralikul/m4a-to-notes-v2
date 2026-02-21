@@ -54,7 +54,19 @@ src/
 │   └── use-entitlements.tsx           # Client-side entitlements state
 ├── services/
 │   ├── index.ts                       # Singleton instantiation
-│   ├── ai.service.ts                  # Whisper transcription (Groq/OpenAI)
+│   ├── ai/
+│   │   ├── index.ts                   # AI module exports
+│   │   ├── transcription-ai.service.ts # Whisper transcription (Groq/OpenAI)
+│   │   ├── text-ai.service.ts         # Summary + translation (OpenAI)
+│   │   ├── job-fit-ai.service.ts      # Resume vs JD analysis (Anthropic)
+│   │   ├── providers/
+│   │   │   ├── openai.client.ts       # OpenAI client factory
+│   │   │   └── anthropic.client.ts    # Anthropic client factory
+│   │   ├── prompts/
+│   │   │   └── job-fit.prompt.ts      # Job-fit prompt builder
+│   │   └── schemas/
+│   │       ├── summary.schema.ts      # Summary/translation output schema
+│   │       └── job-fit.schema.ts      # Job-fit output schema
 │   ├── transcriptions.ts             # Transcription CRUD
 │   ├── users.ts                       # User entitlements
 │   ├── storage.ts                     # Vercel Blob operations
@@ -155,7 +167,9 @@ All services are singletons instantiated in `src/services/index.ts`:
 | Service | Responsibility |
 |---|---|
 | `TranscriptionsService` | CRUD for transcription records, status transitions, progress tracking |
-| `AiService` | Whisper API calls via Groq or OpenAI (configurable via `TRANSCRIPTION_PROVIDER` env var) |
+| `TranscriptionAiService` | Whisper API calls via Groq or OpenAI (configurable via `TRANSCRIPTION_PROVIDER` env var) |
+| `TextAiService` | Transcript summary + translation |
+| `JobFitAiService` | Resume-to-job compatibility analysis |
 | `StorageService` | Upload/download/delete files in Vercel Blob |
 | `UsersService` | User entitlements — get, set (upsert), access checks with plan hierarchy |
 | `ConversationService` | Telegram conversation state with 7-day TTL, message history for LLM context |

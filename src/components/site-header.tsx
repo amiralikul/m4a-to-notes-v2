@@ -7,7 +7,7 @@ import { useUser } from "@clerk/nextjs";
 
 export function SiteHeader() {
 	const [scrolled, setScrolled] = useState(false);
-	const { isSignedIn } = useUser();
+	const { isSignedIn, user } = useUser();
 
 	useEffect(() => {
 		const onScroll = () => setScrolled(window.scrollY > 4);
@@ -49,6 +49,12 @@ export function SiteHeader() {
 				</Link>
 
 				<nav className="hidden md:flex flex-1 items-center gap-8 justify-start ml-10">
+					{ user?.id === "user_39ckoysfZ8KgkQnJXBUTnL8JnRN" && <Link
+						href="/job-match"
+						className="text-sm text-stone-500 hover:text-stone-900 transition-colors"
+					>
+						Job Match
+					</Link> }
 					<Link
 						href="/features"
 						className="text-sm text-stone-500 hover:text-stone-900 transition-colors"
@@ -76,6 +82,12 @@ export function SiteHeader() {
 				</nav>
 
 				<div className="ml-auto flex items-center gap-4">
+					{ user?.id === "user_39ckoysfZ8KgkQnJXBUTnL8JnRN" &&  <Link
+						href="/job-match"
+						className="text-sm text-stone-500 hover:text-stone-900 transition-colors"
+					>
+						Job Match
+					</Link> }
 					<Link
 						href="/dashboard"
 						className="text-sm text-stone-500 hover:text-stone-900 transition-colors"

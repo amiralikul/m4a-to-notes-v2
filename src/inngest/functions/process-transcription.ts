@@ -4,7 +4,7 @@ import { INNGEST_EVENTS } from "../events";
 import {
 	transcriptionsService,
 	storageService,
-	aiService,
+	transcriptionAiService,
 } from "@/services";
 import { sendTelegramMessage } from "@/services/telegram";
 import { TranscriptionStatus } from "@/services/transcriptions";
@@ -76,8 +76,8 @@ export const processTranscription = inngest.createFunction(
 			await transcriptionsService.updateProgress(transcriptionId, 20);
 
 			const text =
-				aiService.provider === "groq"
-					? await aiService.transcribeAudioFromUrl(t.audioKey)
+				transcriptionAiService.provider === "groq"
+					? await transcriptionAiService.transcribeAudioFromUrl(t.audioKey)
 					: await (async () => {
 							logger.info("Downloading audio file", {
 								transcriptionId,
@@ -91,7 +91,7 @@ export const processTranscription = inngest.createFunction(
 								transcriptionId,
 								fileSize: audioBuffer.byteLength,
 							});
-							return aiService.transcribeAudio(audioBuffer);
+							return transcriptionAiService.transcribeAudio(audioBuffer);
 						})();
 
 			if (!text.trim()) {
