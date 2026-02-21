@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
 	SummaryError,
 	TranscriptionError,
+	TranslationError,
 	getErrorMessage,
 } from "@/lib/errors";
 import type { Logger } from "@/lib/logger";
@@ -34,7 +35,7 @@ export interface AiServiceConfig {
 const PROVIDER_CONFIG = {
 	groq: {
 		baseURL: "https://api.groq.com/openai/v1",
-		model: "whisper-large-v3-turbo",
+		model: "whisper-large-v3",
 	},
 	openai: {
 		baseURL: undefined,
@@ -51,7 +52,7 @@ const SUMMARY_PROVIDER_CONFIG = {
 
 const VALID_PROVIDERS: TranscriptionProvider[] = ["groq", "openai"];
 const VALID_SUMMARY_PROVIDERS: SummaryProvider[] = ["openai"];
-const MAX_SUMMARY_TRANSCRIPT_CHARS = 120_000;
+const MAX_SUMMARY_TRANSCRIPT_CHARS = 500_000;
 
 const summarySchema = z.object({
 	summary: z.string().min(1),
@@ -91,10 +92,11 @@ export function parseSummaryProvider(
 }
 
 export class AiService {
-	private readonly client: OpenAI;
+	private client: OpenAI | null = null;
 	private summaryClient: OpenAI | null = null;
 	private readonly logger: Logger;
 	private readonly openaiKey: string;
+	private readonly groqKey: string;
 	readonly provider: TranscriptionProvider;
 	readonly model: string;
 	readonly summaryProvider: SummaryProvider;
@@ -108,20 +110,8 @@ export class AiService {
 			config.summaryModel ||
 			SUMMARY_PROVIDER_CONFIG[config.summaryProvider].model;
 		this.openaiKey = config.openaiKey;
+		this.groqKey = config.groqKey;
 		this.logger = logger;
-
-		const apiKey =
-			config.provider === "groq" ? config.groqKey : config.openaiKey;
-		if (!apiKey) {
-			throw new Error(
-				`Missing API key for transcription provider "${config.provider}"`,
-			);
-		}
-
-		this.client = new OpenAI({
-			apiKey,
-			baseURL: PROVIDER_CONFIG[config.provider].baseURL,
-		});
 	}
 
 	async transcribeAudio(audioBuffer: ArrayBuffer): Promise<string> {
@@ -135,9 +125,8 @@ export class AiService {
 		const startTime = Date.now();
 
 		try {
-			// Groq rate limits (whisper-large-v3-turbo): 20 req/min, 2M audio-sec/day.
-			// Handled by Inngest's built-in retry with backoff (4 retries).
-			const transcription = await this.client.audio.transcriptions.create({
+			// Groq rate limits are handled by Inngest's built-in retry with backoff (4 retries).
+			const transcription = await this.getTranscriptionClient().audio.transcriptions.create({
 				file: new File([audioBuffer], "audio.m4a", { type: "audio/m4a" }),
 				model: this.model,
 			});
@@ -174,6 +163,85 @@ export class AiService {
 			}
 
 			this.logger.error("Transcription failed", errorDetails);
+			throw new TranscriptionError(
+				`Failed to transcribe audio: ${errorMsg}`,
+			);
+		}
+	}
+
+	async transcribeAudioFromUrl(audioUrl: string): Promise<string> {
+		if (this.provider !== "groq") {
+			throw new TranscriptionError(
+				'URL-based transcription is only supported for "groq" provider',
+			);
+		}
+		if (!this.groqKey) {
+			throw new TranscriptionError(
+				`Missing API key for transcription provider "${this.provider}"`,
+			);
+		}
+
+		this.logger.info("Starting transcription", {
+			provider: this.provider,
+			mode: "url",
+			model: this.model,
+			audioUrl,
+		});
+
+		const startTime = Date.now();
+
+		try {
+			const formData = new FormData();
+			formData.append("model", this.model);
+			formData.append("url", audioUrl);
+
+			const response = await fetch(
+				`${PROVIDER_CONFIG.groq.baseURL}/audio/transcriptions`,
+				{
+					method: "POST",
+					headers: {
+						Authorization: `Bearer ${this.groqKey}`,
+					},
+					body: formData,
+				},
+			);
+
+			if (!response.ok) {
+				const errorBody = await response.text();
+				throw new Error(
+					`Groq API error (${response.status}): ${errorBody.slice(0, 300)}`,
+				);
+			}
+
+			const payload = (await response.json()) as { text?: unknown };
+			if (typeof payload.text !== "string") {
+				throw new Error("Groq response missing transcription text");
+			}
+
+			const duration = Date.now() - startTime;
+
+			this.logger.info("Transcription completed", {
+				provider: this.provider,
+				mode: "url",
+				model: this.model,
+				duration: `${duration}ms`,
+				transcriptionLength: payload.text.length,
+				transcriptionPreview: `${payload.text.substring(0, 100)}...`,
+			});
+
+			return payload.text;
+		} catch (error) {
+			const duration = Date.now() - startTime;
+			const errorMsg = getErrorMessage(error);
+
+			this.logger.error("Transcription failed", {
+				error: errorMsg,
+				provider: this.provider,
+				mode: "url",
+				model: this.model,
+				duration: `${duration}ms`,
+				audioUrl,
+			});
 			throw new TranscriptionError(
 				`Failed to transcribe audio: ${errorMsg}`,
 			);
@@ -257,6 +325,134 @@ export class AiService {
 		}
 	}
 
+	async translateText(text: string, targetLanguage: string): Promise<string> {
+		if (!text.trim()) {
+			throw new TranslationError("Cannot translate empty text");
+		}
+
+		const promptText =
+			text.length > MAX_SUMMARY_TRANSCRIPT_CHARS
+				? `${text.slice(0, MAX_SUMMARY_TRANSCRIPT_CHARS)}\n\n[Text truncated for translation.]`
+				: text;
+
+		const startTime = Date.now();
+		this.logger.info("Starting text translation", {
+			provider: this.summaryProvider,
+			model: this.summaryModel,
+			targetLanguage,
+			textLength: text.length,
+		});
+
+		try {
+			const completion = await this.getSummaryClient().chat.completions.create({
+				model: this.summaryModel,
+				messages: [
+					{
+						role: "system",
+						content: `You are a professional translator. Translate the following text to ${targetLanguage}. Preserve the original formatting, paragraph breaks, and tone. Output only the translated text, nothing else.`,
+					},
+					{
+						role: "user",
+						content: promptText,
+					},
+				],
+			});
+
+			const responseText = completion.choices[0]?.message?.content;
+			if (!responseText) {
+				throw new TranslationError("Translation response was empty");
+			}
+
+			this.logger.info("Text translation completed", {
+				provider: this.summaryProvider,
+				model: this.summaryModel,
+				targetLanguage,
+				duration: `${Date.now() - startTime}ms`,
+				outputLength: responseText.length,
+			});
+
+			return responseText;
+		} catch (error) {
+			const errorMsg = getErrorMessage(error);
+			this.logger.error("Text translation failed", {
+				provider: this.summaryProvider,
+				model: this.summaryModel,
+				targetLanguage,
+				duration: `${Date.now() - startTime}ms`,
+				error: errorMsg,
+			});
+			if (error instanceof TranslationError) throw error;
+			throw new TranslationError(`Failed to translate text: ${errorMsg}`);
+		}
+	}
+
+	async translateSummary(
+		summary: SummaryResult,
+		targetLanguage: string,
+	): Promise<SummaryResult> {
+		const startTime = Date.now();
+		this.logger.info("Starting summary translation", {
+			provider: this.summaryProvider,
+			model: this.summaryModel,
+			targetLanguage,
+		});
+
+		try {
+			const completion = await this.getSummaryClient().chat.completions.create({
+				model: this.summaryModel,
+				response_format: { type: "json_object" },
+				messages: [
+					{
+						role: "system",
+						content: `You are a professional translator. Translate the following JSON summary to ${targetLanguage}. Preserve the exact JSON structure with keys: summary (string), keyPoints (string[]), actionItems ({task:string, owner?:string, dueDate?:string}[]), keyTakeaways (string[]). Only translate the text values, not the JSON keys. Return valid JSON.`,
+					},
+					{
+						role: "user",
+						content: JSON.stringify(summary),
+					},
+				],
+			});
+
+			const responseText = completion.choices[0]?.message?.content;
+			if (!responseText) {
+				throw new TranslationError("Summary translation response was empty");
+			}
+
+			let parsed: unknown;
+			try {
+				parsed = JSON.parse(responseText);
+			} catch (parseError) {
+				throw new TranslationError(
+					`Failed to parse translated summary JSON: ${getErrorMessage(parseError)}`,
+				);
+			}
+
+			const result = summarySchema.parse(parsed);
+
+			this.logger.info("Summary translation completed", {
+				provider: this.summaryProvider,
+				model: this.summaryModel,
+				targetLanguage,
+				duration: `${Date.now() - startTime}ms`,
+			});
+
+			return result;
+		} catch (error) {
+			const errorMsg = getErrorMessage(error);
+			this.logger.error("Summary translation failed", {
+				provider: this.summaryProvider,
+				model: this.summaryModel,
+				targetLanguage,
+				duration: `${Date.now() - startTime}ms`,
+				error: errorMsg,
+			});
+			if (error instanceof TranslationError) throw error;
+			throw new TranslationError(
+				`Failed to translate summary: ${errorMsg}`,
+			);
+		}
+	}
+
 	private getSummaryClient(): OpenAI {
 		if (this.summaryProvider !== "openai") {
 			throw new SummaryError(
@@ -278,5 +474,24 @@ export class AiService {
 		}
 
 		return this.summaryClient;
+	}
+
+	private getTranscriptionClient(): OpenAI {
+		const apiKey =
+			this.provider === "groq" ? this.groqKey : this.openaiKey;
+		if (!apiKey) {
+			throw new TranscriptionError(
+				`Missing API key for transcription provider "${this.provider}"`,
+			);
+		}
+
+		if (!this.client) {
+			this.client = new OpenAI({
+				apiKey,
+				baseURL: PROVIDER_CONFIG[this.provider].baseURL,
+			});
+		}
+
+		return this.client;
 	}
 }

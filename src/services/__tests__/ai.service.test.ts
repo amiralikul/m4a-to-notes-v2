@@ -10,6 +10,9 @@ import {
 const mockTranscriptionCreate = vi.fn();
 const mockSummaryCreate = vi.fn();
 const mockConstructor = vi.fn();
+const mockFetch = vi.fn();
+
+vi.stubGlobal("fetch", mockFetch);
 vi.mock("openai", () => {
 	class MockOpenAI {
 		_opts: Record<string, unknown>;
@@ -44,12 +47,9 @@ describe("AiService", () => {
 		it("configures Groq provider with correct baseURL and model", () => {
 			const service = new AiService(makeConfig({ provider: "groq" }), logger);
 
-			expect(mockConstructor).toHaveBeenCalledWith({
-				apiKey: "gsk_test_key",
-				baseURL: "https://api.groq.com/openai/v1",
-			});
+			expect(mockConstructor).not.toHaveBeenCalled();
 			expect(service.provider).toBe("groq");
-			expect(service.model).toBe("whisper-large-v3-turbo");
+			expect(service.model).toBe("whisper-large-v3");
 			expect(service.summaryProvider).toBe("openai");
 			expect(service.summaryModel).toBe("gpt-5-mini");
 		});
@@ -60,29 +60,31 @@ describe("AiService", () => {
 				logger,
 			);
 
-			expect(mockConstructor).toHaveBeenCalledWith({
-				apiKey: "sk-test_key",
-				baseURL: undefined,
-			});
+			expect(mockConstructor).not.toHaveBeenCalled();
 			expect(service.provider).toBe("openai");
 			expect(service.model).toBe("whisper-1");
 		});
 
-		it("throws when Groq key is missing for groq provider", () => {
-			expect(
-				() =>
-					new AiService(makeConfig({ provider: "groq", groqKey: "" }), logger),
-			).toThrow('Missing API key for transcription provider "groq"');
-		});
+		it("defers missing key validation until transcription call", async () => {
+			const groqService = new AiService(
+				makeConfig({ provider: "groq", groqKey: "" }),
+				logger,
+			);
+			await expect(
+				groqService.transcribeAudio(new ArrayBuffer(10)),
+			).rejects.toThrow(
+				'Failed to transcribe audio: Missing API key for transcription provider "groq"',
+			);
 
-		it("throws when OpenAI key is missing for openai provider", () => {
-			expect(
-				() =>
-					new AiService(
-						makeConfig({ provider: "openai", openaiKey: "" }),
-						logger,
-					),
-			).toThrow('Missing API key for transcription provider "openai"');
+			const openaiService = new AiService(
+				makeConfig({ provider: "openai", openaiKey: "" }),
+				logger,
+			);
+			await expect(
+				openaiService.transcribeAudio(new ArrayBuffer(10)),
+			).rejects.toThrow(
+				'Failed to transcribe audio: Missing API key for transcription provider "openai"',
+			);
 		});
 	});
 
@@ -96,7 +98,7 @@ describe("AiService", () => {
 			expect(result).toBe("Hello world");
 			expect(mockTranscriptionCreate).toHaveBeenCalledWith({
 				file: expect.any(File),
-				model: "whisper-large-v3-turbo",
+				model: "whisper-large-v3",
 			});
 		});
 
@@ -114,6 +116,66 @@ describe("AiService", () => {
 				file: expect.any(File),
 				model: "whisper-1",
 			});
+		});
+	});
+
+	describe("transcribeAudioFromUrl", () => {
+		it("sends audio URL to Groq transcription endpoint", async () => {
+			mockFetch.mockResolvedValueOnce({
+				ok: true,
+				json: vi.fn().mockResolvedValue({ text: "Transcript from url" }),
+			} as unknown as Response);
+
+			const service = new AiService(makeConfig({ provider: "groq" }), logger);
+			const result = await service.transcribeAudioFromUrl(
+				"https://blob.vercel-storage.com/audio.m4a",
+			);
+
+			expect(result).toBe("Transcript from url");
+			expect(mockFetch).toHaveBeenCalledTimes(1);
+			const [requestUrl, requestInit] = mockFetch.mock.calls[0] as [
+				string,
+				RequestInit,
+			];
+
+			expect(requestUrl).toBe("https://api.groq.com/openai/v1/audio/transcriptions");
+			expect(requestInit.method).toBe("POST");
+			expect(requestInit.headers).toEqual({
+				Authorization: "Bearer gsk_test_key",
+			});
+			expect(requestInit.body).toBeInstanceOf(FormData);
+
+			const body = requestInit.body as FormData;
+			expect(body.get("model")).toBe("whisper-large-v3");
+			expect(body.get("url")).toBe("https://blob.vercel-storage.com/audio.m4a");
+		});
+
+		it("wraps Groq url transcription errors", async () => {
+			mockFetch.mockResolvedValueOnce({
+				ok: false,
+				status: 400,
+				text: vi.fn().mockResolvedValue("bad request"),
+			} as unknown as Response);
+
+			const service = new AiService(makeConfig({ provider: "groq" }), logger);
+
+			await expect(
+				service.transcribeAudioFromUrl("https://blob.vercel-storage.com/bad.m4a"),
+			).rejects.toThrow("Failed to transcribe audio: Groq API error (400)");
+		});
+
+		it("throws when provider is openai", async () => {
+			const service = new AiService(
+				makeConfig({ provider: "openai" }),
+				logger,
+			);
+
+			await expect(
+				service.transcribeAudioFromUrl("https://blob.vercel-storage.com/audio.m4a"),
+			).rejects.toThrow(
+				'URL-based transcription is only supported for "groq" provider',
+			);
+			expect(mockFetch).not.toHaveBeenCalled();
 		});
 	});
 
@@ -140,7 +202,7 @@ describe("AiService", () => {
 			expect(result.summary).toContain("Sprint planning");
 			expect(result.keyPoints).toHaveLength(2);
 			expect(result.actionItems[0]?.task).toBe("Update roadmap");
-			expect(mockConstructor).toHaveBeenCalledTimes(2);
+			expect(mockConstructor).toHaveBeenCalledTimes(1);
 			expect(mockSummaryCreate).toHaveBeenCalled();
 		});
 

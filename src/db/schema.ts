@@ -57,6 +57,7 @@ export const transcriptions = sqliteTable(
 		startedAt: text("started_at"),
 		completedAt: text("completed_at"),
 		userId: text("user_id"),
+		ownerId: text("owner_id"),
 		summaryStatus: text("summary_status", {
 			enum: ["pending", "processing", "completed", "failed"],
 		}),
@@ -79,6 +80,51 @@ export const transcriptions = sqliteTable(
 		index("idx_transcriptions_status").on(table.status),
 		index("idx_transcriptions_created_at").on(table.createdAt),
 		index("idx_transcriptions_user_id").on(table.userId),
+		index("idx_transcriptions_owner_id").on(table.ownerId),
+	],
+);
+
+export const trialDailyUsage = sqliteTable(
+	"trial_daily_usage",
+	{
+		actorId: text("actor_id").notNull(),
+		dayKey: text("day_key").notNull(),
+		usedCount: integer("used_count").default(0).notNull(),
+		createdAt: text("created_at")
+			.notNull()
+			.default(sql`(CURRENT_TIMESTAMP)`),
+		updatedAt: text("updated_at")
+			.notNull()
+			.default(sql`(CURRENT_TIMESTAMP)`)
+			.$onUpdate(() => sql`(CURRENT_TIMESTAMP)`),
+	},
+	(table) => [
+		uniqueIndex("idx_trial_daily_usage_actor_day").on(
+			table.actorId,
+			table.dayKey,
+		),
+	],
+);
+
+export const actors = sqliteTable(
+	"actors",
+	{
+		id: text("id").primaryKey(),
+		userId: text("user_id"),
+		createdAt: text("created_at")
+			.notNull()
+			.default(sql`(CURRENT_TIMESTAMP)`),
+		updatedAt: text("updated_at")
+			.notNull()
+			.default(sql`(CURRENT_TIMESTAMP)`)
+			.$onUpdate(() => sql`(CURRENT_TIMESTAMP)`),
+		lastSeenAt: text("last_seen_at")
+			.notNull()
+			.default(sql`(CURRENT_TIMESTAMP)`),
+	},
+	(table) => [
+		uniqueIndex("idx_actors_user_id").on(table.userId),
+		index("idx_actors_last_seen_at").on(table.lastSeenAt),
 	],
 );
 
@@ -185,6 +231,12 @@ export type Transcription = typeof transcriptions.$inferSelect;
 export type InsertTranscription = typeof transcriptions.$inferInsert;
 export type UpdateTranscription = Partial<Omit<Transcription, "id">>;
 
+export type TrialDailyUsage = typeof trialDailyUsage.$inferSelect;
+export type InsertTrialDailyUsage = typeof trialDailyUsage.$inferInsert;
+
+export type Actor = typeof actors.$inferSelect;
+export type InsertActor = typeof actors.$inferInsert;
+
 export type Conversation = typeof conversations.$inferSelect;
 export type InsertConversation = typeof conversations.$inferInsert;
 export type UpdateConversation = Partial<Omit<Conversation, "chatId">>;
@@ -195,3 +247,42 @@ export type UpdateUserEntitlement = Partial<Omit<UserEntitlement, "userId">>;
 
 export type BillingSubscription = typeof billingSubscriptions.$inferSelect;
 export type InsertBillingSubscription = typeof billingSubscriptions.$inferInsert;
+
+// Translations table - stores translated versions of transcriptions
+export const translations = sqliteTable(
+	"translations",
+	{
+		id: text("id").primaryKey(),
+		transcriptionId: text("transcription_id").notNull(),
+		language: text("language").notNull(),
+		status: text("status", {
+			enum: ["pending", "processing", "completed", "failed"],
+		}).notNull(),
+		translatedText: text("translated_text"),
+		translatedSummary: text("translated_summary", {
+			mode: "json",
+		}).$type<TranscriptionSummaryData>(),
+		errorDetails: text("error_details", { mode: "json" }).$type<{
+			code?: string;
+			message: string;
+		}>(),
+		createdAt: text("created_at")
+			.notNull()
+			.default(sql`(CURRENT_TIMESTAMP)`),
+		completedAt: text("completed_at"),
+		updatedAt: text("updated_at")
+			.notNull()
+			.default(sql`(CURRENT_TIMESTAMP)`)
+			.$onUpdate(() => sql`(CURRENT_TIMESTAMP)`),
+	},
+	(table) => [
+		uniqueIndex("translations_transcription_language_idx").on(
+			table.transcriptionId,
+			table.language,
+		),
+	],
+);
+
+export type Translation = typeof translations.$inferSelect;
+export type InsertTranslation = typeof translations.$inferInsert;
+export type UpdateTranslation = Partial<Omit<Translation, "id">>;

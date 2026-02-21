@@ -14,10 +14,10 @@ vi.mock("@/services", () => ({
 		markSummaryPending: vi.fn(),
 	},
 	usersService: { getWithDefaults: vi.fn() },
-}));
-
-vi.mock("@/inngest/client", () => ({
-	inngest: { send: vi.fn() },
+	workflowService: {
+		startTranscription: vi.fn(),
+		regenerateSummary: vi.fn(),
+	},
 }));
 
 vi.mock("@/lib/logger", () => ({
@@ -29,24 +29,6 @@ vi.mock("@/db", () => ({
 }));
 
 const protectedRoutes = [
-	{
-		method: "POST",
-		path: "/api/start-transcription",
-		module: () => import("../../api/start-transcription/route"),
-	},
-	{
-		method: "GET",
-		path: "/api/transcriptions/test-id",
-		module: () => import("../../api/transcriptions/[transcriptionId]/route"),
-	},
-	{
-		method: "GET",
-		path: "/api/transcriptions/test-id/transcript",
-		module: () =>
-			import(
-				"../../api/transcriptions/[transcriptionId]/transcript/route"
-			),
-	},
 	{
 		method: "POST",
 		path: "/api/transcriptions/test-id/summary/regenerate",

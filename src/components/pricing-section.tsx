@@ -28,14 +28,17 @@ export function PricingSection() {
 		billingInterval === "yearly" ? plan.yearlyVariantId : plan.monthlyVariantId;
 
 	return (
-		<section id="pricing" className="w-full py-12 md:py-24 lg:py-32 bg-muted">
+		<section id="pricing" className="w-full py-16 md:py-24 lg:py-32 bg-stone-50">
 			<div className="container px-4 md:px-6">
 				<div className="flex flex-col items-center justify-center space-y-4 text-center">
-					<div className="space-y-2">
-						<h2 className="text-3xl font-bold tracking-tighter sm:text-5xl">
+					<div className="space-y-3">
+						<p className="text-sm font-medium text-amber-600 uppercase tracking-wider">
+							Pricing
+						</p>
+						<h2 className="text-3xl font-display italic sm:text-5xl text-stone-900">
 							Simple Pricing
 						</h2>
-						<p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
+						<p className="max-w-[900px] text-stone-500 md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
 							Choose the plan that fits your transcription needs. Start with our
 							free tier or upgrade for unlimited access.
 						</p>

@@ -10,14 +10,14 @@ import {
 	TranscriptionStatus,
 } from "@/services/transcriptions";
 import { getErrorMessage } from "@/lib/errors";
-import { logger } from "@/lib/logger";
-
 export const processSummary = inngest.createFunction(
 	{
 		id: "process-summary",
 		retries: 3,
 		concurrency: { limit: 5 },
-		onFailure: async ({ event, error }) => {
+		idempotency: "event.data.transcriptionId",
+		timeouts: { finish: "10m" },
+		onFailure: async ({ event, error, logger }) => {
 			const transcriptionId =
 				event.data.event.data.transcriptionId;
 
@@ -43,7 +43,7 @@ export const processSummary = inngest.createFunction(
 		},
 	},
 	{ event: INNGEST_EVENTS.TRANSCRIPTION_COMPLETED },
-	async ({ event, step }) => {
+	async ({ event, step, logger }) => {
 		const { transcriptionId } = event.data;
 
 		const transcriptionResult = await step.run(

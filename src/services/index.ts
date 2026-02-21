@@ -9,6 +9,10 @@ import {
 	parseSummaryProvider,
 } from "./ai.service";
 import { StorageService } from "./storage";
+import { WorkflowService } from "./workflow";
+import { TrialUsageService } from "./trial-usage";
+import { ActorsService } from "./actors";
+import { TranslationsService } from "./translations";
 
 export const transcriptionsService = new TranscriptionsService(db, logger);
 export const usersService = new UsersService(db, logger);
@@ -28,3 +32,7 @@ export const aiService = new AiService(
 );
 
 export const storageService = new StorageService();
+export const workflowService = new WorkflowService(logger);
+export const trialUsageService = new TrialUsageService(db, logger);
+export const actorsService = new ActorsService(db, logger);
+export const translationsService = new TranslationsService(db, logger);

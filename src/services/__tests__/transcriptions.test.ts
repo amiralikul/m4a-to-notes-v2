@@ -291,6 +291,66 @@ describe("TranscriptionsService", () => {
 		});
 	});
 
+	describe("findByActorId", () => {
+		it("returns only that actor's transcriptions", async () => {
+			await service.create({
+				audioKey: "a1",
+				filename: "anon-1-a.m4a",
+				ownerId: "actor_1",
+			});
+			await service.create({
+				audioKey: "a2",
+				filename: "anon-1-b.m4a",
+				ownerId: "actor_1",
+			});
+			await service.create({
+				audioKey: "a3",
+				filename: "anon-2-a.m4a",
+				ownerId: "actor_2",
+			});
+			await service.create({
+				audioKey: "a4",
+				filename: "signed-user.m4a",
+				userId: "user_1",
+				ownerId: "actor_1",
+			});
+
+			const results = await service.findByActorId("actor_1");
+			expect(results).toHaveLength(2);
+			expect(results.every((t) => t.userId === null && t.ownerId === "actor_1")).toBe(true);
+		});
+	});
+
+	describe("countByActorId", () => {
+		it("returns correct count for actor transcriptions", async () => {
+			await service.create({
+				audioKey: "a1",
+				filename: "anon-1-a.m4a",
+				ownerId: "actor_1",
+			});
+			await service.create({
+				audioKey: "a2",
+				filename: "anon-1-b.m4a",
+				ownerId: "actor_1",
+			});
+			await service.create({
+				audioKey: "a3",
+				filename: "anon-2-a.m4a",
+				ownerId: "actor_2",
+			});
+			await service.create({
+				audioKey: "a4",
+				filename: "signed-user.m4a",
+				userId: "user_1",
+				ownerId: "actor_1",
+			});
+
+			expect(await service.countByActorId("actor_1")).toBe(2);
+			expect(await service.countByActorId("actor_2")).toBe(1);
+			expect(await service.countByActorId("unknown")).toBe(0);
+		});
+	});
+
 	describe("delete", () => {
 		it("deletes a transcription", async () => {
 			const id = await service.create({

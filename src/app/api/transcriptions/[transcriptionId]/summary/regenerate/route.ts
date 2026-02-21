@@ -1,9 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
-import { inngest } from "@/inngest/client";
-import { INNGEST_EVENTS } from "@/inngest/events";
 import { getErrorMessage } from "@/lib/errors";
 import { logger } from "@/lib/logger";
-import { transcriptionsService } from "@/services";
+import { transcriptionsService, workflowService } from "@/services";
 import { TranscriptionStatus } from "@/services/transcriptions";
 
 export async function POST(
@@ -43,10 +41,7 @@ export async function POST(
 
 		await transcriptionsService.markSummaryPending(transcriptionId);
 
-		await inngest.send({
-			name: INNGEST_EVENTS.TRANSCRIPTION_COMPLETED,
-			data: { transcriptionId },
-		});
+		await workflowService.regenerateSummary(transcriptionId);
 
 		return Response.json(
 			{

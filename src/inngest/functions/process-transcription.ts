@@ -9,14 +9,14 @@ import {
 import { sendTelegramMessage } from "@/services/telegram";
 import { TranscriptionStatus } from "@/services/transcriptions";
 import { getErrorMessage } from "@/lib/errors";
-import { logger } from "@/lib/logger";
-
 export const processTranscription = inngest.createFunction(
 	{
 		id: "process-transcription",
 		retries: 4,
 		concurrency: { limit: 5 },
-		onFailure: async ({ event, error }) => {
+		idempotency: "event.data.transcriptionId",
+		timeouts: { finish: "15m" },
+		onFailure: async ({ event, error, logger }) => {
 			const transcriptionId =
 				event.data.event.data.transcriptionId;
 			logger.error("Transcription failed after all retries (DLQ)", {
@@ -39,7 +39,7 @@ export const processTranscription = inngest.createFunction(
 		},
 	},
 	{ event: INNGEST_EVENTS.TRANSCRIPTION_REQUESTED },
-	async ({ event, step }) => {
+	async ({ event, step, logger }) => {
 		const { transcriptionId } = event.data;
 
 		// Step 1: Fetch transcription and check idempotency
@@ -71,35 +71,38 @@ export const processTranscription = inngest.createFunction(
 
 		const { transcription: t } = transcription;
 
-		// Step 2: Download audio and transcribe with Whisper
-		const transcriptText = await step.run(
-			"download-and-transcribe",
-			async () => {
-				logger.info("Downloading audio file", {
-					transcriptionId,
-					audioKey: t.audioKey,
-				});
-				const audioBuffer = await storageService.downloadContent(
-					t.audioKey,
-				);
-				await transcriptionsService.updateProgress(transcriptionId, 20);
+		// Step 2: Transcribe audio
+		const transcriptText = await step.run("transcribe-audio", async () => {
+			await transcriptionsService.updateProgress(transcriptionId, 20);
 
-				logger.info("Starting Whisper transcription", {
-					transcriptionId,
-					fileSize: audioBuffer.byteLength,
-				});
-				const text = await aiService.transcribeAudio(audioBuffer);
+			const text =
+				aiService.provider === "groq"
+					? await aiService.transcribeAudioFromUrl(t.audioKey)
+					: await (async () => {
+							logger.info("Downloading audio file", {
+								transcriptionId,
+								audioKey: t.audioKey,
+							});
+							const audioBuffer = await storageService.downloadContent(
+								t.audioKey,
+							);
 
-				if (!text.trim()) {
-					throw new NonRetriableError("No speech detected in audio");
-				}
+							logger.info("Starting Whisper transcription", {
+								transcriptionId,
+								fileSize: audioBuffer.byteLength,
+							});
+							return aiService.transcribeAudio(audioBuffer);
+						})();
 
-				await transcriptionsService.updateProgress(transcriptionId, 90);
-				return text;
-			},
-		);
+			if (!text.trim()) {
+				throw new NonRetriableError("No speech detected in audio");
+			}
 
-		// Step 4: Save result
+			await transcriptionsService.updateProgress(transcriptionId, 90);
+			return text;
+		});
+
+		// Step 3: Save result
 		await step.run("save-result", async () => {
 			const preview =
 				transcriptText.substring(0, 150) +
@@ -112,13 +115,14 @@ export const processTranscription = inngest.createFunction(
 			);
 		});
 
-		// Step 5: Trigger summary generation in a separate pipeline.
+		// Step 4: Trigger summary generation in a separate pipeline.
 		await step.sendEvent("request-summary", {
+			id: `summary-requested-${transcriptionId}`,
 			name: INNGEST_EVENTS.TRANSCRIPTION_COMPLETED,
 			data: { transcriptionId },
 		});
 
-		// Step 6: Notify Telegram if source is telegram (#1)
+		// Step 5: Notify Telegram if source is telegram
 		if (t.source === "telegram" && t.userMetadata) {
 			await step.run("notify-telegram", async () => {
 				const chatId = (t.userMetadata as Record<string, unknown>)

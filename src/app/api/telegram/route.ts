@@ -1,17 +1,18 @@
 import { Bot, type Context, webhookCallback } from "grammy";
-import { inngest } from "@/inngest/client";
-import { INNGEST_EVENTS } from "@/inngest/events";
-import { transcriptionsService, conversationService } from "@/services";
+import {
+	transcriptionsService,
+	conversationService,
+	storageService,
+	workflowService,
+} from "@/services";
 import { getChatCompletion } from "@/services/chat";
-import { storageService } from "@/services";
 import { getErrorMessage } from "@/lib/errors";
-import { AUDIO_LIMITS } from "@/lib/validation";
+import { AUDIO_LIMITS, SUPPORTED_AUDIO_FORMATS_TEXT } from "@/lib/validation";
 import { logger } from "@/lib/logger";
 
 // Cache botInfo on globalThis to avoid getMe() on every request (#4)
-const globalForBot = globalThis as unknown as {
-	// biome-ignore lint: Grammy internal type
-	botInfo: any;
+const globalForBot = globalThis as typeof globalThis & {
+	telegramBotInfo?: Bot<Context>["botInfo"];
 };
 
 export async function POST(request: Request) {
@@ -30,20 +31,20 @@ export async function POST(request: Request) {
 		return Response.json({ error: "Invalid token" }, { status: 401 });
 	}
 
-	if (!globalForBot.botInfo) {
+	if (!globalForBot.telegramBotInfo) {
 		const tempBot = new Bot(botToken);
 		await tempBot.init();
-		globalForBot.botInfo = tempBot.botInfo;
+		globalForBot.telegramBotInfo = tempBot.botInfo;
 	}
 
-	const bot = new Bot(botToken, { botInfo: globalForBot.botInfo });
+	const bot = new Bot(botToken, { botInfo: globalForBot.telegramBotInfo });
 
 	// /start command
 	bot.command("start", async (ctx) => {
 		await ctx.reply(
 			"Welcome to AudioScribe! Send me an audio file and I'll transcribe it for you.\n\n" +
-				"Supported formats: M4A, MP3, WAV, OGG, AAC, WebM\n" +
-				"Max file size: 25MB",
+				`Supported formats: ${SUPPORTED_AUDIO_FORMATS_TEXT}\n` +
+				`Max file size: ${AUDIO_LIMITS.MAX_FILE_SIZE / 1024 / 1024}MB`,
 		);
 	});
 
@@ -54,8 +55,8 @@ export async function POST(request: Request) {
 				"1. Send me an audio file\n" +
 				"2. Wait for the transcription\n" +
 				"3. Ask me questions about the transcription\n\n" +
-				"Supported formats: M4A, MP3, WAV, OGG, AAC, WebM\n" +
-				"Max file size: 25MB",
+				`Supported formats: ${SUPPORTED_AUDIO_FORMATS_TEXT}\n` +
+				`Max file size: ${AUDIO_LIMITS.MAX_FILE_SIZE / 1024 / 1024}MB`,
 		);
 	});
 
@@ -75,7 +76,7 @@ export async function POST(request: Request) {
 			await handleFileProcessing(ctx, doc);
 		} else {
 			await ctx.reply(
-				"Please send an audio file. Supported formats: M4A, MP3, WAV, OGG, AAC, WebM",
+				`Please send an audio file. Supported formats: ${SUPPORTED_AUDIO_FORMATS_TEXT}`,
 			);
 		}
 	});
@@ -132,7 +133,7 @@ export async function POST(request: Request) {
 	return handler(request);
 }
 
-// (#1) Rewritten: upload to Blob → create DB record → send Inngest event
+// (#1) Rewritten: upload to Blob → create DB record → trigger workflow
 async function handleFileProcessing(
 	ctx: Context,
 	fileInfo: { file_id: string; file_size?: number; file_name?: string },
@@ -176,11 +177,8 @@ async function handleFileProcessing(
 			userMetadata: { chatId },
 		});
 
-		// Send Inngest event (notify-telegram step will send the result back)
-		await inngest.send({
-			name: INNGEST_EVENTS.TRANSCRIPTION_REQUESTED,
-			data: { transcriptionId },
-		});
+		// notify-telegram step will send the result back
+		await workflowService.startTranscription(transcriptionId);
 
 		logger.info("Telegram file queued for transcription", {
 			transcriptionId,

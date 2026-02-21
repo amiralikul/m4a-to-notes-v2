@@ -15,7 +15,7 @@ export const PRICING_PLANS: Record<string, PricingPlan> = {
 		monthlyVariantId: null,
 		yearlyVariantId: null,
 		features: [
-			"3 transcriptions per month",
+			"3 transcriptions per day",
 			"AI-powered transcription",
 			"Export to TXT",
 			"Secure file handling",

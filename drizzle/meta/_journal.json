@@ -71,6 +71,41 @@
       "when": 1771233215415,
       "tag": "0009_many_luckman",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1771270333219,
+      "tag": "0010_absent_spyke",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1771416024998,
+      "tag": "0011_breezy_earthquake",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1771422335997,
+      "tag": "0012_fat_omega_flight",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1771589480709,
+      "tag": "0013_outstanding_professor_monster",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1771600364966,
+      "tag": "0014_drop_redundant_translations_transcription_id_idx",
+      "breakpoints": true
     }
   ]
 }
