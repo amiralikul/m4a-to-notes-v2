@@ -40,4 +40,14 @@ export class WorkflowService {
 			language,
 		});
 	}
+
+	async requestJobAnalysis(analysisId: string) {
+		await inngest.send({
+			name: INNGEST_EVENTS.JOB_ANALYSIS_REQUESTED,
+			data: { analysisId },
+		});
+		this.logger.info("Workflow: job analysis requested", {
+			analysisId,
+		});
+	}
 }

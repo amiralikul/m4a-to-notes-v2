@@ -222,6 +222,62 @@ export interface TranscriptionSummaryData {
 	keyTakeaways: string[];
 }
 
+export interface JobAnalysisOneWeekPlanDay {
+	day: number;
+	title: string;
+	tasks: string[];
+}
+
+export interface JobAnalysisResultData {
+	compatibilityScore: number;
+	compatibilitySummary: string;
+	strengths: string[];
+	gaps: string[];
+	interviewQuestions: string[];
+	interviewPreparation: string[];
+	oneWeekPlan: JobAnalysisOneWeekPlanDay[];
+}
+
+export const jobAnalyses = sqliteTable(
+	"job_analyses",
+	{
+		id: text("id").primaryKey(),
+		status: text("status", {
+			enum: ["queued", "processing", "completed", "failed"],
+		}).notNull(),
+		jobSourceType: text("job_source_type", {
+			enum: ["url", "text"],
+		}).notNull(),
+		jobUrl: text("job_url"),
+		resumeText: text("resume_text").notNull(),
+		jobDescriptionInput: text("job_description_input"),
+		resolvedJobDescription: text("resolved_job_description"),
+		brightDataSnapshotId: text("brightdata_snapshot_id"),
+		brightDataRawPayload: text("brightdata_raw_payload", {
+			mode: "json",
+		}).$type<unknown>(),
+		resultData: text("result_data", { mode: "json" }).$type<JobAnalysisResultData>(),
+		compatibilityScore: integer("compatibility_score"),
+		modelProvider: text("model_provider"),
+		modelName: text("model_name"),
+		errorCode: text("error_code"),
+		errorMessage: text("error_message"),
+		createdAt: text("created_at")
+			.notNull()
+			.default(sql`(CURRENT_TIMESTAMP)`),
+		startedAt: text("started_at"),
+		completedAt: text("completed_at"),
+		updatedAt: text("updated_at")
+			.notNull()
+			.default(sql`(CURRENT_TIMESTAMP)`)
+			.$onUpdate(() => sql`(CURRENT_TIMESTAMP)`),
+	},
+	(table) => [
+		index("idx_job_analyses_status").on(table.status),
+		index("idx_job_analyses_created_at").on(table.createdAt),
+	],
+);
+
 // Type inference exports
 export type Job = typeof jobs.$inferSelect;
 export type InsertJob = typeof jobs.$inferInsert;
@@ -247,6 +303,10 @@ export type UpdateUserEntitlement = Partial<Omit<UserEntitlement, "userId">>;
 
 export type BillingSubscription = typeof billingSubscriptions.$inferSelect;
 export type InsertBillingSubscription = typeof billingSubscriptions.$inferInsert;
+
+export type JobAnalysis = typeof jobAnalyses.$inferSelect;
+export type InsertJobAnalysis = typeof jobAnalyses.$inferInsert;
+export type UpdateJobAnalysis = Partial<Omit<JobAnalysis, "id">>;
 
 // Translations table - stores translated versions of transcriptions
 export const translations = sqliteTable(

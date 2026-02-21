@@ -50,6 +50,12 @@ export function SiteHeader() {
 
 				<nav className="hidden md:flex flex-1 items-center gap-8 justify-start ml-10">
 					<Link
+						href="/job-match"
+						className="text-sm text-stone-500 hover:text-stone-900 transition-colors"
+					>
+						Job Match
+					</Link>
+					<Link
 						href="/features"
 						className="text-sm text-stone-500 hover:text-stone-900 transition-colors"
 					>
@@ -76,6 +82,12 @@ export function SiteHeader() {
 				</nav>
 
 				<div className="ml-auto flex items-center gap-4">
+					<Link
+						href="/job-match"
+						className="text-sm text-stone-500 hover:text-stone-900 transition-colors"
+					>
+						Job Match
+					</Link>
 					<Link
 						href="/dashboard"
 						className="text-sm text-stone-500 hover:text-stone-900 transition-colors"
