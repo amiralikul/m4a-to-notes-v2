@@ -114,18 +114,16 @@ export class JobAnalysesService {
 	}
 
 	async update(id: string, updates: UpdateJobAnalysis): Promise<JobAnalysis> {
-		const existing = await this.findById(id);
-		if (!existing) {
-			throw new Error(`Job analysis not found: ${id}`);
-		}
-
 		try {
 			const rows = await this.db
 				.update(jobAnalyses)
 				.set(updates)
 				.where(eq(jobAnalyses.id, id))
 				.returning();
-			return rows[0] as JobAnalysis;
+			if (!rows[0]) {
+				throw new Error(`Job analysis not found: ${id}`);
+			}
+			return rows[0];
 		} catch (error) {
 			this.logger.error("Failed to update job analysis", {
 				id,
