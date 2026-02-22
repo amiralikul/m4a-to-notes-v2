@@ -100,18 +100,21 @@ export const processTranslation = inngest.createFunction(
 		const languageName =
 			SUPPORTED_LANGUAGES[language as LanguageCode] || language;
 
-		const translatedText = await step.ai.wrap(
-			"translate-text",
-			textAiService.translateText.bind(textAiService),
-			fetchResult.transcriptText,
-			languageName,
-		);
+		const translatedText = await step.ai.wrap("translate-text", async () => {
+			return textAiService.translateText(
+				fetchResult.transcriptText,
+				languageName,
+			);
+		});
 
 		const translatedSummary = await step.ai.wrap(
 			"translate-summary",
-			textAiService.translateSummary.bind(textAiService),
-			fetchResult.summaryData,
-			languageName,
+			async () => {
+				return textAiService.translateSummary(
+					fetchResult.summaryData,
+					languageName,
+				);
+			},
 		);
 
 		await step.run("save-translation", async () => {

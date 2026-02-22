@@ -72,51 +72,34 @@ export const processTranscription = inngest.createFunction(
 		const { transcription: t } = transcription;
 
 		// Step 2: Transcribe audio
-		await step.run("mark-transcription-progress-started", async () => {
+		const transcriptText = await step.ai.wrap("transcribe-audio", async () => {
 			await transcriptionsService.updateProgress(transcriptionId, 20);
-		});
 
-		const transcriptText = await (async () => {
-			if (transcriptionAiService.provider === "groq") {
-				const text = await step.ai.wrap(
-					"transcribe-audio",
-					transcriptionAiService.transcribeAudioFromUrl.bind(
-						transcriptionAiService,
-					),
-					t.audioKey,
-				);
+			const text =
+				transcriptionAiService.provider === "groq"
+					? await transcriptionAiService.transcribeAudioFromUrl(t.audioKey)
+					: await (async () => {
+							logger.info("Downloading audio file", {
+								transcriptionId,
+								audioKey: t.audioKey,
+							});
+							const audioBuffer = await storageService.downloadContent(
+								t.audioKey,
+							);
 
-				if (!text.trim()) {
-					throw new NonRetriableError("No speech detected in audio");
-				}
-
-				return text;
-			}
-
-			const text = await step.ai.wrap("transcribe-audio", async () => {
-				logger.info("Downloading audio file", {
-					transcriptionId,
-					audioKey: t.audioKey,
-				});
-				const audioBuffer = await storageService.downloadContent(t.audioKey);
-
-				logger.info("Starting Whisper transcription", {
-					transcriptionId,
-					fileSize: audioBuffer.byteLength,
-				});
-
-				return transcriptionAiService.transcribeAudio(audioBuffer);
-			});
+							logger.info("Starting Whisper transcription", {
+								transcriptionId,
+								fileSize: audioBuffer.byteLength,
+							});
+							return transcriptionAiService.transcribeAudio(audioBuffer);
+						})();
 
 			if (!text.trim()) {
 				throw new NonRetriableError("No speech detected in audio");
 			}
 
-			return text;
-		})();
-
-		await step.run("mark-transcription-progress-finished", async () => {
 			await transcriptionsService.updateProgress(transcriptionId, 90);
+			return text;
 		});
 
 		// Step 3: Save result
