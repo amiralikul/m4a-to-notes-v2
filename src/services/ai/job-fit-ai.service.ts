@@ -32,29 +32,40 @@ export class JobFitAiService {
 		});
 	}
 
-	async analyzeResumeMatch(input: {
+	getModel() {
+		return this.anthropicClient(this.model);
+	}
+
+	buildAnalysisRequest(input: {
 		resumeText: string;
 		jobDescription: string;
-	}): Promise<JobAnalysisResultData> {
+	}) {
 		if (!this.apiKey) {
 			throw new Error("ANTHROPIC_API_KEY is not configured");
 		}
 
+		return {
+			model: this.getModel(),
+			output: Output.object({ schema: jobFitResultSchema }),
+			prompt: buildJobFitPrompt(input),
+			temperature: 0.2 as const,
+			maxRetries: this.maxRetries,
+			providerOptions: {
+				anthropic: {
+					structuredOutputMode: "jsonTool" as const,
+				},
+			},
+		};
+	}
+
+	async analyzeResumeMatch(input: {
+		resumeText: string;
+		jobDescription: string;
+	}): Promise<JobAnalysisResultData> {
 		const start = Date.now();
 
 		try {
-			const { output } = await generateText({
-				model: this.anthropicClient(this.model),
-				output: Output.object({ schema: jobFitResultSchema }),
-				prompt: buildJobFitPrompt(input),
-				temperature: 0.2,
-				maxRetries: this.maxRetries,
-				providerOptions: {
-					anthropic: {
-						structuredOutputMode: "jsonTool",
-					},
-				},
-			});
+			const { output } = await generateText(this.buildAnalysisRequest(input));
 
 			this.logger.info("Resume match analysis completed", {
 				model: this.model,

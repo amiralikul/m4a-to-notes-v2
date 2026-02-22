@@ -1,3 +1,4 @@
+import { generateText } from "ai";
 import { NonRetriableError } from "inngest";
 import { INNGEST_EVENTS } from "../events";
 import { inngest } from "../client";
@@ -96,16 +97,21 @@ export const processSummary = inngest.createFunction(
 			};
 		}
 
-		const summary = await step.ai.wrap("generate-summary", async () => {
-			return textAiService.generateSummary(
+		const summary = await step.ai.wrap(
+			"generate-summary",
+			generateText,
+			textAiService.buildSummaryRequest(
 				transcriptionResult.transcription.transcriptText as string,
-			);
-		});
+			),
+		);
 
 		await step.run("save-summary", async () => {
+			if (!summary.experimental_output) {
+				throw new Error("Summary generation returned no output");
+			}
 			await transcriptionsService.markSummaryCompleted(
 				transcriptionId,
-				summary,
+				summary.experimental_output,
 				textAiService.provider,
 				textAiService.model,
 			);
@@ -114,8 +120,8 @@ export const processSummary = inngest.createFunction(
 		return {
 			status: "completed",
 			transcriptionId,
-			keyPoints: summary.keyPoints.length,
-			actionItems: summary.actionItems.length,
+			keyPoints: summary.experimental_output?.keyPoints.length,
+			actionItems: summary.experimental_output?.actionItems.length,
 		};
 	},
 );

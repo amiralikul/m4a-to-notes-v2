@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("ai", () => ({
+	generateText: vi.fn(),
+	Output: {
+		object: ({ schema }: { schema: unknown }) => ({ type: "object", schema }),
+	},
+}));
+
 vi.mock("@/services", () => ({
 	transcriptionsService: {
 		findById: vi.fn(),
@@ -11,6 +18,12 @@ vi.mock("@/services", () => ({
 		provider: "openai",
 		model: "gpt-5-mini",
 		generateSummary: vi.fn(),
+		buildSummaryRequest: vi.fn().mockReturnValue({
+			model: { modelId: "gpt-5-mini" },
+			system: "system prompt",
+			prompt: "summarize",
+			experimental_output: { type: "object" },
+		}),
 	},
 }));
 
@@ -23,6 +36,7 @@ vi.mock("@/lib/logger", () => ({
 	},
 }));
 
+import { generateText } from "ai";
 import { textAiService, transcriptionsService } from "@/services";
 
 async function runProcessSummary(transcriptionId: string) {
@@ -33,6 +47,13 @@ async function runProcessSummary(transcriptionId: string) {
 			event: { data: { transcriptionId: string } };
 			step: {
 				run: <T>(name: string, fn: () => Promise<T>) => Promise<T>;
+				ai: {
+					wrap: <T>(
+						name: string,
+						fn: (...args: unknown[]) => Promise<T>,
+						params: unknown,
+					) => Promise<T>;
+				};
 			};
 		}) => Promise<unknown>;
 	};
@@ -40,6 +61,15 @@ async function runProcessSummary(transcriptionId: string) {
 	const step = {
 		run: async <T>(_name: string, handler: () => Promise<T>): Promise<T> => {
 			return handler();
+		},
+		ai: {
+			wrap: async <T>(
+				_name: string,
+				wrappedFn: (...args: unknown[]) => Promise<T>,
+				params: unknown,
+			): Promise<T> => {
+				return wrappedFn(params);
+			},
 		},
 	};
 
@@ -55,6 +85,13 @@ describe("process-summary Inngest function", () => {
 	});
 
 	it("generates and saves summary for a completed transcription", async () => {
+		const summaryData = {
+			summary: "Discussed release readiness.",
+			keyPoints: ["QA complete", "Deploy Friday"],
+			actionItems: [{ task: "Prepare release notes", owner: "Alex" }],
+			keyTakeaways: ["Release is on track"],
+		};
+
 		vi.mocked(transcriptionsService.findById).mockResolvedValue({
 			id: "tx-1",
 			status: "completed",
@@ -64,12 +101,10 @@ describe("process-summary Inngest function", () => {
 		vi.mocked(transcriptionsService.markSummaryStarted).mockResolvedValue(
 			{} as never,
 		);
-		vi.mocked(textAiService.generateSummary).mockResolvedValue({
-			summary: "Discussed release readiness.",
-			keyPoints: ["QA complete", "Deploy Friday"],
-			actionItems: [{ task: "Prepare release notes", owner: "Alex" }],
-			keyTakeaways: ["Release is on track"],
-		});
+		vi.mocked(generateText).mockResolvedValue({
+			experimental_output: summaryData,
+			text: JSON.stringify(summaryData),
+		} as never);
 		vi.mocked(transcriptionsService.markSummaryCompleted).mockResolvedValue(
 			{} as never,
 		);
@@ -87,9 +122,10 @@ describe("process-summary Inngest function", () => {
 			"openai",
 			"gpt-5-mini",
 		);
-		expect(textAiService.generateSummary).toHaveBeenCalledWith(
+		expect(textAiService.buildSummaryRequest).toHaveBeenCalledWith(
 			"Meeting transcript text",
 		);
+		expect(generateText).toHaveBeenCalled();
 		expect(transcriptionsService.markSummaryCompleted).toHaveBeenCalled();
 	});
 
@@ -114,7 +150,7 @@ describe("process-summary Inngest function", () => {
 			transcriptionId: "tx-2",
 		});
 		expect(transcriptionsService.markSummaryStarted).not.toHaveBeenCalled();
-		expect(textAiService.generateSummary).not.toHaveBeenCalled();
+		expect(generateText).not.toHaveBeenCalled();
 	});
 
 	it("throws when transcription is not ready for summary", async () => {

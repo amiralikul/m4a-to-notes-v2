@@ -1,3 +1,4 @@
+import { generateText } from "ai";
 import { NonRetriableError } from "inngest";
 import { getErrorMessage } from "@/lib/errors";
 import { logger } from "@/lib/logger";
@@ -135,8 +136,10 @@ export const processJobAnalysis = inngest.createFunction(
 			throw new NonRetriableError("Job description is empty after preparation");
 		}
 
-		const result = await step.ai.wrap("analyze-resume-fit", async () =>
-			jobFitAiService.analyzeResumeMatch({
+		const analysisResult = await step.ai.wrap(
+			"analyze-resume-fit",
+			generateText,
+			jobFitAiService.buildAnalysisRequest({
 				resumeText: analysis.resumeText,
 				jobDescription: resolvedJobDescription as string,
 			}),
@@ -145,7 +148,7 @@ export const processJobAnalysis = inngest.createFunction(
 		await step.run("save-analysis-result", async () => {
 			await jobAnalysesService.markCompleted(
 				analysisId,
-				result,
+				analysisResult.output,
 				jobFitAiService.provider,
 				jobFitAiService.model,
 			);
@@ -154,7 +157,7 @@ export const processJobAnalysis = inngest.createFunction(
 		return {
 			status: "completed",
 			analysisId,
-			compatibilityScore: result.compatibilityScore,
+			compatibilityScore: analysisResult.output.compatibilityScore,
 		};
 	},
 );
