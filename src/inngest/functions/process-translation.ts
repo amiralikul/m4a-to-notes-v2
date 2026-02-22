@@ -100,14 +100,14 @@ export const processTranslation = inngest.createFunction(
 		const languageName =
 			SUPPORTED_LANGUAGES[language as LanguageCode] || language;
 
-		const translatedText = await step.run("translate-text", async () => {
+		const translatedText = await step.ai.wrap("translate-text", async () => {
 			return textAiService.translateText(
 				fetchResult.transcriptText,
 				languageName,
 			);
 		});
 
-		const translatedSummary = await step.run(
+		const translatedSummary = await step.ai.wrap(
 			"translate-summary",
 			async () => {
 				return textAiService.translateSummary(

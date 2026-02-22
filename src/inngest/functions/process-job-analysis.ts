@@ -135,7 +135,7 @@ export const processJobAnalysis = inngest.createFunction(
 			throw new NonRetriableError("Job description is empty after preparation");
 		}
 
-		const result = await step.run("analyze-resume-fit", async () =>
+		const result = await step.ai.wrap("analyze-resume-fit", async () =>
 			jobFitAiService.analyzeResumeMatch({
 				resumeText: analysis.resumeText,
 				jobDescription: resolvedJobDescription as string,

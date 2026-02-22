@@ -96,7 +96,7 @@ export const processSummary = inngest.createFunction(
 			};
 		}
 
-		const summary = await step.run("generate-summary", async () => {
+		const summary = await step.ai.wrap("generate-summary", async () => {
 			return textAiService.generateSummary(
 				transcriptionResult.transcription.transcriptText as string,
 			);
