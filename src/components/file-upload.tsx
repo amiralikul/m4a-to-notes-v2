@@ -21,6 +21,7 @@ import {
 	SUPPORTED_AUDIO_FORMATS_TEXT,
 	validateAudioFile,
 } from "@/lib/validation";
+import { AudioPlayer } from "@/components/audio-player";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -32,6 +33,7 @@ interface UploadedFile {
 	progress: number;
 	transcription?: string;
 	transcriptionId?: string;
+	audioUrl?: string;
 	error?: string;
 }
 
@@ -41,6 +43,7 @@ interface PreviousTranscription {
 	status: "pending" | "processing" | "completed" | "failed";
 	progress: number;
 	preview: string | null;
+	audioKey: string | null;
 	createdAt: string;
 }
 
@@ -348,7 +351,12 @@ export default function FileUpload({
 				setUploadedFiles((prev) =>
 					prev.map((f) =>
 						f.id === fileId
-							? { ...f, status: "uploading" as const, progress: 15 }
+							? {
+									...f,
+									status: "uploading" as const,
+									progress: 15,
+									audioUrl: blob.url,
+								}
 							: f,
 					),
 				);
@@ -757,11 +765,17 @@ export default function FileUpload({
 									>
 										<X className="h-4 w-4" />
 									</Button>
-								</div>
+									</div>
 
-								{/* Progress Bar */}
-								{uploadedFile.status !== "completed" &&
-									uploadedFile.status !== "error" && (
+									{uploadedFile.audioUrl && (
+										<div className="mb-4">
+											<AudioPlayer src={uploadedFile.audioUrl} />
+										</div>
+									)}
+
+									{/* Progress Bar */}
+									{uploadedFile.status !== "completed" &&
+										uploadedFile.status !== "error" && (
 										<div className="space-y-3 mb-4">
 											<div className="w-full bg-stone-200 rounded-full h-2 overflow-hidden">
 												<div
@@ -988,14 +1002,19 @@ export default function FileUpload({
 										</Button>
 									</div>
 								</div>
-								{item.preview && (
-									<p className="mt-2 text-sm text-stone-600 line-clamp-2">
-										{item.preview}
-									</p>
-								)}
-							</CardContent>
-						</Card>
-					))}
+									{item.preview && (
+										<p className="mt-2 text-sm text-stone-600 line-clamp-2">
+											{item.preview}
+										</p>
+									)}
+									{item.audioKey && (
+										<div className="mt-3">
+											<AudioPlayer src={item.audioKey} />
+										</div>
+									)}
+								</CardContent>
+							</Card>
+						))}
 				</div>
 			)}
 		</div>
