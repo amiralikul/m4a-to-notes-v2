@@ -211,8 +211,8 @@ export interface ConversationData {
 
 export interface TranscriptionSummaryActionItem {
 	task: string;
-	owner?: string;
-	dueDate?: string;
+	owner: string | null;
+	dueDate: string | null;
 }
 
 export interface TranscriptionSummaryData {

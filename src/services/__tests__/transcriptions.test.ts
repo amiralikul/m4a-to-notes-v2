@@ -141,7 +141,7 @@ describe("TranscriptionsService", () => {
 				{
 					summary: "Summary text",
 					keyPoints: ["A"],
-					actionItems: [{ task: "Follow up" }],
+					actionItems: [{ task: "Follow up", owner: null, dueDate: null }],
 					keyTakeaways: ["B"],
 				},
 				"openai",
@@ -153,7 +153,7 @@ describe("TranscriptionsService", () => {
 			expect(t!.summaryData).toEqual({
 				summary: "Summary text",
 				keyPoints: ["A"],
-				actionItems: [{ task: "Follow up" }],
+				actionItems: [{ task: "Follow up", owner: null, dueDate: null }],
 				keyTakeaways: ["B"],
 			});
 			expect(t!.summaryUpdatedAt).toBeDefined();

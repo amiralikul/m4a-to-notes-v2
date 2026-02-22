@@ -1,4 +1,3 @@
-import { generateText } from "ai";
 import { NonRetriableError } from "inngest";
 import { inngest } from "../client";
 import { INNGEST_EVENTS } from "../events";
@@ -101,32 +100,28 @@ export const processTranslation = inngest.createFunction(
 		const languageName =
 			SUPPORTED_LANGUAGES[language as LanguageCode] || language;
 
-		const translatedTextResult = await step.ai.wrap(
-			"translate-text",
-			generateText,
-			textAiService.buildTranslateTextRequest(
+		const translatedText = await step.ai.wrap("translate-text", async () => {
+			return textAiService.translateText(
 				fetchResult.transcriptText,
 				languageName,
-			),
-		);
+			);
+		});
 
-		const translatedSummaryResult = await step.ai.wrap(
+		const translatedSummary = await step.ai.wrap(
 			"translate-summary",
-			generateText,
-			textAiService.buildTranslateSummaryRequest(
-				fetchResult.summaryData,
-				languageName,
-			),
+			async () => {
+				return textAiService.translateSummary(
+					fetchResult.summaryData,
+					languageName,
+				);
+			},
 		);
 
 		await step.run("save-translation", async () => {
-			if (!translatedSummaryResult.experimental_output) {
-				throw new Error("Summary translation returned no output");
-			}
 			await translationsService.markCompleted(
 				translationId,
-				translatedTextResult.text,
-				translatedSummaryResult.experimental_output,
+				translatedText,
+				translatedSummary,
 			);
 		});
 
