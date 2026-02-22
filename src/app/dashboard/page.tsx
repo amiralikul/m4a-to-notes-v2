@@ -12,6 +12,7 @@ import {
 	RefreshCw,
 	Trash2,
 } from "lucide-react";
+import { AudioPlayer } from "@/components/audio-player";
 import { CopyButton } from "@/components/copy-button";
 import { useRef, useState } from "react";
 import Link from "next/link";
@@ -379,6 +380,11 @@ export default function DashboardPage() {
 											<p className="text-sm text-stone-500 mt-1 line-clamp-2">
 												{t.preview}
 											</p>
+										)}
+										{t.audioKey && (
+											<div className="mt-3">
+												<AudioPlayer src={t.audioKey} />
+											</div>
 										)}
 									</div>
 
