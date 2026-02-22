@@ -96,11 +96,11 @@ export const processSummary = inngest.createFunction(
 			};
 		}
 
-		const summary = await step.run("generate-summary", async () => {
-			return textAiService.generateSummary(
-				transcriptionResult.transcription.transcriptText as string,
-			);
-		});
+		const summary = await step.ai.wrap(
+			"generate-summary",
+			textAiService.generateSummary.bind(textAiService),
+			transcriptionResult.transcription.transcriptText as string,
+		);
 
 		await step.run("save-summary", async () => {
 			await transcriptionsService.markSummaryCompleted(
