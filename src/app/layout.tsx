@@ -5,6 +5,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { LemonSqueezyProvider } from "@/components/lemonsqueezy-provider";
 import { QueryProvider } from "@/components/query-provider";
 import { SiteHeader } from "@/components/site-header";
+import { Analytics } from "@vercel/analytics/next";
 
 const dmSans = DM_Sans({
 	subsets: ["latin"],
@@ -76,6 +77,7 @@ export default function RootLayout({
 							{children}
 						</LemonSqueezyProvider>
 					</QueryProvider>
+					<Analytics />
 				</body>
 			</html>
 		</ClerkProvider>
