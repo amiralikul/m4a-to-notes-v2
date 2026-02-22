@@ -6,8 +6,8 @@ export const summaryResultSchema = z.object({
 	actionItems: z.array(
 		z.object({
 			task: z.string().min(1),
-			owner: z.string().optional(),
-			dueDate: z.string().optional(),
+			owner: z.string().nullable(),
+			dueDate: z.string().nullable(),
 		}),
 	),
 	keyTakeaways: z.array(z.string().min(1)).min(1),
