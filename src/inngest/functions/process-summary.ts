@@ -1,6 +1,4 @@
-import { generateText } from "ai";
 import { NonRetriableError } from "inngest";
-import { summaryResultSchema } from "@/services/ai/schemas/summary.schema";
 import { INNGEST_EVENTS } from "../events";
 import { inngest } from "../client";
 import {
@@ -98,21 +96,11 @@ export const processSummary = inngest.createFunction(
 			};
 		}
 
-		const summaryResult = await step.ai.wrap(
-			"generate-summary",
-			async ({ transcriptText }: { transcriptText: string }) => {
-				const result = await generateText(
-					textAiService.buildSummaryRequest(transcriptText),
-				);
-				return result.output;
-			},
-			{
-				transcriptText:
-					transcriptionResult.transcription.transcriptText as string,
-			},
-		);
-
-		const summary = summaryResultSchema.parse(summaryResult);
+		const summary = await step.ai.wrap("generate-summary", async () => {
+			return textAiService.generateSummary(
+				transcriptionResult.transcription.transcriptText as string,
+			);
+		});
 
 		await step.run("save-summary", async () => {
 			await transcriptionsService.markSummaryCompleted(

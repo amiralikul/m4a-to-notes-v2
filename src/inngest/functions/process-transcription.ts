@@ -72,7 +72,7 @@ export const processTranscription = inngest.createFunction(
 		const { transcription: t } = transcription;
 
 		// Step 2: Transcribe audio
-		const transcriptText = await step.run("transcribe-audio", async () => {
+		const transcriptText = await step.ai.wrap("transcribe-audio", async () => {
 			await transcriptionsService.updateProgress(transcriptionId, 20);
 
 			const text =
