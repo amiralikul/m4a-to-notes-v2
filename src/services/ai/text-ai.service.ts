@@ -1,19 +1,18 @@
-import { generateText, Output } from "ai";
-import { createOpenAI } from "@ai-sdk/openai";
 import {
 	SummaryError,
 	TranslationError,
 	getErrorMessage,
 } from "@/lib/errors";
 import type { Logger } from "@/lib/logger";
+import { createOpenAiClient } from "./providers/openai.client";
 import { summaryResultSchema } from "./schemas/summary.schema";
 
 export type TextAiProvider = "openai";
 
 export interface SummaryActionItem {
 	task: string;
-	owner: string | null;
-	dueDate: string | null;
+	owner?: string;
+	dueDate?: string;
 }
 
 export interface SummaryResult {
@@ -50,6 +49,7 @@ export function parseTextAiProvider(value: string | undefined): TextAiProvider {
 }
 
 export class TextAiService {
+	private client: ReturnType<typeof createOpenAiClient> | null = null;
 	private readonly logger: Logger;
 	private readonly openaiKey: string;
 	readonly provider: TextAiProvider;
@@ -60,18 +60,6 @@ export class TextAiService {
 		this.model = config.model || PROVIDER_CONFIG[config.provider].model;
 		this.openaiKey = config.openaiKey;
 		this.logger = logger;
-	}
-
-	private getModel() {
-		if (!this.openaiKey) {
-			throw new SummaryError(
-				`Missing API key for summary provider "${this.provider}"`,
-			);
-		}
-		return createOpenAI({
-			apiKey: this.openaiKey,
-			baseURL: PROVIDER_CONFIG[this.provider].baseURL,
-		})(this.model);
 	}
 
 	async generateSummary(transcriptText: string): Promise<SummaryResult> {
@@ -93,17 +81,37 @@ export class TextAiService {
 		});
 
 		try {
-			const { experimental_output: result } = await generateText({
-				model: this.getModel(),
-				system:
-					"You summarize meeting transcripts. Return valid JSON with keys: summary (string), keyPoints (string[]), actionItems ({task:string, owner?:string, dueDate?:string}[]), keyTakeaways (string[]). Keep content concise and factual.",
-				prompt: `Summarize this transcript:\n\n${promptTranscript}`,
-				experimental_output: Output.object({ schema: summaryResultSchema }),
+			const completion = await this.getClient().chat.completions.create({
+				model: this.model,
+				response_format: { type: "json_object" },
+				messages: [
+					{
+						role: "system",
+						content:
+							"You summarize meeting transcripts. Return valid JSON with keys: summary (string), keyPoints (string[]), actionItems ({task:string, owner?:string, dueDate?:string}[]), keyTakeaways (string[]). Keep content concise and factual.",
+					},
+					{
+						role: "user",
+						content: `Summarize this transcript:\n\n${promptTranscript}`,
+					},
+				],
 			});
 
-			if (!result) {
+			const responseText = completion.choices[0]?.message?.content;
+			if (!responseText) {
 				throw new SummaryError("Summary response was empty");
 			}
+
+			let parsed: unknown;
+			try {
+				parsed = JSON.parse(responseText);
+			} catch (parseError) {
+				throw new SummaryError(
+					`Failed to parse summary JSON: ${getErrorMessage(parseError)}`,
+				);
+			}
+
+			const result = summaryResultSchema.parse(parsed);
 
 			this.logger.info("Summary generation completed", {
 				provider: this.provider,
@@ -150,12 +158,21 @@ export class TextAiService {
 		});
 
 		try {
-			const { text: responseText } = await generateText({
-				model: this.getModel(),
-				system: `You are a professional translator. Translate the following text to ${targetLanguage}. Preserve the original formatting, paragraph breaks, and tone. Output only the translated text, nothing else.`,
-				prompt: promptText,
+			const completion = await this.getClient().chat.completions.create({
+				model: this.model,
+				messages: [
+					{
+						role: "system",
+						content: `You are a professional translator. Translate the following text to ${targetLanguage}. Preserve the original formatting, paragraph breaks, and tone. Output only the translated text, nothing else.`,
+					},
+					{
+						role: "user",
+						content: promptText,
+					},
+				],
 			});
 
+			const responseText = completion.choices[0]?.message?.content;
 			if (!responseText) {
 				throw new TranslationError("Translation response was empty");
 			}
@@ -195,16 +212,36 @@ export class TextAiService {
 		});
 
 		try {
-			const { experimental_output: result } = await generateText({
-				model: this.getModel(),
-				system: `You are a professional translator. Translate the following JSON summary to ${targetLanguage}. Preserve the exact JSON structure with keys: summary (string), keyPoints (string[]), actionItems ({task:string, owner?:string, dueDate?:string}[]), keyTakeaways (string[]). Only translate the text values, not the JSON keys. Return valid JSON.`,
-				prompt: JSON.stringify(summary),
-				experimental_output: Output.object({ schema: summaryResultSchema }),
+			const completion = await this.getClient().chat.completions.create({
+				model: this.model,
+				response_format: { type: "json_object" },
+				messages: [
+					{
+						role: "system",
+						content: `You are a professional translator. Translate the following JSON summary to ${targetLanguage}. Preserve the exact JSON structure with keys: summary (string), keyPoints (string[]), actionItems ({task:string, owner?:string, dueDate?:string}[]), keyTakeaways (string[]). Only translate the text values, not the JSON keys. Return valid JSON.`,
+					},
+					{
+						role: "user",
+						content: JSON.stringify(summary),
+					},
+				],
 			});
 
-			if (!result) {
+			const responseText = completion.choices[0]?.message?.content;
+			if (!responseText) {
 				throw new TranslationError("Summary translation response was empty");
 			}
+
+			let parsed: unknown;
+			try {
+				parsed = JSON.parse(responseText);
+			} catch (parseError) {
+				throw new TranslationError(
+					`Failed to parse translated summary JSON: ${getErrorMessage(parseError)}`,
+				);
+			}
+
+			const result = summaryResultSchema.parse(parsed);
 
 			this.logger.info("Summary translation completed", {
 				provider: this.provider,
@@ -228,5 +265,22 @@ export class TextAiService {
 				`Failed to translate summary: ${errorMsg}`,
 			);
 		}
+	}
+
+	private getClient(): ReturnType<typeof createOpenAiClient> {
+		if (!this.openaiKey) {
+			throw new SummaryError(
+				`Missing API key for summary provider "${this.provider}"`,
+			);
+		}
+
+		if (!this.client) {
+			this.client = createOpenAiClient({
+				apiKey: this.openaiKey,
+				baseURL: PROVIDER_CONFIG[this.provider].baseURL,
+			});
+		}
+
+		return this.client;
 	}
 }

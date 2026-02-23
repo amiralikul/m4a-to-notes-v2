@@ -12,15 +12,16 @@ import {
 } from "@/services/ai";
 
 const mockTranscriptionCreate = vi.fn();
+const mockSummaryCreate = vi.fn();
 const mockConstructor = vi.fn();
 const mockFetch = vi.fn();
-const mockGenerateText = vi.fn();
 
 vi.stubGlobal("fetch", mockFetch);
 vi.mock("openai", () => {
 	class MockOpenAI {
 		_opts: Record<string, unknown>;
 		audio = { transcriptions: { create: mockTranscriptionCreate } };
+		chat = { completions: { create: mockSummaryCreate } };
 		constructor(opts: Record<string, unknown>) {
 			mockConstructor(opts);
 			this._opts = opts;
@@ -28,15 +29,6 @@ vi.mock("openai", () => {
 	}
 	return { default: MockOpenAI };
 });
-vi.mock("ai", () => ({
-	generateText: (...args: unknown[]) => mockGenerateText(...args),
-	Output: {
-		object: ({ schema }: { schema: unknown }) => ({ type: "object", schema }),
-	},
-}));
-vi.mock("@ai-sdk/openai", () => ({
-	createOpenAI: () => (model: string) => ({ modelId: model }),
-}));
 
 const logger = createTestLogger();
 
@@ -219,16 +211,19 @@ describe("TextAiService", () => {
 	});
 
 	it("returns validated structured summary", async () => {
-		const summaryData = {
-			summary: "Sprint planning reviewed blockers.",
-			keyPoints: ["Blockers reviewed", "Timeline adjusted"],
-			actionItems: [{ task: "Update roadmap", owner: "Sam" }],
-			keyTakeaways: ["Team aligned on priorities"],
-		};
-
-		mockGenerateText.mockResolvedValueOnce({
-			experimental_output: summaryData,
-			text: JSON.stringify(summaryData),
+		mockSummaryCreate.mockResolvedValueOnce({
+			choices: [
+				{
+					message: {
+						content: JSON.stringify({
+							summary: "Sprint planning reviewed blockers.",
+							keyPoints: ["Blockers reviewed", "Timeline adjusted"],
+							actionItems: [{ task: "Update roadmap", owner: "Sam" }],
+							keyTakeaways: ["Team aligned on priorities"],
+						}),
+					},
+				},
+			],
 		});
 
 		const service = new TextAiService(makeTextConfig(), logger);
@@ -237,7 +232,8 @@ describe("TextAiService", () => {
 		expect(result.summary).toContain("Sprint planning");
 		expect(result.keyPoints).toHaveLength(2);
 		expect(result.actionItems[0]?.task).toBe("Update roadmap");
-		expect(mockGenerateText).toHaveBeenCalledTimes(1);
+		expect(mockConstructor).toHaveBeenCalledTimes(1);
+		expect(mockSummaryCreate).toHaveBeenCalled();
 	});
 
 	it("fails when OpenAI key is missing for summary generation", async () => {
