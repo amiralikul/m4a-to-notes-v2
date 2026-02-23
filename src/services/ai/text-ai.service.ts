@@ -62,7 +62,7 @@ export class TextAiService {
 		this.logger = logger;
 	}
 
-	private getModel() {
+	getModel() {
 		if (!this.openaiKey) {
 			throw new SummaryError(
 				`Missing API key for summary provider "${this.provider}"`,
@@ -72,6 +72,51 @@ export class TextAiService {
 			apiKey: this.openaiKey,
 			baseURL: PROVIDER_CONFIG[this.provider].baseURL,
 		})(this.model);
+	}
+
+	buildSummaryRequest(transcriptText: string) {
+		if (!transcriptText.trim()) {
+			throw new SummaryError("Cannot generate summary for empty transcript");
+		}
+
+		const promptTranscript =
+			transcriptText.length > MAX_TEXT_CHARS
+				? `${transcriptText.slice(0, MAX_TEXT_CHARS)}\n\n[Transcript truncated for summarization.]`
+				: transcriptText;
+
+		return {
+			model: this.getModel(),
+			system:
+				"You summarize meeting transcripts. Return valid JSON with keys: summary (string), keyPoints (string[]), actionItems ({task:string, owner?:string, dueDate?:string}[]), keyTakeaways (string[]). Keep content concise and factual.",
+			prompt: `Summarize this transcript:\n\n${promptTranscript}`,
+			output: Output.object({ schema: summaryResultSchema }),
+		};
+	}
+
+	buildTranslateTextRequest(text: string, targetLanguage: string) {
+		if (!text.trim()) {
+			throw new TranslationError("Cannot translate empty text");
+		}
+
+		const promptText =
+			text.length > MAX_TEXT_CHARS
+				? `${text.slice(0, MAX_TEXT_CHARS)}\n\n[Text truncated for translation.]`
+				: text;
+
+		return {
+			model: this.getModel(),
+			system: `You are a professional translator. Translate the following text to ${targetLanguage}. Preserve the original formatting, paragraph breaks, and tone. Output only the translated text, nothing else.`,
+			prompt: promptText,
+		};
+	}
+
+	buildTranslateSummaryRequest(summary: SummaryResult, targetLanguage: string) {
+		return {
+			model: this.getModel(),
+			system: `You are a professional translator. Translate the following JSON summary to ${targetLanguage}. Preserve the exact JSON structure with keys: summary (string), keyPoints (string[]), actionItems ({task:string, owner?:string, dueDate?:string}[]), keyTakeaways (string[]). Only translate the text values, not the JSON keys. Return valid JSON.`,
+			prompt: JSON.stringify(summary),
+			output: Output.object({ schema: summaryResultSchema }),
+		};
 	}
 
 	async generateSummary(transcriptText: string): Promise<SummaryResult> {
@@ -93,12 +138,12 @@ export class TextAiService {
 		});
 
 		try {
-			const { experimental_output: result } = await generateText({
+			const { output: result } = await generateText({
 				model: this.getModel(),
 				system:
 					"You summarize meeting transcripts. Return valid JSON with keys: summary (string), keyPoints (string[]), actionItems ({task:string, owner?:string, dueDate?:string}[]), keyTakeaways (string[]). Keep content concise and factual.",
 				prompt: `Summarize this transcript:\n\n${promptTranscript}`,
-				experimental_output: Output.object({ schema: summaryResultSchema }),
+				output: Output.object({ schema: summaryResultSchema }),
 			});
 
 			if (!result) {
@@ -195,11 +240,11 @@ export class TextAiService {
 		});
 
 		try {
-			const { experimental_output: result } = await generateText({
+			const { output: result } = await generateText({
 				model: this.getModel(),
 				system: `You are a professional translator. Translate the following JSON summary to ${targetLanguage}. Preserve the exact JSON structure with keys: summary (string), keyPoints (string[]), actionItems ({task:string, owner?:string, dueDate?:string}[]), keyTakeaways (string[]). Only translate the text values, not the JSON keys. Return valid JSON.`,
 				prompt: JSON.stringify(summary),
-				experimental_output: Output.object({ schema: summaryResultSchema }),
+				output: Output.object({ schema: summaryResultSchema }),
 			});
 
 			if (!result) {

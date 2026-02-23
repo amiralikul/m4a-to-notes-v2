@@ -59,11 +59,6 @@ async function runProcessTranscription(transcriptionId: string) {
 		run: async <T>(_name: string, handler: () => Promise<T>): Promise<T> => {
 			return handler();
 		},
-		ai: {
-			wrap: async <T>(_name: string, handler: () => Promise<T>): Promise<T> => {
-				return handler();
-			},
-		},
 		sendEvent: mockSendEvent,
 	};
 
