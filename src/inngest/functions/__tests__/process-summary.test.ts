@@ -33,9 +33,6 @@ async function runProcessSummary(transcriptionId: string) {
 			event: { data: { transcriptionId: string } };
 			step: {
 				run: <T>(name: string, fn: () => Promise<T>) => Promise<T>;
-				ai: {
-					wrap: <T>(name: string, fn: () => Promise<T>) => Promise<T>;
-				};
 			};
 		}) => Promise<unknown>;
 	};
@@ -43,11 +40,6 @@ async function runProcessSummary(transcriptionId: string) {
 	const step = {
 		run: async <T>(_name: string, handler: () => Promise<T>): Promise<T> => {
 			return handler();
-		},
-		ai: {
-			wrap: async <T>(_name: string, handler: () => Promise<T>): Promise<T> => {
-				return handler();
-			},
 		},
 	};
 
@@ -75,7 +67,7 @@ describe("process-summary Inngest function", () => {
 		vi.mocked(textAiService.generateSummary).mockResolvedValue({
 			summary: "Discussed release readiness.",
 			keyPoints: ["QA complete", "Deploy Friday"],
-			actionItems: [{ task: "Prepare release notes", owner: "Alex", dueDate: null }],
+			actionItems: [{ task: "Prepare release notes", owner: "Alex" }],
 			keyTakeaways: ["Release is on track"],
 		});
 		vi.mocked(transcriptionsService.markSummaryCompleted).mockResolvedValue(
