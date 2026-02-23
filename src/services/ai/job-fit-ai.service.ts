@@ -1,6 +1,4 @@
-import { generateText, Output } from "ai";
-import type { JobAnalysisResultData } from "@/db/schema";
-import { getErrorMessage } from "@/lib/errors";
+import { Output } from "ai";
 import type { Logger } from "@/lib/logger";
 import { buildJobFitPrompt } from "./prompts/job-fit.prompt";
 import { createAnthropicClient } from "./providers/anthropic.client";
@@ -32,46 +30,23 @@ export class JobFitAiService {
 		});
 	}
 
-	async analyzeResumeMatch(input: {
-		resumeText: string;
-		jobDescription: string;
-	}): Promise<JobAnalysisResultData> {
+	buildAnalysisRequest(input: { resumeText: string; jobDescription: string }) {
 		if (!this.apiKey) {
 			throw new Error("ANTHROPIC_API_KEY is not configured");
 		}
 
-		const start = Date.now();
-
-		try {
-			const { output } = await generateText({
-				model: this.anthropicClient(this.model),
-				output: Output.object({ schema: jobFitResultSchema }),
-				prompt: buildJobFitPrompt(input),
-				temperature: 0.2,
-				maxRetries: this.maxRetries,
-				providerOptions: {
-					anthropic: {
-						structuredOutputMode: "jsonTool",
-					},
+		return {
+			model: this.anthropicClient(this.model),
+			output: Output.object({ schema: jobFitResultSchema }),
+			prompt: buildJobFitPrompt(input),
+			temperature: 0.2 as const,
+			maxRetries: this.maxRetries,
+			providerOptions: {
+				anthropic: {
+					structuredOutputMode: "jsonTool" as const,
 				},
-			});
-
-			this.logger.info("Resume match analysis completed", {
-				model: this.model,
-				durationMs: Date.now() - start,
-				score: output.compatibilityScore,
-				maxRetries: this.maxRetries,
-			});
-
-			return output;
-		} catch (error) {
-			this.logger.error("Anthropic analysis failed", {
-				model: this.model,
-				durationMs: Date.now() - start,
-				maxRetries: this.maxRetries,
-				error: getErrorMessage(error),
-			});
-			throw error;
-		}
+			},
+		};
 	}
+
 }

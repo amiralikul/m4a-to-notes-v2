@@ -62,7 +62,7 @@ export class TextAiService {
 		this.logger = logger;
 	}
 
-	private getModel() {
+	getModel() {
 		if (!this.openaiKey) {
 			throw new SummaryError(
 				`Missing API key for summary provider "${this.provider}"`,
@@ -74,7 +74,7 @@ export class TextAiService {
 		})(this.model);
 	}
 
-	async generateSummary(transcriptText: string): Promise<SummaryResult> {
+	buildSummaryRequest(transcriptText: string) {
 		if (!transcriptText.trim()) {
 			throw new SummaryError("Cannot generate summary for empty transcript");
 		}
@@ -84,6 +84,42 @@ export class TextAiService {
 				? `${transcriptText.slice(0, MAX_TEXT_CHARS)}\n\n[Transcript truncated for summarization.]`
 				: transcriptText;
 
+		return {
+			model: this.getModel(),
+			system:
+				"You summarize meeting transcripts. Return valid JSON with keys: summary (string), keyPoints (string[]), actionItems ({task:string, owner?:string, dueDate?:string}[]), keyTakeaways (string[]). Keep content concise and factual.",
+			prompt: `Summarize this transcript:\n\n${promptTranscript}`,
+			output: Output.object({ schema: summaryResultSchema }),
+		};
+	}
+
+	buildTranslateTextRequest(text: string, targetLanguage: string) {
+		if (!text.trim()) {
+			throw new TranslationError("Cannot translate empty text");
+		}
+
+		const promptText =
+			text.length > MAX_TEXT_CHARS
+				? `${text.slice(0, MAX_TEXT_CHARS)}\n\n[Text truncated for translation.]`
+				: text;
+
+		return {
+			model: this.getModel(),
+			system: `You are a professional translator. Translate the following text to ${targetLanguage}. Preserve the original formatting, paragraph breaks, and tone. Output only the translated text, nothing else.`,
+			prompt: promptText,
+		};
+	}
+
+	buildTranslateSummaryRequest(summary: SummaryResult, targetLanguage: string) {
+		return {
+			model: this.getModel(),
+			system: `You are a professional translator. Translate the following JSON summary to ${targetLanguage}. Preserve the exact JSON structure with keys: summary (string), keyPoints (string[]), actionItems ({task:string, owner?:string, dueDate?:string}[]), keyTakeaways (string[]). Only translate the text values, not the JSON keys. Return valid JSON.`,
+			prompt: JSON.stringify(summary),
+			output: Output.object({ schema: summaryResultSchema }),
+		};
+	}
+
+	async generateSummary(transcriptText: string): Promise<SummaryResult> {
 		const startTime = Date.now();
 		this.logger.info("Starting summary generation", {
 			provider: this.provider,
@@ -93,13 +129,9 @@ export class TextAiService {
 		});
 
 		try {
-			const { experimental_output: result } = await generateText({
-				model: this.getModel(),
-				system:
-					"You summarize meeting transcripts. Return valid JSON with keys: summary (string), keyPoints (string[]), actionItems ({task:string, owner?:string, dueDate?:string}[]), keyTakeaways (string[]). Keep content concise and factual.",
-				prompt: `Summarize this transcript:\n\n${promptTranscript}`,
-				experimental_output: Output.object({ schema: summaryResultSchema }),
-			});
+			const { output: result } = await generateText(
+				this.buildSummaryRequest(transcriptText),
+			);
 
 			if (!result) {
 				throw new SummaryError("Summary response was empty");
@@ -132,15 +164,6 @@ export class TextAiService {
 	}
 
 	async translateText(text: string, targetLanguage: string): Promise<string> {
-		if (!text.trim()) {
-			throw new TranslationError("Cannot translate empty text");
-		}
-
-		const promptText =
-			text.length > MAX_TEXT_CHARS
-				? `${text.slice(0, MAX_TEXT_CHARS)}\n\n[Text truncated for translation.]`
-				: text;
-
 		const startTime = Date.now();
 		this.logger.info("Starting text translation", {
 			provider: this.provider,
@@ -150,11 +173,9 @@ export class TextAiService {
 		});
 
 		try {
-			const { text: responseText } = await generateText({
-				model: this.getModel(),
-				system: `You are a professional translator. Translate the following text to ${targetLanguage}. Preserve the original formatting, paragraph breaks, and tone. Output only the translated text, nothing else.`,
-				prompt: promptText,
-			});
+			const { text: responseText } = await generateText(
+				this.buildTranslateTextRequest(text, targetLanguage),
+			);
 
 			if (!responseText) {
 				throw new TranslationError("Translation response was empty");
@@ -195,12 +216,9 @@ export class TextAiService {
 		});
 
 		try {
-			const { experimental_output: result } = await generateText({
-				model: this.getModel(),
-				system: `You are a professional translator. Translate the following JSON summary to ${targetLanguage}. Preserve the exact JSON structure with keys: summary (string), keyPoints (string[]), actionItems ({task:string, owner?:string, dueDate?:string}[]), keyTakeaways (string[]). Only translate the text values, not the JSON keys. Return valid JSON.`,
-				prompt: JSON.stringify(summary),
-				experimental_output: Output.object({ schema: summaryResultSchema }),
-			});
+			const { output: result } = await generateText(
+				this.buildTranslateSummaryRequest(summary, targetLanguage),
+			);
 
 			if (!result) {
 				throw new TranslationError("Summary translation response was empty");

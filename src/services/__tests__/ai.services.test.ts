@@ -227,7 +227,7 @@ describe("TextAiService", () => {
 		};
 
 		mockGenerateText.mockResolvedValueOnce({
-			experimental_output: summaryData,
+			output: summaryData,
 			text: JSON.stringify(summaryData),
 		});
 
