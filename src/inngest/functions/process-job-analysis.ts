@@ -1,6 +1,4 @@
-import { generateText } from "ai";
 import { NonRetriableError } from "inngest";
-import { jobFitResultSchema } from "@/services/ai/schemas/job-fit.schema";
 import { getErrorMessage } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import {
@@ -137,30 +135,12 @@ export const processJobAnalysis = inngest.createFunction(
 			throw new NonRetriableError("Job description is empty after preparation");
 		}
 
-		const analysisResult = await step.ai.wrap(
-			"analyze-resume-fit",
-			async ({
-				resumeText,
-				jobDescription,
-			}: {
-				resumeText: string;
-				jobDescription: string;
-			}) => {
-				const result = await generateText(
-					jobFitAiService.buildAnalysisRequest({
-						resumeText,
-						jobDescription,
-					}),
-				);
-				return result.output;
-			},
-			{
+		const result = await step.ai.wrap("analyze-resume-fit", async () =>
+			jobFitAiService.analyzeResumeMatch({
 				resumeText: analysis.resumeText,
 				jobDescription: resolvedJobDescription as string,
-			},
+			}),
 		);
-
-		const result = jobFitResultSchema.parse(analysisResult);
 
 		await step.run("save-analysis-result", async () => {
 			await jobAnalysesService.markCompleted(

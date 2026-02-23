@@ -1,6 +1,4 @@
-import { generateText } from "ai";
 import { NonRetriableError } from "inngest";
-import { summaryResultSchema } from "@/services/ai/schemas/summary.schema";
 import { inngest } from "../client";
 import { INNGEST_EVENTS } from "../events";
 import {
@@ -102,53 +100,22 @@ export const processTranslation = inngest.createFunction(
 		const languageName =
 			SUPPORTED_LANGUAGES[language as LanguageCode] || language;
 
-		const translatedText = await step.ai.wrap(
-			"translate-text",
-			async ({
-				transcriptText,
-				targetLanguage,
-			}: {
-				transcriptText: string;
-				targetLanguage: string;
-			}) => {
-				const result = await generateText(
-					textAiService.buildTranslateTextRequest(
-						transcriptText,
-						targetLanguage,
-					),
-				);
-				return result.text;
-			},
-			{
-				transcriptText: fetchResult.transcriptText,
-				targetLanguage: languageName,
-			},
-		);
+		const translatedText = await step.ai.wrap("translate-text", async () => {
+			return textAiService.translateText(
+				fetchResult.transcriptText,
+				languageName,
+			);
+		});
 
-		const translatedSummaryResult = await step.ai.wrap(
+		const translatedSummary = await step.ai.wrap(
 			"translate-summary",
-			async ({
-				summaryData,
-				targetLanguage,
-			}: {
-				summaryData: typeof fetchResult.summaryData;
-				targetLanguage: string;
-			}) => {
-				const result = await generateText(
-					textAiService.buildTranslateSummaryRequest(
-						summaryData,
-						targetLanguage,
-					),
+			async () => {
+				return textAiService.translateSummary(
+					fetchResult.summaryData,
+					languageName,
 				);
-				return result.output;
-			},
-			{
-				summaryData: fetchResult.summaryData,
-				targetLanguage: languageName,
 			},
 		);
-
-		const translatedSummary = summaryResultSchema.parse(translatedSummaryResult);
 
 		await step.run("save-translation", async () => {
 			await translationsService.markCompleted(
