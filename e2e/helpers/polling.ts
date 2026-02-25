@@ -6,7 +6,6 @@ interface PollOptions {
 interface TranscriptionStatus {
 	status: string;
 	summaryStatus: string | null;
-	transcriptText: string | null;
 	preview: string | null;
 	[key: string]: unknown;
 }

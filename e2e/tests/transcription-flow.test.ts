@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createSignedActorCookie } from "../helpers/auth";
 import { createApiClient } from "../helpers/api-client";
-import { uploadTestFixture } from "../helpers/upload";
+import { uploadTestFixture, deleteBlob } from "../helpers/upload";
 import { pollUntilComplete } from "../helpers/polling";
 
 describe("Transcription Flow (E2E)", () => {
@@ -10,6 +10,12 @@ describe("Transcription Flow (E2E)", () => {
 	beforeAll(async () => {
 		blobUrl = await uploadTestFixture();
 	}, 30_000);
+
+	afterAll(async () => {
+		if (blobUrl) {
+			await deleteBlob(blobUrl);
+		}
+	});
 
 	it("should transcribe audio and generate summary", async () => {
 		const { cookieHeader } = createSignedActorCookie();
@@ -27,8 +33,8 @@ describe("Transcription Flow (E2E)", () => {
 		const result = await pollUntilComplete(api.get.bind(api), transcriptionId);
 
 		expect(result.status).toBe("completed");
-		expect(result.transcriptText).toBeTruthy();
-		expect(typeof result.transcriptText).toBe("string");
+		expect(result.preview).toBeTruthy();
+		expect(typeof result.preview).toBe("string");
 	});
 
 	it("should return 404 for transcription owned by different actor", async () => {
