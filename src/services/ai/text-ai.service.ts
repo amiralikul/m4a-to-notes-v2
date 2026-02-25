@@ -160,6 +160,7 @@ export class TextAiService {
 		try {
 			const completion = await this.getClient().chat.completions.create({
 				model: this.model,
+				reasoning_effort: "low",
 				messages: [
 					{
 						role: "system",
@@ -214,6 +215,7 @@ export class TextAiService {
 		try {
 			const completion = await this.getClient().chat.completions.create({
 				model: this.model,
+				reasoning_effort: "low",
 				response_format: { type: "json_object" },
 				messages: [
 					{
