@@ -16,3 +16,8 @@ export {
 	JobFitAiService,
 	type JobFitAiServiceConfig,
 } from "./job-fit-ai.service";
+export {
+	AssemblyAiService,
+	type AssemblyAiServiceConfig,
+	type AssemblyAiResult,
+} from "./assemblyai.service";

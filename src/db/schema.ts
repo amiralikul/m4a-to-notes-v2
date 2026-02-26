@@ -68,6 +68,8 @@ export const transcriptions = sqliteTable(
 			code?: string;
 			message?: string;
 		}>(),
+		enableDiarization: integer("enable_diarization", { mode: "boolean" }).default(false).notNull(),
+		diarizationData: text("diarization_data", { mode: "json" }).$type<DiarizationSegment[] | null>(),
 		summaryProvider: text("summary_provider"),
 		summaryModel: text("summary_model"),
 		summaryUpdatedAt: text("summary_updated_at"),
@@ -207,6 +209,13 @@ export interface ConversationData {
 	}>;
 	createdAt: string;
 	updatedAt: string;
+}
+
+export interface DiarizationSegment {
+	speaker: string;   // "A", "B", etc.
+	text: string;
+	start: number;     // milliseconds
+	end: number;       // milliseconds
 }
 
 export interface TranscriptionSummaryActionItem {

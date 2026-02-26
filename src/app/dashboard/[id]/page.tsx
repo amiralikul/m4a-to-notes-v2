@@ -8,6 +8,7 @@ import {
 	Globe,
 	Loader2,
 	Trash2,
+	Users,
 } from "lucide-react";
 import { CopyButton } from "@/components/copy-button";
 import { useRef, useState } from "react";
@@ -27,6 +28,13 @@ import { transcriptionKeys } from "@/lib/query-keys";
 import { SUPPORTED_LANGUAGES } from "@/lib/constants/languages";
 import type { LanguageCode } from "@/lib/constants/languages";
 
+interface DiarizationSegment {
+	speaker: string;
+	text: string;
+	start: number;
+	end: number;
+}
+
 interface TranscriptionDetail {
 	transcriptionId: string;
 	status: "pending" | "processing" | "completed" | "failed";
@@ -35,6 +43,9 @@ interface TranscriptionDetail {
 	createdAt: string;
 	completedAt: string | null;
 	preview: string | null;
+	enableDiarization: boolean;
+	diarizationData: DiarizationSegment[] | null;
+	transcriptText: string | null;
 	summaryStatus: "pending" | "processing" | "completed" | "failed" | null;
 	summaryUpdatedAt: string | null;
 	error?: { code?: string; message?: string };
@@ -81,8 +92,15 @@ const statusConfig = {
 
 const MAX_POLLING_MS = 10 * 60 * 1000;
 
+function formatTimestamp(ms: number): string {
+	const totalSeconds = Math.floor(ms / 1000);
+	const minutes = Math.floor(totalSeconds / 60);
+	const seconds = totalSeconds % 60;
+	return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
 async function fetchTranscription(id: string): Promise<TranscriptionDetail> {
-	const res = await fetch(`/api/transcriptions/${id}`, { cache: "no-store" });
+	const res = await fetch(`/api/transcriptions/${id}/detail`, { cache: "no-store" });
 	if (!res.ok) throw new Error("Failed to fetch transcription");
 	return res.json();
 }
@@ -281,6 +299,12 @@ export default function TranscriptionDetailPage() {
 						<Badge className={statusConfig[transcription.status].className}>
 							{statusConfig[transcription.status].label}
 						</Badge>
+						{transcription.enableDiarization && (
+							<Badge className="bg-violet-100 text-violet-800">
+								<Users className="w-3 h-3 mr-1" />
+								Speakers
+							</Badge>
+						)}
 						{transcription.summaryStatus && (
 							<Badge
 								className={
@@ -317,17 +341,50 @@ export default function TranscriptionDetailPage() {
 			</div>
 
 			{/* Transcript Preview */}
-			{transcription.preview && (
+			{(transcription.preview || transcription.diarizationData) && (
 				<Card>
 					<CardHeader className="flex flex-row items-center justify-between">
-						<CardTitle className="text-lg">Transcript Preview</CardTitle>
+						<CardTitle className="text-lg flex items-center gap-2">
+							{transcription.diarizationData ? (
+								<>
+									<Users className="w-5 h-5" />
+									Speaker Transcript
+								</>
+							) : (
+								"Transcript Preview"
+							)}
+						</CardTitle>
 						<CopyButton contentRef={transcriptRef} />
 					</CardHeader>
 					<CardContent>
 						<div ref={transcriptRef}>
-						<p className="text-stone-600 whitespace-pre-wrap">
-							{viewingTranslation?.translatedText ?? transcription.preview}
-						</p>
+							{viewingTranslation?.translatedText ? (
+								<p className="text-stone-600 whitespace-pre-wrap">
+									{viewingTranslation.translatedText}
+								</p>
+							) : transcription.diarizationData && transcription.diarizationData.length > 0 ? (
+								<div className="space-y-4">
+									{transcription.diarizationData.map((segment, index) => (
+										<div key={`segment-${index}`}>
+											<div className="flex items-center gap-2 mb-1">
+												<span className="text-sm font-semibold text-stone-900">
+													Speaker {segment.speaker}
+												</span>
+												<span className="text-xs text-stone-400">
+													{formatTimestamp(segment.start)} – {formatTimestamp(segment.end)}
+												</span>
+											</div>
+											<p className="text-stone-600 text-sm leading-relaxed">
+												{segment.text}
+											</p>
+										</div>
+									))}
+								</div>
+							) : (
+								<p className="text-stone-600 whitespace-pre-wrap">
+									{transcription.transcriptText ?? transcription.preview}
+								</p>
+							)}
 						</div>
 						{viewingTranslation?.translatedText && (
 							<p className="text-xs text-stone-400 mt-2">

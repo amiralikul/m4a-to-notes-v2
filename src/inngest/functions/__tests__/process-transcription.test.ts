@@ -18,6 +18,10 @@ vi.mock("@/services", () => ({
 		transcribeAudio: vi.fn(),
 		transcribeAudioFromUrl: vi.fn(),
 	},
+	assemblyAiService: {
+		submit: vi.fn(),
+		getTranscript: vi.fn(),
+	},
 }));
 
 vi.mock("@/services/telegram", () => ({
@@ -37,6 +41,7 @@ import {
 	transcriptionsService,
 	storageService,
 	transcriptionAiService,
+	assemblyAiService,
 } from "@/services";
 import { INNGEST_EVENTS } from "@/inngest/events";
 import { sendTelegramMessage } from "@/services/telegram";
@@ -51,7 +56,7 @@ async function runProcessTranscription(transcriptionId: string) {
 	// Extract the handler function from the Inngest function config
 	const fn = processTranscription as unknown as {
 		["~trigger"]: { event: string };
-		fn: (args: { event: { data: { transcriptionId: string } }; step: { run: <T>(name: string, fn: () => Promise<T>) => Promise<T>; sendEvent: (id: string, payload: unknown) => Promise<void> }; logger: { info: typeof vi.fn; warn: typeof vi.fn; error: typeof vi.fn; debug: typeof vi.fn } }) => Promise<unknown>;
+		fn: (args: { event: { data: { transcriptionId: string } }; step: { run: <T>(name: string, fn: () => Promise<T>) => Promise<T>; sleep: (name: string, duration: string) => Promise<void>; sendEvent: (id: string, payload: unknown) => Promise<void> }; logger: { info: typeof vi.fn; warn: typeof vi.fn; error: typeof vi.fn; debug: typeof vi.fn } }) => Promise<unknown>;
 	};
 
 	// Simple step.run that just executes the function
@@ -59,6 +64,7 @@ async function runProcessTranscription(transcriptionId: string) {
 		run: async <T>(_name: string, handler: () => Promise<T>): Promise<T> => {
 			return handler();
 		},
+		sleep: vi.fn().mockResolvedValue(undefined),
 		sendEvent: mockSendEvent,
 	};
 
@@ -255,6 +261,112 @@ describe("process-transcription Inngest function", () => {
 
 		expect(storageService.deleteObject).not.toHaveBeenCalled();
 		expect(transcriptionsService.markCompleted).toHaveBeenCalled();
+	});
+
+	describe("diarization path", () => {
+		it("uses AssemblyAI when enableDiarization is true", async () => {
+			const mockTranscription = {
+				id: "tx-diar-1",
+				status: "pending",
+				audioKey: "https://blob.vercel/meeting.m4a",
+				filename: "meeting.m4a",
+				source: "web",
+				enableDiarization: true,
+				userMetadata: {},
+			};
+
+			vi.mocked(transcriptionsService.findById).mockResolvedValue(
+				mockTranscription as unknown as Awaited<ReturnType<typeof transcriptionsService.findById>>,
+			);
+			vi.mocked(transcriptionsService.markStarted).mockResolvedValue({} as never);
+			vi.mocked(transcriptionsService.updateProgress).mockResolvedValue({} as never);
+			vi.mocked(transcriptionsService.markCompleted).mockResolvedValue({} as never);
+
+			vi.mocked(assemblyAiService.submit).mockResolvedValue("aai-job-1");
+			vi.mocked(assemblyAiService.getTranscript).mockResolvedValue({
+				status: "completed",
+				text: "Speaker A said hello. Speaker B replied.",
+				segments: [
+					{ speaker: "A", text: "Hello", start: 0, end: 1500 },
+					{ speaker: "B", text: "Hi there", start: 1500, end: 3000 },
+				],
+			});
+
+			const result = await runProcessTranscription("tx-diar-1");
+
+			expect(result).toEqual({
+				status: "completed",
+				transcriptionId: "tx-diar-1",
+				transcriptionLength: "Speaker A said hello. Speaker B replied.".length,
+			});
+
+			expect(assemblyAiService.submit).toHaveBeenCalledWith("https://blob.vercel/meeting.m4a");
+			expect(assemblyAiService.getTranscript).toHaveBeenCalledWith("aai-job-1");
+			expect(transcriptionsService.markCompleted).toHaveBeenCalledWith(
+				"tx-diar-1",
+				expect.any(String),
+				"Speaker A said hello. Speaker B replied.",
+				[
+					{ speaker: "A", text: "Hello", start: 0, end: 1500 },
+					{ speaker: "B", text: "Hi there", start: 1500, end: 3000 },
+				],
+			);
+			// Should NOT use Groq/OpenAI
+			expect(transcriptionAiService.transcribeAudioFromUrl).not.toHaveBeenCalled();
+			expect(transcriptionAiService.transcribeAudio).not.toHaveBeenCalled();
+		});
+
+		it("throws NonRetriableError when AssemblyAI returns error", async () => {
+			const mockTranscription = {
+				id: "tx-diar-err",
+				status: "pending",
+				audioKey: "https://blob.vercel/bad.m4a",
+				filename: "bad.m4a",
+				source: "web",
+				enableDiarization: true,
+				userMetadata: {},
+			};
+
+			vi.mocked(transcriptionsService.findById).mockResolvedValue(
+				mockTranscription as unknown as Awaited<ReturnType<typeof transcriptionsService.findById>>,
+			);
+			vi.mocked(transcriptionsService.markStarted).mockResolvedValue({} as never);
+			vi.mocked(transcriptionsService.updateProgress).mockResolvedValue({} as never);
+
+			vi.mocked(assemblyAiService.submit).mockResolvedValue("aai-job-err");
+			vi.mocked(assemblyAiService.getTranscript).mockResolvedValue({
+				status: "error",
+				error: "Audio too short",
+			});
+
+			await expect(runProcessTranscription("tx-diar-err")).rejects.toThrow("Audio too short");
+		});
+
+		it("does not call AssemblyAI when enableDiarization is false", async () => {
+			const mockTranscription = {
+				id: "tx-no-diar",
+				status: "pending",
+				audioKey: "https://blob.vercel/audio.m4a",
+				filename: "test.m4a",
+				source: "web",
+				enableDiarization: false,
+				userMetadata: {},
+			};
+
+			vi.mocked(transcriptionsService.findById).mockResolvedValue(
+				mockTranscription as unknown as Awaited<ReturnType<typeof transcriptionsService.findById>>,
+			);
+			vi.mocked(transcriptionAiService.transcribeAudioFromUrl).mockResolvedValue("Transcript text");
+			vi.mocked(transcriptionsService.markStarted).mockResolvedValue({} as never);
+			vi.mocked(transcriptionsService.updateProgress).mockResolvedValue({} as never);
+			vi.mocked(transcriptionsService.markCompleted).mockResolvedValue({} as never);
+
+			await runProcessTranscription("tx-no-diar");
+
+			expect(assemblyAiService.submit).not.toHaveBeenCalled();
+			expect(assemblyAiService.getTranscript).not.toHaveBeenCalled();
+			expect(transcriptionAiService.transcribeAudioFromUrl).toHaveBeenCalled();
+		});
 	});
 
 	it("falls back to file upload transcription for openai provider", async () => {

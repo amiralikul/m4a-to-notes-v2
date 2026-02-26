@@ -46,6 +46,8 @@ export function createTestDb() {
 			summary_provider TEXT,
 			summary_model TEXT,
 			summary_updated_at TEXT,
+			enable_diarization INTEGER DEFAULT 0 NOT NULL,
+			diarization_data TEXT,
 			updated_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL
 		);
 

@@ -10,6 +10,7 @@ import { ActorsService } from "./actors";
 import { JobAnalysesService } from "./job-analyses";
 import { BrightDataService } from "./brightdata.service";
 import {
+	AssemblyAiService,
 	JobFitAiService,
 	parseTextAiProvider,
 	parseTranscriptionProvider,
@@ -71,3 +72,7 @@ export const jobFitAiService = new JobFitAiService(
 	logger,
 );
 export const translationsService = new TranslationsService(db, logger);
+export const assemblyAiService = new AssemblyAiService(
+	{ apiKey: process.env.ASSEMBLYAI_API_KEY || "" },
+	logger,
+);
