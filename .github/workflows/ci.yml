@@ -80,6 +80,7 @@ jobs:
     name: integration-tests
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    environment: Preview
     env:
       TURSO_DATABASE_URL: ${{ secrets.STAGING_TURSO_DATABASE_URL }}
       TURSO_AUTH_TOKEN: ${{ secrets.STAGING_TURSO_AUTH_TOKEN }}
