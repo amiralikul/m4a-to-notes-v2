@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { route } from "@/lib/route";
-import { ForbiddenError, ValidationError } from "@/lib/errors";
+import { ForbiddenError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { billingSubscriptionsService } from "@/services";
 
@@ -24,31 +24,52 @@ export const POST = route({
 			throw new Error("LEMONSQUEEZY_API_KEY is required");
 		}
 
-		const response = await fetch(
-			`https://api.lemonsqueezy.com/v1/subscriptions/${body.subscriptionId}`,
-			{
-				method: "PATCH",
-				headers: {
-					Authorization: `Bearer ${apiKey}`,
-					"Content-Type": "application/vnd.api+json",
-					Accept: "application/vnd.api+json",
-				},
-				body: JSON.stringify({
-					data: {
-						type: "subscriptions",
-						id: body.subscriptionId,
-						attributes: {
-							cancelled: true,
-						},
+		let response: Response;
+		try {
+			response = await fetch(
+				`https://api.lemonsqueezy.com/v1/subscriptions/${body.subscriptionId}`,
+				{
+					method: "PATCH",
+					headers: {
+						Authorization: `Bearer ${apiKey}`,
+						"Content-Type": "application/vnd.api+json",
+						Accept: "application/vnd.api+json",
 					},
-				}),
-			},
-		);
+					body: JSON.stringify({
+						data: {
+							type: "subscriptions",
+							id: body.subscriptionId,
+							attributes: {
+								cancelled: true,
+							},
+						},
+					}),
+					signal: AbortSignal.timeout(10_000),
+				},
+			);
+		} catch (error) {
+			if (
+				error instanceof Error &&
+				(error.name === "AbortError" || error.name === "TimeoutError")
+			) {
+				logger.error("Lemon Squeezy cancel request timed out", {
+					subscriptionId: body.subscriptionId,
+				});
+				return Response.json({ error: "Upstream timeout" }, { status: 504 });
+			}
+			throw error;
+		}
 
 		if (!response.ok) {
 			const errorText = await response.text();
-			throw new Error(
-				`Lemon Squeezy API error: ${response.status} - ${errorText}`,
+			logger.error("Lemon Squeezy cancel request failed", {
+				subscriptionId: body.subscriptionId,
+				status: response.status,
+				error: errorText,
+			});
+			return Response.json(
+				{ error: "Upstream service error" },
+				{ status: 502 },
 			);
 		}
 

@@ -4,7 +4,7 @@ import { route } from "@/lib/route";
 import { ValidationError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { usersService } from "@/services";
-import { PRICING_PLANS } from "@/lib/pricing";
+import { findPlanKeyByVariantId } from "@/lib/pricing";
 import { PLAN_HIERARCHY } from "@/lib/constants/plans";
 
 export const POST = route({
@@ -24,21 +24,18 @@ export const POST = route({
 		}
 
 		const entitlements = await usersService.getWithDefaults(userId);
-		let targetPlan = body.planKey;
-		if (!targetPlan) {
-			for (const [key, plan] of Object.entries(PRICING_PLANS)) {
-				if (
-					plan.monthlyVariantId === body.variantId ||
-					plan.yearlyVariantId === body.variantId
-				) {
-					targetPlan = key.toLowerCase();
-					break;
-				}
-			}
-		}
-
-		if (!targetPlan) {
+		const derivedPlanKey = findPlanKeyByVariantId(body.variantId);
+		if (!derivedPlanKey) {
 			throw new ValidationError("Unknown plan/variant");
+		}
+		const targetPlan = derivedPlanKey.toLowerCase();
+		if (
+			body.planKey &&
+			body.planKey.toLowerCase() !== targetPlan
+		) {
+			throw new ValidationError(
+				"Provided planKey does not match selected variant",
+			);
 		}
 
 		const hasActive = ["active", "trialing"].includes(

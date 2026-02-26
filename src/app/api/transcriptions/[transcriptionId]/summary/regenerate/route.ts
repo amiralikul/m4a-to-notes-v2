@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { route } from "@/lib/route";
-import { NotFoundError, ValidationError } from "@/lib/errors";
+import { getErrorMessage, NotFoundError, ValidationError } from "@/lib/errors";
+import { logger } from "@/lib/logger";
 import { transcriptionsService, workflowService } from "@/services";
 import { TranscriptionStatus } from "@/services/transcriptions";
 
@@ -27,7 +28,26 @@ export const POST = route({
 		}
 
 		await transcriptionsService.markSummaryPending(params.transcriptionId);
-		await workflowService.regenerateSummary(params.transcriptionId);
+
+		try {
+			await workflowService.regenerateSummary(params.transcriptionId);
+		} catch (error) {
+			logger.error("Failed to enqueue summary regeneration", {
+				transcriptionId: params.transcriptionId,
+				error: getErrorMessage(error),
+			});
+
+			await transcriptionsService.update(params.transcriptionId, {
+				summaryStatus: transcription.summaryStatus,
+				summaryData: transcription.summaryData,
+				summaryError: transcription.summaryError,
+				summaryProvider: transcription.summaryProvider,
+				summaryModel: transcription.summaryModel,
+				summaryUpdatedAt: transcription.summaryUpdatedAt,
+			});
+
+			throw error;
+		}
 
 		return Response.json(
 			{

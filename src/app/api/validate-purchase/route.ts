@@ -4,7 +4,7 @@ import { ValidationError } from "@/lib/errors";
 import { getErrorMessage } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { usersService } from "@/services";
-import { PRICING_PLANS } from "@/lib/pricing";
+import { PRICING_PLANS, findPlanKeyByVariantId } from "@/lib/pricing";
 import { PLAN_HIERARCHY } from "@/lib/constants/plans";
 
 export const POST = route({
@@ -17,22 +17,19 @@ export const POST = route({
 		try {
 			const entitlements = await usersService.getWithDefaults(userId);
 
-			let targetPlan = body.planKey;
-			if (!targetPlan) {
-				for (const [key, plan] of Object.entries(PRICING_PLANS)) {
-					if (
-						plan.monthlyVariantId === body.variantId ||
-						plan.yearlyVariantId === body.variantId
-					) {
-						targetPlan = key.toLowerCase();
-						break;
-					}
-				}
-			}
-
-			if (!targetPlan || targetPlan === "unknown") {
+			const providedPlanKey = body.planKey?.trim().toUpperCase();
+			if (providedPlanKey && !(providedPlanKey in PRICING_PLANS)) {
 				throw new ValidationError("Invalid variant ID or plan key");
 			}
+			const derivedPlanKey = findPlanKeyByVariantId(body.variantId);
+			if (!derivedPlanKey) {
+				throw new ValidationError("Invalid variant ID or plan key");
+			}
+			if (providedPlanKey && providedPlanKey !== derivedPlanKey) {
+				throw new ValidationError("planKey does not match variantId");
+			}
+
+			const targetPlan = derivedPlanKey.toLowerCase();
 
 			const hasActiveSubscription = ["active", "trialing"].includes(
 				entitlements.status || "",

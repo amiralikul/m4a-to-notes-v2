@@ -65,7 +65,7 @@ export const POST = route({
 				return Response.json(
 					{
 						error: `Daily free limit reached (${TRIAL_DAILY_LIMIT} files/day).`,
-						code: "rate_limited",
+						code: TRIAL_ERROR_CODES.DAILY_LIMIT_REACHED,
 					},
 					{ status: 429 },
 				);

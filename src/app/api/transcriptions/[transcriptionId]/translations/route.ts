@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { route } from "@/lib/route";
 import { NotFoundError, ValidationError } from "@/lib/errors";
-import { getErrorMessage } from "@/lib/errors";
 import {
 	transcriptionsService,
 	translationsService,
@@ -12,6 +11,19 @@ import {
 	SummaryStatus,
 } from "@/services/transcriptions";
 import { isValidLanguage } from "@/lib/constants/languages";
+
+function getErrorCode(error: unknown): string | null {
+	if (
+		typeof error === "object" &&
+		error !== null &&
+		"code" in error &&
+		typeof (error as { code?: unknown }).code === "string"
+	) {
+		return (error as { code: string }).code;
+	}
+
+	return null;
+}
 
 export const GET = route({
 	auth: "required",
@@ -73,8 +85,8 @@ export const POST = route({
 				body.language,
 			);
 		} catch (insertError) {
-			const msg = getErrorMessage(insertError);
-			if (msg.includes("UNIQUE constraint")) {
+			const errorCode = getErrorCode(insertError);
+			if (errorCode?.startsWith("SQLITE_CONSTRAINT")) {
 				const existing =
 					await translationsService.findByTranscriptionAndLanguage(
 						params.transcriptionId,

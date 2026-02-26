@@ -25,8 +25,24 @@ export const GET = route({
 		}
 
 		try {
+			if (!actorId) {
+				return Response.json(
+					{
+						error: "Actor identity required",
+						code: TRIAL_ERROR_CODES.INVALID_REQUEST,
+						limited: false,
+						remaining: null,
+						limit: TRIAL_DAILY_LIMIT,
+					},
+					{
+						status: 400,
+						headers: { "Cache-Control": "no-store" },
+					},
+				);
+			}
+
 			const remaining = await trialUsageService.getRemaining(
-				actorId!,
+				actorId,
 				getUtcDayKey(),
 			);
 

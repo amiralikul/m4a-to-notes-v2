@@ -38,7 +38,7 @@ vi.mock("@/services", () => ({
 		create: vi.fn().mockResolvedValue("tr-1"),
 		findById: vi.fn(),
 		findByIdForOwner: vi.fn(),
-		getStatus: vi.fn(),
+		getStatusForOwner: vi.fn(),
 	},
 	trialUsageService: {
 		getRemaining: vi.fn().mockResolvedValue(3),
@@ -147,12 +147,7 @@ describe("Anonymous trial routes", () => {
 	});
 
 	it("allows anonymous user to poll only own transcription status", async () => {
-		vi.mocked(transcriptionsService.findByIdForOwner).mockResolvedValue({
-			id: "tr-1",
-			userId: null,
-			ownerId: "actor-1",
-		} as never);
-		vi.mocked(transcriptionsService.getStatus).mockResolvedValue({
+		vi.mocked(transcriptionsService.getStatusForOwner).mockResolvedValue({
 			status: "processing",
 			progress: 50,
 		} as never);
@@ -162,7 +157,7 @@ describe("Anonymous trial routes", () => {
 		});
 		expect(ownResponse.status).toBe(200);
 
-		vi.mocked(transcriptionsService.findByIdForOwner).mockResolvedValue(null);
+		vi.mocked(transcriptionsService.getStatusForOwner).mockResolvedValue(null);
 		const otherResponse = await getTranscriptionStatus(new Request("http://x"), {
 			params: Promise.resolve({ transcriptionId: "tr-2" }),
 		});

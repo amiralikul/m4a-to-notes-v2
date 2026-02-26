@@ -523,6 +523,20 @@ describe("TranscriptionsService", () => {
 			});
 			expect(result).toBeNull();
 		});
+
+		it("returns null when owner identity is missing", async () => {
+			const id = await service.create({
+				audioKey: "a1",
+				filename: "test.m4a",
+				userId: "user_1",
+			});
+
+			const result = await service.findByIdForOwner(id, {
+				userId: null,
+				actorId: null,
+			});
+			expect(result).toBeNull();
+		});
 	});
 
 	describe("delete", () => {

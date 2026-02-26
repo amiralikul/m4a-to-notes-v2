@@ -40,7 +40,6 @@ export const GET = route({
 						updatedAt: new Date().toISOString(),
 					},
 				},
-				{ status: 500 },
 			);
 		}
 	},

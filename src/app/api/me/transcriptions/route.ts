@@ -31,10 +31,14 @@ export const GET = route({
 	auth: "optional",
 	handler: async ({ userId, actorId, request }) => {
 		const url = new URL(request.url);
-		const limit = Math.min(
-			Number(url.searchParams.get("limit") || "50"),
-			50,
+		const parsedLimit = Number.parseInt(
+			url.searchParams.get("limit") ?? "",
+			10,
 		);
+		const limit =
+			Number.isFinite(parsedLimit) && parsedLimit > 0
+				? Math.min(parsedLimit, 50)
+				: 50;
 
 		if (userId) {
 			const [transcriptions, total] = await Promise.all([
