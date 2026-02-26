@@ -106,6 +106,40 @@ export class TranscriptionsService {
 		}
 	}
 
+	async findByIdForOwner(
+		transcriptionId: string,
+		owner: { userId: string | null; actorId: string | null },
+	): Promise<Transcription | null> {
+		try {
+			const conditions = owner.userId
+				? and(
+						eq(transcriptions.id, transcriptionId),
+						eq(transcriptions.userId, owner.userId),
+					)
+				: owner.actorId
+					? and(
+							eq(transcriptions.id, transcriptionId),
+							isNull(transcriptions.userId),
+							eq(transcriptions.ownerId, owner.actorId),
+						)
+					: eq(transcriptions.id, transcriptionId);
+
+			const result = await this.db
+				.select()
+				.from(transcriptions)
+				.where(conditions)
+				.limit(1);
+
+			return result[0] || null;
+		} catch (error) {
+			this.logger.error("Failed to find transcription for owner", {
+				transcriptionId,
+				error: getErrorMessage(error),
+			});
+			throw error;
+		}
+	}
+
 	async findById(transcriptionId: string): Promise<Transcription | null> {
 		try {
 			const result = await this.db

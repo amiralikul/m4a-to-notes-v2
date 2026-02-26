@@ -1,66 +1,41 @@
-import { auth } from "@clerk/nextjs/server";
-import { getErrorMessage } from "@/lib/errors";
-import { logger } from "@/lib/logger";
+import { z } from "zod";
+import { route } from "@/lib/route";
+import { NotFoundError, ValidationError } from "@/lib/errors";
 import { transcriptionsService, workflowService } from "@/services";
 import { TranscriptionStatus } from "@/services/transcriptions";
 
-export async function POST(
-	_request: Request,
-	{ params }: { params: Promise<{ transcriptionId: string }> },
-) {
-	const { userId } = await auth();
-	if (!userId) {
-		return Response.json({ error: "Unauthorized" }, { status: 401 });
-	}
+export const POST = route({
+	auth: "optional",
+	params: z.object({ transcriptionId: z.string() }),
+	handler: async ({ userId, actorId, params }) => {
+		const transcription = await transcriptionsService.findByIdForOwner(
+			params.transcriptionId,
+			{ userId, actorId },
+		);
 
-	const { transcriptionId } = await params;
-
-	try {
-		const transcription =
-			await transcriptionsService.findById(transcriptionId);
-
-		if (!transcription || transcription.userId !== userId) {
-			return Response.json(
-				{ error: "Transcription not found" },
-				{ status: 404 },
-			);
+		if (!transcription) {
+			throw new NotFoundError("Transcription not found");
 		}
 
 		if (
 			transcription.status !== TranscriptionStatus.COMPLETED ||
 			!transcription.transcriptText
 		) {
-			return Response.json(
-				{
-					error:
-						"Cannot regenerate summary until transcription is completed",
-				},
-				{ status: 400 },
+			throw new ValidationError(
+				"Cannot regenerate summary until transcription is completed",
 			);
 		}
 
-		await transcriptionsService.markSummaryPending(transcriptionId);
-
-		await workflowService.regenerateSummary(transcriptionId);
+		await transcriptionsService.markSummaryPending(params.transcriptionId);
+		await workflowService.regenerateSummary(params.transcriptionId);
 
 		return Response.json(
 			{
 				status: "queued",
-				transcriptionId,
+				transcriptionId: params.transcriptionId,
 				summaryStatus: "pending",
 			},
 			{ status: 202 },
 		);
-	} catch (error) {
-		logger.error("Failed to queue summary regeneration", {
-			userId,
-			transcriptionId,
-			error: getErrorMessage(error),
-		});
-
-		return Response.json(
-			{ error: "Failed to queue summary regeneration" },
-			{ status: 500 },
-		);
-	}
-}
+	},
+});

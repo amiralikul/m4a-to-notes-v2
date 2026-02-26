@@ -26,6 +26,19 @@ vi.mock("@/services", () => ({
 	},
 }));
 
+vi.mock("@/lib/logger", () => ({
+	logger: {
+		info: vi.fn(),
+		warn: vi.fn(),
+		error: vi.fn(),
+		debug: vi.fn(),
+	},
+}));
+
+function makeRequest() {
+	return new Request("http://localhost/api/trial/quota");
+}
+
 describe("Trial quota route", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -37,7 +50,7 @@ describe("Trial quota route", () => {
 	});
 
 	it("returns remaining quota for anonymous user", async () => {
-		const response = await getTrialQuota();
+		const response = await getTrialQuota(makeRequest());
 		const body = await response.json();
 
 		expect(response.status).toBe(200);
@@ -52,7 +65,7 @@ describe("Trial quota route", () => {
 	it("returns coded 429 when anonymous quota is exhausted", async () => {
 		vi.mocked(trialUsageService.getRemaining).mockResolvedValue(0);
 
-		const response = await getTrialQuota();
+		const response = await getTrialQuota(makeRequest());
 		const body = await response.json();
 
 		expect(response.status).toBe(429);
@@ -63,7 +76,7 @@ describe("Trial quota route", () => {
 	it("returns unlimited response for signed-in user", async () => {
 		vi.mocked(auth).mockResolvedValue({ userId: "user_123" } as never);
 
-		const response = await getTrialQuota();
+		const response = await getTrialQuota(makeRequest());
 		const body = await response.json();
 
 		expect(response.status).toBe(200);

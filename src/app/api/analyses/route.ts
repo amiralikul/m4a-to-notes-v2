@@ -1,5 +1,6 @@
-import { auth } from "@clerk/nextjs/server";
 import { z } from "zod";
+import { route } from "@/lib/route";
+import { ValidationError } from "@/lib/errors";
 import { getErrorMessage } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import {
@@ -25,43 +26,27 @@ const createAnalysisSchema = z
 		},
 	);
 
-export async function POST(request: Request) {
-	const { userId } = await auth();
-	if (!userId) {
-		return Response.json({ error: "Unauthorized" }, { status: 401 });
-	}
-
-	let payload: z.infer<typeof createAnalysisSchema>;
-
-	try {
-		payload = createAnalysisSchema.parse(await request.json());
-	} catch (error) {
-		return Response.json(
-			{ error: `Invalid request: ${getErrorMessage(error)}` },
-			{ status: 400 },
-		);
-	}
-
-	try {
+export const POST = route({
+	auth: "required",
+	body: createAnalysisSchema,
+	handler: async ({ userId, body }) => {
 		if (
-			payload.jobUrl &&
-			!brightDataService.isSupportedLinkedinJobUrl(payload.jobUrl)
+			body.jobUrl &&
+			!brightDataService.isSupportedLinkedinJobUrl(body.jobUrl)
 		) {
-			return Response.json(
-				{
-					error:
-						"Only LinkedIn job URLs are supported for MVP (linkedin.com/jobs/view/...)",
-				},
-				{ status: 400 },
+			throw new ValidationError(
+				"Only LinkedIn job URLs are supported for MVP (linkedin.com/jobs/view/...)",
 			);
 		}
 
 		const analysisId = await jobAnalysesService.create({
 			userId,
-			resumeText: payload.resumeText,
-			jobSourceType: payload.jobUrl ? JobSourceType.URL : JobSourceType.TEXT,
-			jobUrl: payload.jobUrl,
-			jobDescriptionInput: payload.jobDescription,
+			resumeText: body.resumeText,
+			jobSourceType: body.jobUrl
+				? JobSourceType.URL
+				: JobSourceType.TEXT,
+			jobUrl: body.jobUrl,
+			jobDescriptionInput: body.jobDescription,
 		});
 
 		try {
@@ -74,10 +59,13 @@ export async function POST(request: Request) {
 					getErrorMessage(workflowError),
 				);
 			} catch (markFailedError) {
-				logger.error("Failed to mark analysis as failed after trigger error", {
-					analysisId,
-					error: getErrorMessage(markFailedError),
-				});
+				logger.error(
+					"Failed to mark analysis as failed after trigger error",
+					{
+						analysisId,
+						error: getErrorMessage(markFailedError),
+					},
+				);
 			}
 			throw workflowError;
 		}
@@ -89,13 +77,5 @@ export async function POST(request: Request) {
 			},
 			{ status: 202 },
 		);
-	} catch (error) {
-		logger.error("Failed to create job analysis", {
-			error: getErrorMessage(error),
-		});
-		return Response.json(
-			{ error: "Failed to create analysis" },
-			{ status: 500 },
-		);
-	}
-}
+	},
+});

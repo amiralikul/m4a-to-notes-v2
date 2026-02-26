@@ -21,7 +21,7 @@ vi.mock("@/services", () => ({
 		deleteObject: vi.fn().mockResolvedValue(undefined),
 	},
 	transcriptionsService: {
-		findById: vi.fn(),
+		findByIdForOwner: vi.fn(),
 		delete: vi.fn().mockResolvedValue(undefined),
 	},
 	translationsService: {
@@ -45,7 +45,7 @@ describe("DELETE /api/me/transcriptions/[transcriptionId]", () => {
 
 	it("allows signed-in user to delete own transcription", async () => {
 		vi.mocked(auth).mockResolvedValue({ userId: "user_1" } as never);
-		vi.mocked(transcriptionsService.findById).mockResolvedValue({
+		vi.mocked(transcriptionsService.findByIdForOwner).mockResolvedValue({
 			id: "tr_1",
 			userId: "user_1",
 			ownerId: "actor_1",
@@ -66,7 +66,7 @@ describe("DELETE /api/me/transcriptions/[transcriptionId]", () => {
 	it("allows anonymous user to delete own transcription", async () => {
 		vi.mocked(auth).mockResolvedValue({ userId: null } as never);
 		vi.mocked(resolveActorIdentity).mockResolvedValue({ actorId: "actor_1" });
-		vi.mocked(transcriptionsService.findById).mockResolvedValue({
+		vi.mocked(transcriptionsService.findByIdForOwner).mockResolvedValue({
 			id: "tr_1",
 			userId: null,
 			ownerId: "actor_1",
@@ -87,12 +87,7 @@ describe("DELETE /api/me/transcriptions/[transcriptionId]", () => {
 	it("returns 404 for anonymous non-owner", async () => {
 		vi.mocked(auth).mockResolvedValue({ userId: null } as never);
 		vi.mocked(resolveActorIdentity).mockResolvedValue({ actorId: "actor_1" });
-		vi.mocked(transcriptionsService.findById).mockResolvedValue({
-			id: "tr_2",
-			userId: null,
-			ownerId: "actor_2",
-			audioKey: "blob://audio-2",
-		} as never);
+		vi.mocked(transcriptionsService.findByIdForOwner).mockResolvedValue(null);
 
 		const response = await deleteTranscription(new Request("http://x"), {
 			params: Promise.resolve({ transcriptionId: "tr_2" }),

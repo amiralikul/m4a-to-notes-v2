@@ -1,43 +1,23 @@
-import { auth } from "@clerk/nextjs/server";
-import { db } from "@/db";
-import { BillingSubscriptionsService } from "@/services/billing-subscriptions";
-import { getErrorMessage } from "@/lib/errors";
+import { z } from "zod";
+import { route } from "@/lib/route";
+import { ForbiddenError, ValidationError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
+import { billingSubscriptionsService } from "@/services";
 
-export async function POST(request: Request) {
-	const { userId } = await auth();
-	if (!userId) {
-		return Response.json({ error: "Unauthorized" }, { status: 401 });
-	}
-
-	try {
-		const { subscriptionId, cancellationReason } =
-			(await request.json()) as {
-				subscriptionId?: string;
-				cancellationReason?: string;
-			};
-
-		if (!subscriptionId) {
-			return Response.json(
-				{ error: "Subscription ID is required" },
-				{ status: 400 },
-			);
-		}
-
-		// IDOR prevention: verify the subscription belongs to this user
-		const billingService = new BillingSubscriptionsService(db, logger);
-		const isOwner = await billingService.verifyOwnership(
+export const POST = route({
+	auth: "required",
+	body: z.object({
+		subscriptionId: z.string(),
+		cancellationReason: z.string().optional(),
+	}),
+	handler: async ({ userId, body }) => {
+		const isOwner = await billingSubscriptionsService.verifyOwnership(
 			userId,
-			subscriptionId,
+			body.subscriptionId,
 			"lemonsqueezy",
 		);
 
-		if (!isOwner) {
-			return Response.json(
-				{ error: "Forbidden" },
-				{ status: 403 },
-			);
-		}
+		if (!isOwner) throw new ForbiddenError();
 
 		const apiKey = process.env.LEMONSQUEEZY_API_KEY;
 		if (!apiKey) {
@@ -45,7 +25,7 @@ export async function POST(request: Request) {
 		}
 
 		const response = await fetch(
-			`https://api.lemonsqueezy.com/v1/subscriptions/${subscriptionId}`,
+			`https://api.lemonsqueezy.com/v1/subscriptions/${body.subscriptionId}`,
 			{
 				method: "PATCH",
 				headers: {
@@ -56,7 +36,7 @@ export async function POST(request: Request) {
 				body: JSON.stringify({
 					data: {
 						type: "subscriptions",
-						id: subscriptionId,
+						id: body.subscriptionId,
 						attributes: {
 							cancelled: true,
 						},
@@ -75,24 +55,13 @@ export async function POST(request: Request) {
 		const data = (await response.json()) as { data: unknown };
 
 		logger.info("Subscription canceled", {
-			subscriptionId,
-			reason: cancellationReason,
+			subscriptionId: body.subscriptionId,
+			reason: body.cancellationReason,
 		});
 
-		return Response.json({
+		return {
 			success: true,
 			subscription: data.data,
-		});
-	} catch (error) {
-		logger.error("Failed to cancel subscription", {
-			error: getErrorMessage(error),
-		});
-
-		return Response.json(
-			{
-				error: "Failed to cancel subscription",
-			},
-			{ status: 500 },
-		);
-	}
-}
+		};
+	},
+});

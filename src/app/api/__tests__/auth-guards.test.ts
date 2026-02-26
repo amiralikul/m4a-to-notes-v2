@@ -30,14 +30,6 @@ vi.mock("@/db", () => ({
 
 const protectedRoutes = [
 	{
-		method: "POST",
-		path: "/api/transcriptions/test-id/summary/regenerate",
-		module: () =>
-			import(
-				"../../api/transcriptions/[transcriptionId]/summary/regenerate/route"
-			),
-	},
-	{
 		method: "GET",
 		path: "/api/me/entitlements",
 		module: () => import("../../api/me/entitlements/route"),

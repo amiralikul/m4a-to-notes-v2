@@ -1,8 +1,8 @@
-import { auth } from "@clerk/nextjs/server";
+import { z } from "zod";
+import { route } from "@/lib/route";
 import { TRIAL_ERROR_CODES } from "@/lib/trial-errors";
 import {
 	getUtcDayKey,
-	resolveActorIdentity,
 	TRIAL_DAILY_LIMIT,
 } from "@/lib/trial-identity";
 import {
@@ -11,45 +11,23 @@ import {
 	trialUsageService,
 	workflowService,
 } from "@/services";
-import { getErrorMessage } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 
-export async function POST(request: Request) {
-	const { userId } = await auth();
-	let actorId: string | null = null;
-	let blobUrl: string;
-	let filename: string;
-
-	let enableDiarization: boolean;
-
-	try {
-		const body: { blobUrl: string; filename: string; enableDiarization?: boolean } = await request.json();
-		blobUrl = body.blobUrl;
-		filename = body.filename;
-		enableDiarization = body.enableDiarization === true;
-	} catch {
-		return Response.json(
-			{ error: "Invalid JSON", code: TRIAL_ERROR_CODES.INVALID_REQUEST },
-			{ status: 400 },
-		);
-	}
-
-	try {
-		if (!blobUrl || !filename) {
-			return Response.json(
-				{ error: "blobUrl and filename are required" },
-				{ status: 400 },
-			);
-		}
+export const POST = route({
+	auth: "optional",
+	body: z.object({
+		blobUrl: z.string(),
+		filename: z.string(),
+		enableDiarization: z.boolean().optional().default(false),
+	}),
+	handler: async ({ userId, actorId, body }) => {
+		let resolvedActorId: string | null = actorId;
 
 		if (userId) {
-			actorId = await actorsService.getOrCreateForUser(userId);
-		} else {
-			const identity = await resolveActorIdentity();
-			actorId = identity.actorId;
-			await actorsService.ensureActor(actorId);
+			resolvedActorId = await actorsService.getOrCreateForUser(userId);
+		} else if (resolvedActorId) {
 			const consumed = await trialUsageService.consumeSlot(
-				actorId,
+				resolvedActorId,
 				getUtcDayKey(),
 			);
 			if (!consumed) {
@@ -64,13 +42,15 @@ export async function POST(request: Request) {
 		}
 
 		const transcriptionId = await transcriptionsService.create({
-			audioKey: blobUrl,
-			filename,
+			audioKey: body.blobUrl,
+			filename: body.filename,
 			source: "web",
 			userId: userId ?? undefined,
-			ownerId: actorId ?? undefined,
-			userMetadata: userId ? { userId, actorId } : { actorId },
-			enableDiarization,
+			ownerId: resolvedActorId ?? undefined,
+			userMetadata: userId
+				? { userId, actorId: resolvedActorId }
+				: { actorId: resolvedActorId },
+			enableDiarization: body.enableDiarization,
 		});
 
 		await workflowService.startTranscription(transcriptionId);
@@ -78,23 +58,13 @@ export async function POST(request: Request) {
 		logger.info("Transcription started", {
 			transcriptionId,
 			userId,
-			actorId,
-			filename,
+			actorId: resolvedActorId,
+			filename: body.filename,
 		});
 
 		return Response.json(
 			{ transcriptionId, status: "pending" },
 			{ status: 201 },
 		);
-	} catch (error) {
-		logger.error("Failed to start transcription", {
-			userId,
-			actorId,
-			error: getErrorMessage(error),
-		});
-		return Response.json(
-			{ error: "Failed to start transcription" },
-			{ status: 500 },
-		);
-	}
-}
+	},
+});

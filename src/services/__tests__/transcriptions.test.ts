@@ -442,6 +442,89 @@ describe("TranscriptionsService", () => {
 		});
 	});
 
+	describe("findByIdForOwner", () => {
+		it("returns transcription owned by userId", async () => {
+			const id = await service.create({
+				audioKey: "a1",
+				filename: "test.m4a",
+				userId: "user_1",
+			});
+
+			const result = await service.findByIdForOwner(id, {
+				userId: "user_1",
+				actorId: null,
+			});
+			expect(result).not.toBeNull();
+			expect(result!.id).toBe(id);
+		});
+
+		it("returns null when userId does not match", async () => {
+			const id = await service.create({
+				audioKey: "a1",
+				filename: "test.m4a",
+				userId: "user_1",
+			});
+
+			const result = await service.findByIdForOwner(id, {
+				userId: "user_2",
+				actorId: null,
+			});
+			expect(result).toBeNull();
+		});
+
+		it("returns transcription owned by actorId when userId is null", async () => {
+			const id = await service.create({
+				audioKey: "a1",
+				filename: "test.m4a",
+				ownerId: "actor_1",
+			});
+
+			const result = await service.findByIdForOwner(id, {
+				userId: null,
+				actorId: "actor_1",
+			});
+			expect(result).not.toBeNull();
+			expect(result!.id).toBe(id);
+		});
+
+		it("returns null when actorId does not match", async () => {
+			const id = await service.create({
+				audioKey: "a1",
+				filename: "test.m4a",
+				ownerId: "actor_1",
+			});
+
+			const result = await service.findByIdForOwner(id, {
+				userId: null,
+				actorId: "actor_2",
+			});
+			expect(result).toBeNull();
+		});
+
+		it("blocks anonymous access to claimed transcriptions (strict rule)", async () => {
+			const id = await service.create({
+				audioKey: "a1",
+				filename: "test.m4a",
+				userId: "user_1",
+				ownerId: "actor_1",
+			});
+
+			const result = await service.findByIdForOwner(id, {
+				userId: null,
+				actorId: "actor_1",
+			});
+			expect(result).toBeNull();
+		});
+
+		it("returns null for non-existent transcription", async () => {
+			const result = await service.findByIdForOwner("non-existent", {
+				userId: "user_1",
+				actorId: null,
+			});
+			expect(result).toBeNull();
+		});
+	});
+
 	describe("delete", () => {
 		it("deletes a transcription", async () => {
 			const id = await service.create({

@@ -3,7 +3,7 @@ import { resolveActorIdentity } from "@/lib/trial-identity";
 import { actorsService } from "@/services";
 import { isAppError, getErrorMessage } from "@/lib/errors";
 import { logger } from "@/lib/logger";
-import type { z } from "zod";
+import { type z, ZodError } from "zod";
 
 // --- Auth context types ---
 
@@ -151,6 +151,13 @@ export function route<
 				return Response.json(
 					{ error: error.message },
 					{ status: error.statusCode },
+				);
+			}
+
+			if (error instanceof ZodError) {
+				return Response.json(
+					{ error: "Validation failed", details: error.issues },
+					{ status: 400 },
 				);
 			}
 

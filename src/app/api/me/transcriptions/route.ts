@@ -1,75 +1,65 @@
-import { auth } from "@clerk/nextjs/server";
-import { resolveActorIdentity } from "@/lib/trial-identity";
-import { actorsService, transcriptionsService } from "@/services";
-import { getErrorMessage } from "@/lib/errors";
-import { logger } from "@/lib/logger";
+import { route } from "@/lib/route";
+import { transcriptionsService } from "@/services";
 
-export async function GET(request: Request) {
-	const { userId } = await auth();
-	let actorId: string | null = null;
+function mapTranscription(t: {
+	id: string;
+	filename: string;
+	status: string;
+	progress: number | null;
+	preview: string | null;
+	summaryStatus: string | null;
+	summaryUpdatedAt: string | null;
+	createdAt: string | null;
+	completedAt: string | null;
+	audioKey: string | null;
+}) {
+	return {
+		id: t.id,
+		filename: t.filename,
+		status: t.status,
+		progress: t.progress,
+		preview: t.preview,
+		summaryStatus: t.summaryStatus,
+		summaryUpdatedAt: t.summaryUpdatedAt,
+		createdAt: t.createdAt,
+		completedAt: t.completedAt,
+		audioKey: t.audioKey,
+	};
+}
 
-	try {
+export const GET = route({
+	auth: "optional",
+	handler: async ({ userId, actorId, request }) => {
 		const url = new URL(request.url);
 		const limit = Math.min(
 			Number(url.searchParams.get("limit") || "50"),
 			50,
 		);
 
-		if (!userId) {
-			const identity = await resolveActorIdentity();
-			actorId = identity.actorId;
-			await actorsService.ensureActor(actorId);
+		if (userId) {
+			const [transcriptions, total] = await Promise.all([
+				transcriptionsService.findByUserId(userId, limit),
+				transcriptionsService.countByUserId(userId),
+			]);
+
+			return {
+				transcriptions: transcriptions.map(mapTranscription),
+				total,
+			};
+		}
+
+		if (actorId) {
 			const [transcriptions, total] = await Promise.all([
 				transcriptionsService.findByActorId(actorId, limit),
 				transcriptionsService.countByActorId(actorId),
 			]);
 
-			return Response.json({
-				transcriptions: transcriptions.map((t) => ({
-					id: t.id,
-					filename: t.filename,
-					status: t.status,
-					progress: t.progress,
-					preview: t.preview,
-					summaryStatus: t.summaryStatus,
-					summaryUpdatedAt: t.summaryUpdatedAt,
-					createdAt: t.createdAt,
-					completedAt: t.completedAt,
-					audioKey: t.audioKey,
-				})),
+			return {
+				transcriptions: transcriptions.map(mapTranscription),
 				total,
-			});
+			};
 		}
 
-		const [transcriptions, total] = await Promise.all([
-			transcriptionsService.findByUserId(userId, limit),
-			transcriptionsService.countByUserId(userId),
-		]);
-
-		return Response.json({
-			transcriptions: transcriptions.map((t) => ({
-				id: t.id,
-				filename: t.filename,
-				status: t.status,
-				progress: t.progress,
-				preview: t.preview,
-				summaryStatus: t.summaryStatus,
-				summaryUpdatedAt: t.summaryUpdatedAt,
-				createdAt: t.createdAt,
-				completedAt: t.completedAt,
-				audioKey: t.audioKey,
-			})),
-			total,
-		});
-	} catch (error) {
-		logger.error("Failed to list transcriptions", {
-			userId,
-			actorId,
-			error: getErrorMessage(error),
-		});
-		return Response.json(
-			{ error: "Failed to list transcriptions" },
-			{ status: 500 },
-		);
-	}
-}
+		return { transcriptions: [], total: 0 };
+	},
+});
