@@ -13,7 +13,14 @@ describe("Transcription Flow (E2E)", () => {
 
 	afterAll(async () => {
 		if (blobUrl) {
-			await deleteBlob(blobUrl);
+			try {
+				await deleteBlob(blobUrl);
+			} catch (error) {
+				console.error(
+					`[e2e cleanup] Failed to delete blob ${blobUrl}:`,
+					error,
+				);
+			}
 		}
 	});
 
@@ -26,11 +33,18 @@ describe("Transcription Flow (E2E)", () => {
 			filename: "test-audio.m4a",
 		});
 
-		expect(startRes.status).toBe(201);
-		const { transcriptionId } = await startRes.json();
+		const startBody = await startRes.json();
+		expect(
+			startRes.status,
+			`Start transcription failed: ${JSON.stringify(startBody)}`,
+		).toBe(201);
+		const { transcriptionId } = startBody;
 		expect(transcriptionId).toBeDefined();
 
-		const result = await pollUntilComplete(api.get.bind(api), transcriptionId);
+		const result = await pollUntilComplete(
+			api.get.bind(api),
+			transcriptionId,
+		);
 
 		expect(result.status).toBe("completed");
 		expect(result.preview).toBeTruthy();
@@ -48,8 +62,12 @@ describe("Transcription Flow (E2E)", () => {
 			filename: "test-audio.m4a",
 		});
 
-		expect(startRes.status).toBe(201);
-		const { transcriptionId } = await startRes.json();
+		const startBody = await startRes.json();
+		expect(
+			startRes.status,
+			`Start transcription failed: ${JSON.stringify(startBody)}`,
+		).toBe(201);
+		const { transcriptionId } = startBody;
 
 		const res = await api2.get(`/api/transcriptions/${transcriptionId}`);
 		expect(res.status).toBe(404);

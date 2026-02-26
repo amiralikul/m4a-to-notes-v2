@@ -34,6 +34,12 @@ export async function pollUntilComplete(
 			);
 		}
 
+		if (data.summaryStatus === "failed") {
+			throw new Error(
+				`Summary generation failed: ${JSON.stringify(data)}`,
+			);
+		}
+
 		if (
 			data.status === "completed" &&
 			(data.summaryStatus === "completed" || data.summaryStatus === null)

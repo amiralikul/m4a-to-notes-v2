@@ -78,6 +78,7 @@ jobs:
 
   integration-tests:
     name: integration-tests
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     env:
       TURSO_DATABASE_URL: ${{ secrets.STAGING_TURSO_DATABASE_URL }}
@@ -106,15 +107,36 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Validate required secrets
+        run: |
+          missing=""
+          [ -z "$TURSO_DATABASE_URL" ] && missing="$missing STAGING_TURSO_DATABASE_URL"
+          [ -z "$M4A_TO_NOTES_READ_WRITE_TOKEN" ] && missing="$missing M4A_TO_NOTES_READ_WRITE_TOKEN"
+          [ -z "$OPENAI_API_KEY" ] && missing="$missing OPENAI_API_KEY"
+          [ -z "$GROQ_API_KEY" ] && missing="$missing GROQ_API_KEY"
+          [ -z "$INNGEST_SIGNING_KEY" ] && missing="$missing INNGEST_SIGNING_KEY"
+          [ -z "$INNGEST_EVENT_KEY" ] && missing="$missing INNGEST_EVENT_KEY"
+          [ -z "$TRIAL_COOKIE_SECRET" ] && missing="$missing TRIAL_COOKIE_SECRET"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing required secrets:$missing"
+            exit 1
+          fi
+
       - name: Start Inngest dev server
         run: npx inngest-cli@latest dev &
 
       - name: Start Next.js dev server
         run: npm run dev &
 
+      - name: Wait for Inngest to be ready
+        run: |
+          timeout 60 bash -c 'until curl -sf http://localhost:8288 > /dev/null 2>&1; do sleep 2; done' \
+            || { echo "::error::Inngest dev server failed to start within 60 seconds"; exit 1; }
+
       - name: Wait for Next.js to be ready
         run: |
-          timeout 60 bash -c 'until curl -s http://localhost:3000 > /dev/null 2>&1; do sleep 2; done'
+          timeout 60 bash -c 'until curl -sf http://localhost:3000/api/health > /dev/null 2>&1; do sleep 2; done' \
+            || { echo "::error::Next.js failed to start within 60 seconds"; exit 1; }
 
       - name: Run integration tests
         run: npx vitest run --config e2e/vitest.config.ts
