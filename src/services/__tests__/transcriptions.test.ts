@@ -351,6 +351,97 @@ describe("TranscriptionsService", () => {
 		});
 	});
 
+	describe("diarization", () => {
+		it("creates a transcription with enableDiarization: true", async () => {
+			const id = await service.create({
+				audioKey: "blob://test.m4a",
+				filename: "meeting.m4a",
+				enableDiarization: true,
+			});
+
+			const t = await service.findById(id);
+			expect(t!.enableDiarization).toBe(true);
+		});
+
+		it("defaults enableDiarization to false", async () => {
+			const id = await service.create({
+				audioKey: "blob://test.m4a",
+				filename: "test.m4a",
+			});
+
+			const t = await service.findById(id);
+			expect(t!.enableDiarization).toBe(false);
+		});
+
+		it("saves diarizationData via markCompleted", async () => {
+			const id = await service.create({
+				audioKey: "blob://test.m4a",
+				filename: "meeting.m4a",
+				enableDiarization: true,
+			});
+
+			const segments = [
+				{ speaker: "A", text: "Hello", start: 0, end: 1500 },
+				{ speaker: "B", text: "Hi there", start: 1500, end: 3000 },
+			];
+
+			await service.markCompleted(id, "Hello...", "Hello Hi there", segments);
+
+			const t = await service.findById(id);
+			expect(t!.diarizationData).toEqual(segments);
+			expect(t!.transcriptText).toBe("Hello Hi there");
+		});
+
+		it("preserves null diarizationData when not provided", async () => {
+			const id = await service.create({
+				audioKey: "blob://test.m4a",
+				filename: "mono.m4a",
+			});
+
+			await service.markCompleted(id, "Preview", "Full text");
+
+			const t = await service.findById(id);
+			expect(t!.diarizationData).toBeNull();
+		});
+
+		it("getStatus does not include diarizationData", async () => {
+			const id = await service.create({
+				audioKey: "blob://test.m4a",
+				filename: "meeting.m4a",
+				enableDiarization: true,
+			});
+
+			const segments = [
+				{ speaker: "A", text: "Hello", start: 0, end: 1500 },
+			];
+			await service.markCompleted(id, "Hello...", "Hello", segments);
+
+			const status = await service.getStatus(id);
+			expect(status).not.toBeNull();
+			expect(status).not.toHaveProperty("diarizationData");
+			expect(status).not.toHaveProperty("transcriptText");
+		});
+
+		it("getDetail includes diarization fields", async () => {
+			const id = await service.create({
+				audioKey: "blob://test.m4a",
+				filename: "meeting.m4a",
+				enableDiarization: true,
+			});
+
+			const segments = [
+				{ speaker: "A", text: "Hello", start: 0, end: 1500 },
+			];
+			await service.markCompleted(id, "Hello...", "Hello", segments);
+
+			const detail = await service.getDetail(id);
+			expect(detail).not.toBeNull();
+			expect(detail!.enableDiarization).toBe(true);
+			expect(detail!.diarizationData).toEqual(segments);
+			expect(detail!.transcriptText).toBe("Hello");
+		});
+	});
+
 	describe("delete", () => {
 		it("deletes a transcription", async () => {
 			const id = await service.create({

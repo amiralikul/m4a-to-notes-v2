@@ -1,5 +1,6 @@
 import { and, count, desc, eq, isNull } from "drizzle-orm";
 import type {
+	DiarizationSegment,
 	InsertTranscription,
 	Transcription,
 	TranscriptionSummaryData,
@@ -55,6 +56,7 @@ export class TranscriptionsService {
 		userMetadata = {},
 		userId,
 		ownerId,
+		enableDiarization = false,
 	}: {
 		audioKey: string;
 		filename: string;
@@ -62,6 +64,7 @@ export class TranscriptionsService {
 		userMetadata?: Record<string, unknown>;
 		userId?: string;
 		ownerId?: string;
+		enableDiarization?: boolean;
 	}): Promise<string> {
 		try {
 			const transcriptionId = crypto.randomUUID();
@@ -77,6 +80,7 @@ export class TranscriptionsService {
 				userMetadata,
 				userId,
 				ownerId,
+				enableDiarization,
 				createdAt: now,
 				updatedAt: now,
 			};
@@ -175,12 +179,14 @@ export class TranscriptionsService {
 		transcriptionId: string,
 		preview: string | null = null,
 		transcriptText: string,
+		diarizationData?: DiarizationSegment[] | null,
 	): Promise<Transcription> {
 		return this.update(transcriptionId, {
 			status: TranscriptionStatus.COMPLETED,
 			progress: 100,
 			preview,
 			transcriptText,
+			diarizationData: diarizationData ?? null,
 			summaryStatus: SummaryStatus.PENDING,
 			summaryError: null,
 			summaryUpdatedAt: new Date().toISOString(),
@@ -387,6 +393,41 @@ export class TranscriptionsService {
 			});
 			throw error;
 		}
+	}
+
+	async getDetail(transcriptionId: string) {
+		const transcription = await this.findById(transcriptionId);
+
+		if (!transcription) {
+			return null;
+		}
+
+		return {
+			transcriptionId: transcription.id,
+			status: transcription.status,
+			progress: transcription.progress,
+			filename: transcription.filename,
+			createdAt: transcription.createdAt,
+			completedAt: transcription.completedAt,
+			preview: transcription.preview,
+			enableDiarization: transcription.enableDiarization,
+			diarizationData: transcription.diarizationData ?? null,
+			transcriptText: transcription.transcriptText,
+			summaryStatus: transcription.summaryStatus,
+			summaryUpdatedAt: transcription.summaryUpdatedAt,
+			error: transcription.errorDetails
+				? {
+						code: transcription.errorDetails.code,
+						message: transcription.errorDetails.message,
+					}
+				: undefined,
+			summaryError: transcription.summaryError
+				? {
+						code: transcription.summaryError.code,
+						message: transcription.summaryError.message,
+					}
+				: undefined,
+		};
 	}
 
 	async getStatus(transcriptionId: string) {

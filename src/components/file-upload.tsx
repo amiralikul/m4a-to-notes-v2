@@ -9,6 +9,7 @@ import {
 	RotateCcw,
 	Trash2,
 	Upload,
+	Users,
 	X,
 } from "lucide-react";
 import Link from "next/link";
@@ -117,6 +118,7 @@ export default function FileUpload({
 	const [deletingPreviousIds, setDeletingPreviousIds] = useState<Set<string>>(
 		new Set(),
 	);
+	const [enableDiarization, setEnableDiarization] = useState(false);
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const abortControllerRef = useRef<AbortController | null>(null);
 	const pollTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
@@ -367,6 +369,7 @@ export default function FileUpload({
 					body: JSON.stringify({
 						blobUrl: blob.url,
 						filename: file.name,
+						enableDiarization,
 					}),
 				});
 
@@ -430,7 +433,7 @@ export default function FileUpload({
 				);
 			}
 		},
-		[pollTranscriptionStatus, fetchPreviousTranscriptions],
+		[enableDiarization, fetchPreviousTranscriptions, pollTranscriptionStatus],
 	);
 
 	const processFiles = useCallback(
@@ -668,6 +671,17 @@ export default function FileUpload({
 						{" "}
 						{SUPPORTED_AUDIO_FORMATS_TEXT}.
 					</p>
+
+					<label className="flex items-center gap-2 mb-6 cursor-pointer select-none text-sm text-stone-600 hover:text-stone-800 transition-colors">
+						<input
+							type="checkbox"
+							checked={enableDiarization}
+							onChange={(e) => setEnableDiarization(e.target.checked)}
+							className="h-4 w-4 rounded border-stone-300 text-amber-500 focus:ring-amber-500"
+						/>
+						<Users className="w-4 h-4" />
+						Identify Speakers
+					</label>
 
 					<Button
 						onClick={() => fileInputRef.current?.click()}

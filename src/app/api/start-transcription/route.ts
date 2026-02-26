@@ -20,11 +20,13 @@ export async function POST(request: Request) {
 	let blobUrl: string;
 	let filename: string;
 
+	let enableDiarization: boolean;
+
 	try {
-		({ blobUrl, filename } = (await request.json()) as {
-			blobUrl: string;
-			filename: string;
-		});
+		const body: { blobUrl: string; filename: string; enableDiarization?: boolean } = await request.json();
+		blobUrl = body.blobUrl;
+		filename = body.filename;
+		enableDiarization = body.enableDiarization === true;
 	} catch {
 		return Response.json(
 			{ error: "Invalid JSON", code: TRIAL_ERROR_CODES.INVALID_REQUEST },
@@ -68,6 +70,7 @@ export async function POST(request: Request) {
 			userId: userId ?? undefined,
 			ownerId: actorId ?? undefined,
 			userMetadata: userId ? { userId, actorId } : { actorId },
+			enableDiarization,
 		});
 
 		await workflowService.startTranscription(transcriptionId);
