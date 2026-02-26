@@ -30,5 +30,11 @@ export async function GET(
 	}
 
 	const detail = await transcriptionsService.getDetail(transcriptionId);
+	if (!detail) {
+		return Response.json(
+			{ error: "Transcription not found" },
+			{ status: 404 },
+		);
+	}
 	return Response.json(detail);
 }

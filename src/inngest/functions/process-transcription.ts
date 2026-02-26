@@ -97,6 +97,9 @@ export const processTranscription = inngest.createFunction(
 
 					const result = await assemblyAiService.getTranscript(assemblyJobId);
 					if (result.status === "completed") {
+						if (!result.text.trim()) {
+							return { done: true as const, error: "No speech detected in audio", text: "" };
+						}
 						const preview =
 							result.text.substring(0, 150) +
 							(result.text.length > 150 ? "..." : "");

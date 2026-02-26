@@ -23,7 +23,7 @@ export class AssemblyAiService {
 	}
 
 	async submit(audioUrl: string): Promise<string> {
-		this.logger.info("Submitting audio to AssemblyAI", { audioUrl });
+		this.logger.info("Submitting audio to AssemblyAI");
 
 		const startTime = Date.now();
 
@@ -31,7 +31,7 @@ export class AssemblyAiService {
 			const transcript = await this.getClient().transcripts.submit({
 				audio: audioUrl,
 				speaker_labels: true,
-				speech_models: ["universal-2" as "universal"],
+				speech_models: ["universal-2"],
 			});
 
 			const duration = Date.now() - startTime;
@@ -47,7 +47,6 @@ export class AssemblyAiService {
 			this.logger.error("Failed to submit to AssemblyAI", {
 				error: getErrorMessage(error),
 				duration: `${duration}ms`,
-				audioUrl,
 			});
 			throw error;
 		}

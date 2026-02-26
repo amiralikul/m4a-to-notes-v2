@@ -341,11 +341,11 @@ export default function TranscriptionDetailPage() {
 			</div>
 
 			{/* Transcript Preview */}
-			{(transcription.preview || transcription.diarizationData) && (
+			{(transcription.preview || transcription.transcriptText || (transcription.diarizationData && transcription.diarizationData.length > 0)) && (
 				<Card>
 					<CardHeader className="flex flex-row items-center justify-between">
 						<CardTitle className="text-lg flex items-center gap-2">
-							{transcription.diarizationData ? (
+							{transcription.diarizationData && transcription.diarizationData.length > 0 ? (
 								<>
 									<Users className="w-5 h-5" />
 									Speaker Transcript
@@ -364,8 +364,8 @@ export default function TranscriptionDetailPage() {
 								</p>
 							) : transcription.diarizationData && transcription.diarizationData.length > 0 ? (
 								<div className="space-y-4">
-									{transcription.diarizationData.map((segment, index) => (
-										<div key={`segment-${index}`}>
+									{transcription.diarizationData.map((segment) => (
+										<div key={`${segment.speaker}-${segment.start}-${segment.end}`}>
 											<div className="flex items-center gap-2 mb-1">
 												<span className="text-sm font-semibold text-stone-900">
 													Speaker {segment.speaker}
