@@ -112,13 +112,27 @@ export class TranscriptionsService {
 		owner: OwnerIdentity,
 	): Promise<Transcription | null> {
 		try {
-			let conditions;
+			if (owner.userId === null && owner.actorId === null) {
+				this.logger.warn("Cannot find transcription without owner identity", {
+					transcriptionId,
+				});
+				return null;
+			}
+
+			let conditions: ReturnType<typeof and>;
 			if (owner.userId !== null) {
 				conditions = and(
 					eq(transcriptions.id, transcriptionId),
 					eq(transcriptions.userId, owner.userId),
 				);
 			} else {
+				if (owner.actorId === null) {
+					this.logger.warn("Cannot find transcription without actor identity", {
+						transcriptionId,
+					});
+					return null;
+				}
+
 				conditions = and(
 					eq(transcriptions.id, transcriptionId),
 					isNull(transcriptions.userId),

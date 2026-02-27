@@ -10,6 +10,7 @@ import {
 	TranscriptionStatus,
 	SummaryStatus,
 } from "@/services/transcriptions";
+import { TranslationStatus } from "@/services/translations";
 import { isValidLanguage } from "@/lib/constants/languages";
 
 function getErrorCode(error: unknown): string | null {
@@ -95,10 +96,21 @@ export const POST = route({
 						body.language,
 					);
 				if (existing) {
-					return { translation: existing };
+					const shouldReturnExisting =
+						existing.status === TranslationStatus.PROCESSING ||
+						existing.status === TranslationStatus.COMPLETED;
+
+					if (shouldReturnExisting) {
+						return { translation: existing };
+					}
+
+					translationId = existing.id;
+				} else {
+					throw insertError;
 				}
+			} else {
+				throw insertError;
 			}
-			throw insertError;
 		}
 
 		await workflowService.requestTranslation(
