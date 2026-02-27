@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { route } from "@/lib/route";
+import { route, type OwnerIdentity } from "@/lib/route";
 import { getErrorMessage, NotFoundError, ValidationError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { transcriptionsService, workflowService } from "@/services";
@@ -11,7 +11,7 @@ export const POST = route({
 	handler: async ({ userId, actorId, params }) => {
 		const transcription = await transcriptionsService.findByIdForOwner(
 			params.transcriptionId,
-			{ userId, actorId },
+			{ userId, actorId } as OwnerIdentity,
 		);
 
 		if (!transcription) {

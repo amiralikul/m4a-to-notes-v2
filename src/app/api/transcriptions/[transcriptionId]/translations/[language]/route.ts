@@ -12,11 +12,12 @@ export const GET = route({
 	auth: "required",
 	params: paramsSchema,
 	handler: async ({ userId, params }) => {
-		const transcription = await transcriptionsService.findById(
+		const transcription = await transcriptionsService.findByIdForOwner(
 			params.transcriptionId,
+			{ userId, actorId: null },
 		);
 
-		if (!transcription || transcription.userId !== userId) {
+		if (!transcription) {
 			throw new NotFoundError("Transcription not found");
 		}
 
@@ -38,11 +39,12 @@ export const DELETE = route({
 	auth: "required",
 	params: paramsSchema,
 	handler: async ({ userId, params }) => {
-		const transcription = await transcriptionsService.findById(
+		const transcription = await transcriptionsService.findByIdForOwner(
 			params.transcriptionId,
+			{ userId, actorId: null },
 		);
 
-		if (!transcription || transcription.userId !== userId) {
+		if (!transcription) {
 			throw new NotFoundError("Transcription not found");
 		}
 

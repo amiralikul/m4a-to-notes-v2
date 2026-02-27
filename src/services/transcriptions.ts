@@ -9,6 +9,7 @@ import type {
 import { transcriptions } from "@/db/schema";
 import { getErrorMessage } from "@/lib/errors";
 import type { Logger } from "@/lib/logger";
+import type { OwnerIdentity } from "@/lib/route";
 
 export const TranscriptionStatus = {
 	PENDING: "pending",
@@ -108,31 +109,21 @@ export class TranscriptionsService {
 
 	async findByIdForOwner(
 		transcriptionId: string,
-		owner: { userId: string | null; actorId: string | null },
+		owner: OwnerIdentity,
 	): Promise<Transcription | null> {
 		try {
-			if (!owner.userId && !owner.actorId) {
-				this.logger.warn("Missing owner identity for transcription lookup", {
-					transcriptionId,
-				});
-				return null;
-			}
-
-			const conditions = owner.userId
-				? and(
-						eq(transcriptions.id, transcriptionId),
-						eq(transcriptions.userId, owner.userId),
-					)
-				: owner.actorId
-						? and(
-								eq(transcriptions.id, transcriptionId),
-								isNull(transcriptions.userId),
-								eq(transcriptions.ownerId, owner.actorId),
-							)
-						: null;
-
-			if (!conditions) {
-				return null;
+			let conditions;
+			if (owner.userId !== null) {
+				conditions = and(
+					eq(transcriptions.id, transcriptionId),
+					eq(transcriptions.userId, owner.userId),
+				);
+			} else {
+				conditions = and(
+					eq(transcriptions.id, transcriptionId),
+					isNull(transcriptions.userId),
+					eq(transcriptions.ownerId, owner.actorId),
+				);
 			}
 
 			const result = await this.db
@@ -452,7 +443,7 @@ export class TranscriptionsService {
 
 	async getDetailForOwner(
 		transcriptionId: string,
-		owner: { userId: string | null; actorId: string | null },
+		owner: OwnerIdentity,
 	) {
 		const transcription = await this.findByIdForOwner(transcriptionId, owner);
 
@@ -475,7 +466,7 @@ export class TranscriptionsService {
 
 	async getStatusForOwner(
 		transcriptionId: string,
-		owner: { userId: string | null; actorId: string | null },
+		owner: OwnerIdentity,
 	) {
 		const transcription = await this.findByIdForOwner(transcriptionId, owner);
 

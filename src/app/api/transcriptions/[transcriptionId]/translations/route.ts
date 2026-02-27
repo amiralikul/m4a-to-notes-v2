@@ -29,11 +29,12 @@ export const GET = route({
 	auth: "required",
 	params: z.object({ transcriptionId: z.string() }),
 	handler: async ({ userId, params }) => {
-		const transcription = await transcriptionsService.findById(
+		const transcription = await transcriptionsService.findByIdForOwner(
 			params.transcriptionId,
+			{ userId, actorId: null },
 		);
 
-		if (!transcription || transcription.userId !== userId) {
+		if (!transcription) {
 			throw new NotFoundError("Transcription not found");
 		}
 
@@ -55,11 +56,12 @@ export const POST = route({
 			throw new ValidationError("Invalid or unsupported language code");
 		}
 
-		const transcription = await transcriptionsService.findById(
+		const transcription = await transcriptionsService.findByIdForOwner(
 			params.transcriptionId,
+			{ userId, actorId: null },
 		);
 
-		if (!transcription || transcription.userId !== userId) {
+		if (!transcription) {
 			throw new NotFoundError("Transcription not found");
 		}
 

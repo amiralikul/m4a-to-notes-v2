@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { route } from "@/lib/route";
+import { route, type OwnerIdentity } from "@/lib/route";
 import { NotFoundError } from "@/lib/errors";
 import { getErrorMessage } from "@/lib/errors";
 import { logger } from "@/lib/logger";
@@ -15,7 +15,7 @@ export const DELETE = route({
 	handler: async ({ userId, actorId, params }) => {
 		const transcription = await transcriptionsService.findByIdForOwner(
 			params.transcriptionId,
-			{ userId, actorId },
+			{ userId, actorId } as OwnerIdentity,
 		);
 
 		if (!transcription) throw new NotFoundError("Transcription not found");
