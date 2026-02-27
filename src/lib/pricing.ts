@@ -46,3 +46,16 @@ export function getSubscriptionPlans(): PricingPlan[] {
 		(plan) => plan.monthlyVariantId !== null || plan.yearlyVariantId !== null,
 	);
 }
+
+export function findPlanKeyByVariantId(variantId: string): string | null {
+	for (const [planKey, plan] of Object.entries(PRICING_PLANS)) {
+		if (
+			plan.monthlyVariantId === variantId ||
+			plan.yearlyVariantId === variantId
+		) {
+			return planKey;
+		}
+	}
+
+	return null;
+}

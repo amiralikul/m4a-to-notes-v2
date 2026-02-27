@@ -9,6 +9,7 @@ import type {
 import { transcriptions } from "@/db/schema";
 import { getErrorMessage } from "@/lib/errors";
 import type { Logger } from "@/lib/logger";
+import type { OwnerIdentity } from "@/lib/route";
 
 export const TranscriptionStatus = {
 	PENDING: "pending",
@@ -100,6 +101,55 @@ export class TranscriptionsService {
 				audioKey,
 				filename,
 				source,
+				error: getErrorMessage(error),
+			});
+			throw error;
+		}
+	}
+
+	async findByIdForOwner(
+		transcriptionId: string,
+		owner: OwnerIdentity,
+	): Promise<Transcription | null> {
+		try {
+			if (owner.userId === null && owner.actorId === null) {
+				this.logger.warn("Cannot find transcription without owner identity", {
+					transcriptionId,
+				});
+				return null;
+			}
+
+			let conditions: ReturnType<typeof and>;
+			if (owner.userId !== null) {
+				conditions = and(
+					eq(transcriptions.id, transcriptionId),
+					eq(transcriptions.userId, owner.userId),
+				);
+			} else {
+				if (owner.actorId === null) {
+					this.logger.warn("Cannot find transcription without actor identity", {
+						transcriptionId,
+					});
+					return null;
+				}
+
+				conditions = and(
+					eq(transcriptions.id, transcriptionId),
+					isNull(transcriptions.userId),
+					eq(transcriptions.ownerId, owner.actorId),
+				);
+			}
+
+			const result = await this.db
+				.select()
+				.from(transcriptions)
+				.where(conditions)
+				.limit(1);
+
+			return result[0] || null;
+		} catch (error) {
+			this.logger.error("Failed to find transcription for owner", {
+				transcriptionId,
 				error: getErrorMessage(error),
 			});
 			throw error;
@@ -402,6 +452,46 @@ export class TranscriptionsService {
 			return null;
 		}
 
+		return this.mapDetail(transcription);
+	}
+
+	async getDetailForOwner(
+		transcriptionId: string,
+		owner: OwnerIdentity,
+	) {
+		const transcription = await this.findByIdForOwner(transcriptionId, owner);
+
+		if (!transcription) {
+			return null;
+		}
+
+		return this.mapDetail(transcription);
+	}
+
+	async getStatus(transcriptionId: string) {
+		const transcription = await this.findById(transcriptionId);
+
+		if (!transcription) {
+			return null;
+		}
+
+		return this.mapStatus(transcription);
+	}
+
+	async getStatusForOwner(
+		transcriptionId: string,
+		owner: OwnerIdentity,
+	) {
+		const transcription = await this.findByIdForOwner(transcriptionId, owner);
+
+		if (!transcription) {
+			return null;
+		}
+
+		return this.mapStatus(transcription);
+	}
+
+	private mapDetail(transcription: Transcription) {
 		return {
 			transcriptionId: transcription.id,
 			status: transcription.status,
@@ -430,13 +520,7 @@ export class TranscriptionsService {
 		};
 	}
 
-	async getStatus(transcriptionId: string) {
-		const transcription = await this.findById(transcriptionId);
-
-		if (!transcription) {
-			return null;
-		}
-
+	private mapStatus(transcription: Transcription) {
 		return {
 			transcriptionId: transcription.id,
 			jobId: transcription.id,

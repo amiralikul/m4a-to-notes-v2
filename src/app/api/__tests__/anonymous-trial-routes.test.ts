@@ -37,7 +37,8 @@ vi.mock("@/services", () => ({
 	transcriptionsService: {
 		create: vi.fn().mockResolvedValue("tr-1"),
 		findById: vi.fn(),
-		getStatus: vi.fn(),
+		findByIdForOwner: vi.fn(),
+		getStatusForOwner: vi.fn(),
 	},
 	trialUsageService: {
 		getRemaining: vi.fn().mockResolvedValue(3),
@@ -146,12 +147,7 @@ describe("Anonymous trial routes", () => {
 	});
 
 	it("allows anonymous user to poll only own transcription status", async () => {
-		vi.mocked(transcriptionsService.findById).mockResolvedValue({
-			id: "tr-1",
-			userId: null,
-			ownerId: "actor-1",
-		} as never);
-		vi.mocked(transcriptionsService.getStatus).mockResolvedValue({
+		vi.mocked(transcriptionsService.getStatusForOwner).mockResolvedValue({
 			status: "processing",
 			progress: 50,
 		} as never);
@@ -161,11 +157,7 @@ describe("Anonymous trial routes", () => {
 		});
 		expect(ownResponse.status).toBe(200);
 
-		vi.mocked(transcriptionsService.findById).mockResolvedValue({
-			id: "tr-2",
-			userId: null,
-			ownerId: "actor-2",
-		} as never);
+		vi.mocked(transcriptionsService.getStatusForOwner).mockResolvedValue(null);
 		const otherResponse = await getTranscriptionStatus(new Request("http://x"), {
 			params: Promise.resolve({ transcriptionId: "tr-2" }),
 		});
@@ -173,7 +165,7 @@ describe("Anonymous trial routes", () => {
 	});
 
 	it("allows anonymous user to fetch transcript only for own job", async () => {
-		vi.mocked(transcriptionsService.findById).mockResolvedValue({
+		vi.mocked(transcriptionsService.findByIdForOwner).mockResolvedValue({
 			id: "tr-1",
 			filename: "meeting.m4a",
 			userId: null,
@@ -187,13 +179,7 @@ describe("Anonymous trial routes", () => {
 		expect(ownResponse.status).toBe(200);
 		expect(await ownResponse.text()).toContain("transcript body");
 
-		vi.mocked(transcriptionsService.findById).mockResolvedValue({
-			id: "tr-2",
-			filename: "other.m4a",
-			userId: null,
-			ownerId: "actor-2",
-			transcriptText: "other body",
-		} as never);
+		vi.mocked(transcriptionsService.findByIdForOwner).mockResolvedValue(null);
 
 		const otherResponse = await getTranscript(new Request("http://x"), {
 			params: Promise.resolve({ transcriptionId: "tr-2" }),

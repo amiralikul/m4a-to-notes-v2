@@ -3,9 +3,13 @@ import { resolveActorIdentity } from "@/lib/trial-identity";
 import { actorsService } from "@/services";
 import { isAppError, getErrorMessage } from "@/lib/errors";
 import { logger } from "@/lib/logger";
-import type { z } from "zod";
+import { type z, ZodError } from "zod";
 
 // --- Auth context types ---
+
+export type OwnerIdentity =
+	| { userId: string; actorId: string | null }
+	| { userId: null; actorId: string };
 
 type RequiredAuthContext = { userId: string };
 type OptionalAuthContext = { userId: string | null; actorId: string | null };
@@ -146,6 +150,9 @@ export function route<
 				if (error.statusCode >= 500) {
 					logger.error(error.message, {
 						error: getErrorMessage(error),
+						stack: error.stack,
+						url: request.url,
+						method: request.method,
 					});
 				}
 				return Response.json(
@@ -154,8 +161,19 @@ export function route<
 				);
 			}
 
+			if (error instanceof ZodError) {
+				return Response.json(
+					{ error: "Validation failed", details: error.issues },
+					{ status: 400 },
+				);
+			}
+
 			logger.error("Unhandled route error", {
 				error: getErrorMessage(error),
+				stack: error instanceof Error ? error.stack : undefined,
+				errorType: error instanceof Error ? error.constructor.name : typeof error,
+				url: request.url,
+				method: request.method,
 			});
 			return Response.json(
 				{ error: "Internal server error" },

@@ -110,4 +110,18 @@ describe("GET /api/me/transcriptions", () => {
 		expect(body.total).toBe(1);
 		expect(body.transcriptions).toHaveLength(1);
 	});
+
+	it("uses default limit when query parameter is invalid", async () => {
+		vi.mocked(auth).mockResolvedValue({ userId: "user_1" } as never);
+
+		const response = await listTranscriptions(
+			new Request("http://localhost:3000/api/me/transcriptions?limit=-10"),
+		);
+
+		expect(response.status).toBe(200);
+		expect(transcriptionsService.findByUserId).toHaveBeenCalledWith(
+			"user_1",
+			50,
+		);
+	});
 });

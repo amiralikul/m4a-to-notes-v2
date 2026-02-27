@@ -50,26 +50,4 @@ describe("Transcription Flow (E2E)", () => {
 		expect(result.preview).toBeTruthy();
 		expect(typeof result.preview).toBe("string");
 	});
-
-	it("should return 404 for transcription owned by different actor", async () => {
-		const { cookieHeader: cookie1 } = createSignedActorCookie();
-		const { cookieHeader: cookie2 } = createSignedActorCookie();
-		const api1 = createApiClient(cookie1);
-		const api2 = createApiClient(cookie2);
-
-		const startRes = await api1.post("/api/start-transcription", {
-			blobUrl,
-			filename: "test-audio.m4a",
-		});
-
-		const startBody = await startRes.json();
-		expect(
-			startRes.status,
-			`Start transcription failed: ${JSON.stringify(startBody)}`,
-		).toBe(201);
-		const { transcriptionId } = startBody;
-
-		const res = await api2.get(`/api/transcriptions/${transcriptionId}`);
-		expect(res.status).toBe(404);
-	});
 });

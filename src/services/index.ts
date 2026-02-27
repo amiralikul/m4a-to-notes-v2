@@ -18,6 +18,7 @@ import {
 	TranscriptionAiService,
 } from "./ai";
 import { TranslationsService } from "./translations";
+import { BillingSubscriptionsService } from "./billing-subscriptions";
 
 export const transcriptionsService = new TranscriptionsService(db, logger);
 export const usersService = new UsersService(db, logger);
@@ -74,5 +75,9 @@ export const jobFitAiService = new JobFitAiService(
 export const translationsService = new TranslationsService(db, logger);
 export const assemblyAiService = new AssemblyAiService(
 	{ apiKey: process.env.ASSEMBLYAI_API_KEY || "" },
+	logger,
+);
+export const billingSubscriptionsService = new BillingSubscriptionsService(
+	db,
 	logger,
 );
