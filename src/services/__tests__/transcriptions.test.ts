@@ -1,6 +1,9 @@
+import { eq } from "drizzle-orm";
 import { describe, it, expect, beforeEach } from "vitest";
+import { translations } from "@/db/schema";
 import { createTestDb } from "@/test/db";
 import { createTestLogger } from "@/test/setup";
+import { TranscriptionChunksService } from "../transcription-chunks";
 import {
 	SummaryStatus,
 	TranscriptionStatus,
@@ -8,12 +11,15 @@ import {
 } from "../transcriptions";
 
 describe("TranscriptionsService", () => {
+	let db: ReturnType<typeof createTestDb>;
 	let service: TranscriptionsService;
+	let chunksService: TranscriptionChunksService;
 
 	beforeEach(() => {
-		const db = createTestDb();
+		db = createTestDb();
 		const logger = createTestLogger();
 		service = new TranscriptionsService(db, logger);
+		chunksService = new TranscriptionChunksService(db, logger);
 	});
 
 	describe("create", () => {
@@ -537,5 +543,54 @@ describe("TranscriptionsService", () => {
 			const result = await service.findById(id);
 			expect(result).toBeNull();
 		});
+
+		it("deletes chunk rows via FK cascade when deleting transcription", async () => {
+			const id = await service.create({
+				audioKey: "blob://test.m4a",
+				filename: "test.m4a",
+			});
+
+			await chunksService.createMany(id, [
+				{
+					chunkIndex: 0,
+					blobUrl: "https://blob.example/chunk-0.flac",
+					startMs: 0,
+					endMs: 600000,
+				},
+			]);
+
+			await service.delete(id);
+
+			const result = await service.findById(id);
+			expect(result).toBeNull();
+
+			const chunks = await chunksService.findByTranscriptionId(id);
+			expect(chunks).toHaveLength(0);
+		});
+
+		it("deletes translations for the transcription", async () => {
+			const id = await service.create({
+				audioKey: "blob://test.m4a",
+				filename: "test.m4a",
+			});
+
+			await db.insert(translations).values({
+				id: crypto.randomUUID(),
+				transcriptionId: id,
+				language: "es",
+				status: "pending",
+				createdAt: new Date().toISOString(),
+				updatedAt: new Date().toISOString(),
+			});
+
+			await service.delete(id);
+
+			const rows = await db
+				.select()
+				.from(translations)
+				.where(eq(translations.transcriptionId, id));
+			expect(rows).toHaveLength(0);
+		});
+
 	});
 });

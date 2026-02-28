@@ -5,7 +5,6 @@ import { getErrorMessage } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import {
 	transcriptionsService,
-	translationsService,
 	storageService,
 } from "@/services";
 
@@ -32,9 +31,6 @@ export const DELETE = route({
 			}
 		}
 
-		await translationsService.deleteByTranscriptionId(
-			params.transcriptionId,
-		);
 		await transcriptionsService.delete(params.transcriptionId);
 
 		return new Response(null, { status: 204 });

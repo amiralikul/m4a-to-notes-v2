@@ -7,3 +7,10 @@ export const transcriptionKeys = {
 	translations: (id: string) =>
 		[...transcriptionKeys.detail(id), "translations"] as const,
 };
+
+export const viewerTranscriptionKeys = {
+	all: ["viewer", "transcriptions"] as const,
+	lists: () => [...viewerTranscriptionKeys.all, "list"] as const,
+	list: (limit: number) =>
+		[...viewerTranscriptionKeys.lists(), { limit }] as const,
+};

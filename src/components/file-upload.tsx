@@ -1,6 +1,11 @@
 "use client";
 import { useUser } from "@clerk/nextjs";
 import {
+	useMutation,
+	useQuery,
+	useQueryClient,
+} from "@tanstack/react-query";
+import {
 	AlertCircle,
 	CheckCircle,
 	Download,
@@ -16,11 +21,11 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { upload } from "@vercel/blob/client";
 import { logger } from "@/lib/logger";
+import { viewerTranscriptionKeys } from "@/lib/query-keys";
 import { TRIAL_ERROR_CODES } from "@/lib/trial-errors";
 import {
 	AUDIO_LIMITS,
 	SUPPORTED_AUDIO_FORMATS_TEXT,
-	validateAudioFile,
 } from "@/lib/validation";
 import { AudioPlayer } from "@/components/audio-player";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +40,18 @@ interface UploadedFile {
 	transcription?: string;
 	transcriptionId?: string;
 	audioUrl?: string;
+	error?: string;
+}
+
+interface ChunkManifestItem {
+	chunkIndex: number;
+	blobUrl: string;
+	startMs: number;
+	endMs: number;
+}
+
+interface ChunkerResponsePayload {
+	chunks?: ChunkManifestItem[];
 	error?: string;
 }
 
@@ -56,6 +73,12 @@ const DAILY_LIMIT_MESSAGE = "Daily free limit reached (3 files/day).";
 const DAILY_LIMIT_EXPLANATION =
 	"You have used all 3 free transcriptions for today. The limit resets daily (UTC). Upgrade to Pro to continue now.";
 const BLOB_RATE_LIMIT_CODE = "rate_limited";
+const CHUNKER_RATE_LIMIT_CODE = "chunker_rate_limited";
+const MAX_CHUNKER_FILE_SIZE = 1024 * 1024 * 1024;
+const RECENT_TRANSCRIPTIONS_LIMIT = 10;
+const CHUNKER_CHUNK_SECONDS = 10 * 60; //FIXME
+const CHUNKER_OVERLAP_SECONDS = 10;
+const AUDIO_CHUNKER_URL = process.env.NEXT_PUBLIC_AUDIO_CHUNKER_URL;
 
 function isDailyLimitErrorMessage(message: string): boolean {
 	const normalized = message.toLowerCase();
@@ -85,7 +108,8 @@ function isDailyLimitError(error: unknown): boolean {
 		const code = (error as { code?: string }).code;
 		if (
 			code === TRIAL_ERROR_CODES.DAILY_LIMIT_REACHED ||
-			code === BLOB_RATE_LIMIT_CODE
+			code === BLOB_RATE_LIMIT_CODE ||
+			code === CHUNKER_RATE_LIMIT_CODE
 		) {
 			return true;
 		}
@@ -96,27 +120,55 @@ function isDailyLimitError(error: unknown): boolean {
 		return (
 			code === TRIAL_ERROR_CODES.DAILY_LIMIT_REACHED ||
 			code === BLOB_RATE_LIMIT_CODE ||
+			code === CHUNKER_RATE_LIMIT_CODE ||
 			isDailyLimitErrorMessage(error.message)
 		);
 	}
 	return false;
 }
 
+async function fetchPreviousTranscriptionsApi(
+	limit: number,
+): Promise<PreviousTranscription[]> {
+	const response = await fetch(`/api/me/transcriptions?limit=${limit}`, {
+		cache: "no-store",
+	});
+	if (!response.ok) {
+		throw new Error("Could not load transcriptions right now.");
+	}
+
+	const data = (await response.json()) as {
+		transcriptions?: PreviousTranscription[];
+	};
+	return data.transcriptions || [];
+}
+
+async function deletePreviousTranscriptionApi(
+	transcriptionId: string,
+): Promise<void> {
+	const response = await fetch(`/api/me/transcriptions/${transcriptionId}`, {
+		method: "DELETE",
+	});
+	if (!response.ok) {
+		throw new Error("Could not delete transcription right now. Please try again.");
+	}
+}
+
 export default function FileUpload({
 	showHistory = true,
 }: FileUploadProps) {
 	const { isLoaded, isSignedIn } = useUser();
+	const queryClient = useQueryClient();
+	const recentTranscriptionsQueryKey = viewerTranscriptionKeys.list(
+		RECENT_TRANSCRIPTIONS_LIMIT,
+	);
 	const [isDragOver, setIsDragOver] = useState(false);
 	const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-	const [previousTranscriptions, setPreviousTranscriptions] = useState<
-		PreviousTranscription[]
-	>([]);
-	const [loadingPreviousTranscriptions, setLoadingPreviousTranscriptions] =
-		useState(false);
-	const [previousTranscriptionsError, setPreviousTranscriptionsError] =
-		useState<string | null>(null);
 	const [deletingPreviousIds, setDeletingPreviousIds] = useState<Set<string>>(
 		new Set(),
+	);
+	const [historyActionError, setHistoryActionError] = useState<string | null>(
+		null,
 	);
 	const [enableDiarization, setEnableDiarization] = useState(false);
 	const fileInputRef = useRef<HTMLInputElement>(null);
@@ -145,22 +197,39 @@ export default function FileUpload({
 	}, []);
 
 	const validateFile = useCallback((file: File) => {
-		const result = validateAudioFile({
-			size: file.size,
-			type: file.type,
-			name: file.name,
-		});
-		if (!result.valid) {
-			if (result.error === "Unsupported audio format") {
-				alert(`Supported formats: ${SUPPORTED_AUDIO_FORMATS_TEXT}.`);
-				return false;
-			}
-			alert(result.error || "Invalid file.");
+		const extension = `.${file.name.split(".").pop()?.toLowerCase()}`;
+		const isSupportedFormat =
+			AUDIO_LIMITS.VALID_MIME_TYPES.includes(file.type) ||
+			AUDIO_LIMITS.VALID_EXTENSIONS.includes(extension);
+
+		if (!isSupportedFormat) {
+			alert(`Supported formats: ${SUPPORTED_AUDIO_FORMATS_TEXT}.`);
+			return false;
+		}
+
+		if (file.name.length > AUDIO_LIMITS.MAX_FILENAME_LENGTH) {
+			alert("Filename too long.");
+			return false;
+		}
+
+		const maximumAllowedSize = AUDIO_CHUNKER_URL
+			? MAX_CHUNKER_FILE_SIZE
+			: AUDIO_LIMITS.MAX_FILE_SIZE;
+
+		if (file.size > maximumAllowedSize) {
+			alert(
+				`File size exceeds ${maximumAllowedSize / 1024 / 1024}MB limit.`,
+			);
+			return false;
+		}
+
+		if (file.size > AUDIO_LIMITS.MAX_FILE_SIZE && enableDiarization) {
+			alert("Speaker diarization is supported only for files up to 100MB.");
 			return false;
 		}
 
 		return true;
-	}, []);
+	}, [enableDiarization]);
 
 	const formatFileSize = (bytes: number) => {
 		if (bytes === 0) return "0 Bytes";
@@ -291,32 +360,115 @@ export default function FileUpload({
 		[],
 	);
 
-	const fetchPreviousTranscriptions = useCallback(async () => {
-		if (!isLoaded || !showHistory) {
-			return;
-		}
+	const {
+		data: previousTranscriptions = [],
+		isLoading: loadingPreviousTranscriptions,
+		isFetching: fetchingPreviousTranscriptions,
+		error: previousTranscriptionsQueryError,
+		refetch: refetchPreviousTranscriptions,
+	} = useQuery({
+		queryKey: recentTranscriptionsQueryKey,
+		queryFn: () =>
+			fetchPreviousTranscriptionsApi(RECENT_TRANSCRIPTIONS_LIMIT),
+		enabled: showHistory && isLoaded,
+		staleTime: 20_000,
+		gcTime: 10 * 60 * 1000,
+		retry: 1,
+	});
 
-		setLoadingPreviousTranscriptions(true);
-		try {
-			const response = await fetch("/api/me/transcriptions?limit=10", {
-				cache: "no-store",
+	const { mutateAsync: deletePreviousTranscription } = useMutation({
+		mutationFn: deletePreviousTranscriptionApi,
+		onMutate: async (transcriptionId) => {
+			await queryClient.cancelQueries({
+				queryKey: viewerTranscriptionKeys.lists(),
 			});
-			if (!response.ok) {
-				throw new Error("Failed to fetch transcriptions");
-			}
-			const data = (await response.json()) as {
-				transcriptions?: PreviousTranscription[];
-			};
-			setPreviousTranscriptions(data.transcriptions || []);
-			setPreviousTranscriptionsError(null);
-		} catch {
-			setPreviousTranscriptionsError(
-				"Could not load transcriptions right now.",
+			const previous = queryClient.getQueryData<PreviousTranscription[]>(
+				recentTranscriptionsQueryKey,
 			);
-		} finally {
-			setLoadingPreviousTranscriptions(false);
-		}
-	}, [isLoaded, showHistory]);
+
+			queryClient.setQueryData<PreviousTranscription[]>(
+				recentTranscriptionsQueryKey,
+				(old) => (old || []).filter((item) => item.id !== transcriptionId),
+			);
+
+			return { previous };
+		},
+		onError: (_error, _transcriptionId, context) => {
+			if (context?.previous) {
+				queryClient.setQueryData(
+					recentTranscriptionsQueryKey,
+					context.previous,
+				);
+			}
+			setHistoryActionError(
+				"Could not delete transcription right now. Please try again.",
+			);
+		},
+		onSuccess: () => {
+			setHistoryActionError(null);
+		},
+		onSettled: () => {
+			void queryClient.invalidateQueries({
+				queryKey: viewerTranscriptionKeys.lists(),
+			});
+		},
+	});
+
+	const requestChunkManifest = useCallback(
+		async (file: File): Promise<ChunkManifestItem[]> => {
+			if (!AUDIO_CHUNKER_URL) {
+				throw new Error(
+					"Large-file transcription is not configured (missing NEXT_PUBLIC_AUDIO_CHUNKER_URL).",
+				);
+			}
+
+			const formData = new FormData();
+			formData.append("audio", file, file.name);
+			formData.append("chunkSeconds", CHUNKER_CHUNK_SECONDS.toString());
+			formData.append("overlapSeconds", CHUNKER_OVERLAP_SECONDS.toString());
+
+			const response = await fetch(`${AUDIO_CHUNKER_URL}/chunk`, {
+				method: "POST",
+				body: formData,
+			});
+
+			let payload: ChunkerResponsePayload = {};
+			try {
+				payload = (await response.json()) as ChunkerResponsePayload;
+			} catch {
+				payload = {};
+			}
+
+			if (!response.ok) {
+				const errorMessage =
+					payload.error ||
+					"Failed to chunk large audio file for transcription.";
+				if (response.status === 429) {
+					throw createCodedError(errorMessage, CHUNKER_RATE_LIMIT_CODE);
+				}
+				throw new Error(errorMessage);
+			}
+
+			const chunks = payload.chunks;
+			if (!Array.isArray(chunks) || chunks.length === 0) {
+				throw new Error("Chunker returned an empty or invalid chunk manifest.");
+			}
+
+			const isValidChunk = (value: ChunkManifestItem): boolean =>
+				typeof value.chunkIndex === "number" &&
+				typeof value.blobUrl === "string" &&
+				typeof value.startMs === "number" &&
+				typeof value.endMs === "number" &&
+				value.endMs > value.startMs;
+
+			if (!chunks.every((chunk) => isValidChunk(chunk))) {
+				throw new Error("Chunker returned malformed chunk metadata.");
+			}
+
+			return chunks;
+		},
+		[],
+	);
 
 	const processFileWithAPI = useCallback(
 		async (fileId: string, file: File) => {
@@ -344,33 +496,80 @@ export default function FileUpload({
 					);
 				}
 
-				const blob = await upload(file.name, file, {
-					access: "public",
-					handleUploadUrl: "/api/upload",
-					multipart: true,
-				});
+				const isLargeFile = file.size > AUDIO_LIMITS.MAX_FILE_SIZE;
+				let startPayload:
+					| {
+							filename: string;
+							enableDiarization: boolean;
+							blobUrl: string;
+					  }
+					| {
+							filename: string;
+							chunks: ChunkManifestItem[];
+					  };
 
-				setUploadedFiles((prev) =>
-					prev.map((f) =>
-						f.id === fileId
-							? {
-									...f,
-									status: "uploading" as const,
-									progress: 15,
-									audioUrl: blob.url,
-								}
-							: f,
-					),
-				);
+				if (isLargeFile) {
+					setUploadedFiles((prev) =>
+						prev.map((f) =>
+							f.id === fileId
+								? {
+										...f,
+										status: "uploading" as const,
+										progress: 10,
+									}
+								: f,
+						),
+					);
+
+					const chunks = await requestChunkManifest(file);
+
+					setUploadedFiles((prev) =>
+						prev.map((f) =>
+							f.id === fileId
+								? {
+										...f,
+										status: "uploading" as const,
+										progress: 15,
+									}
+								: f,
+						),
+					);
+
+					startPayload = {
+						filename: file.name,
+						chunks,
+					};
+				} else {
+					const blob = await upload(file.name, file, {
+						access: "public",
+						handleUploadUrl: "/api/upload",
+						multipart: true,
+					});
+
+					setUploadedFiles((prev) =>
+						prev.map((f) =>
+							f.id === fileId
+								? {
+										...f,
+										status: "uploading" as const,
+										progress: 15,
+										audioUrl: blob.url,
+									}
+								: f,
+						),
+					);
+
+					startPayload = {
+						blobUrl: blob.url,
+						filename: file.name,
+						enableDiarization,
+					};
+				}
 
 				const response = await fetch("/api/start-transcription", {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({
-						blobUrl: blob.url,
-						filename: file.name,
-						enableDiarization,
-					}),
+					body: JSON.stringify(startPayload),
 				});
 
 				const result = await response.json();
@@ -404,7 +603,10 @@ export default function FileUpload({
 					),
 				);
 
-				void fetchPreviousTranscriptions();
+				setHistoryActionError(null);
+				void queryClient.invalidateQueries({
+					queryKey: viewerTranscriptionKeys.lists(),
+				});
 				pollTranscriptionStatus(fileId, result.transcriptionId);
 			} catch (error) {
 				logger.error("Failed to process upload", {
@@ -433,8 +635,13 @@ export default function FileUpload({
 				);
 			}
 		},
-		[enableDiarization, fetchPreviousTranscriptions, pollTranscriptionStatus],
-	);
+			[
+				enableDiarization,
+				pollTranscriptionStatus,
+				queryClient,
+				requestChunkManifest,
+			],
+		);
 
 	const processFiles = useCallback(
 		(files: FileList) => {
@@ -475,10 +682,6 @@ export default function FileUpload({
 		e.target.value = "";
 	};
 
-	useEffect(() => {
-		void fetchPreviousTranscriptions();
-	}, [fetchPreviousTranscriptions]);
-
 	const removeFile = (fileId: string) => {
 		const timeout = pollTimeoutsRef.current.get(fileId);
 		if (timeout) {
@@ -507,7 +710,7 @@ export default function FileUpload({
 
 			const fileToRetry = uploadedFiles.find((f) => f.id === fileId);
 			if (fileToRetry) {
-				processFileWithAPI(fileId, fileToRetry.file);
+				void processFileWithAPI(fileId, fileToRetry.file);
 			}
 		},
 		[uploadedFiles, processFileWithAPI],
@@ -519,12 +722,21 @@ export default function FileUpload({
 			file.error &&
 			isDailyLimitErrorMessage(file.error),
 	);
+	const maxUploadSizeBytes = AUDIO_CHUNKER_URL
+		? MAX_CHUNKER_FILE_SIZE
+		: AUDIO_LIMITS.MAX_FILE_SIZE;
 	const shouldShowPreviousTranscriptions =
 		showHistory &&
 		isLoaded &&
 		(loadingPreviousTranscriptions ||
-			Boolean(previousTranscriptionsError) ||
+			Boolean(historyActionError) ||
+			Boolean(previousTranscriptionsQueryError) ||
 			previousTranscriptions.length > 0);
+	const previousTranscriptionsError =
+		historyActionError ||
+		(previousTranscriptionsQueryError instanceof Error
+			? previousTranscriptionsQueryError.message
+			: null);
 
 	const handleDeletePreviousTranscription = useCallback(
 		async (transcriptionId: string) => {
@@ -534,35 +746,18 @@ export default function FileUpload({
 				return next;
 			});
 
-			try {
-				const response = await fetch(
-					`/api/me/transcriptions/${transcriptionId}`,
-					{
-						method: "DELETE",
-					},
-				);
-				if (!response.ok) {
-					throw new Error("Failed to delete transcription");
+				try {
+					await deletePreviousTranscription(transcriptionId);
+				} finally {
+					setDeletingPreviousIds((prev) => {
+						const next = new Set(prev);
+						next.delete(transcriptionId);
+						return next;
+					});
 				}
-
-				setPreviousTranscriptions((prev) =>
-					prev.filter((item) => item.id !== transcriptionId),
-				);
-				setPreviousTranscriptionsError(null);
-			} catch {
-				setPreviousTranscriptionsError(
-					"Could not delete transcription right now. Please try again.",
-				);
-			} finally {
-				setDeletingPreviousIds((prev) => {
-					const next = new Set(prev);
-					next.delete(transcriptionId);
-					return next;
-				});
-			}
-		},
-		[],
-	);
+			},
+			[deletePreviousTranscription],
+		);
 
 	const getStatusIcon = (status: UploadedFile["status"]) => {
 		switch (status) {
@@ -623,9 +818,9 @@ export default function FileUpload({
 					transcriptText,
 					`${filename.replace(/\.[^.]+$/, "")}.txt`,
 				);
-				setPreviousTranscriptionsError(null);
+				setHistoryActionError(null);
 			} catch {
-				setPreviousTranscriptionsError(
+				setHistoryActionError(
 					"Could not download transcript right now. Please try again.",
 				);
 			}
@@ -705,7 +900,7 @@ export default function FileUpload({
 							className="bg-white border-stone-200 text-stone-600 px-4 py-2"
 						>
 							<CheckCircle className="w-3 h-3 mr-2" />
-							Max 100MB per file
+							Max {formatFileSize(maxUploadSizeBytes)} per file
 						</Badge>
 						<Badge
 							variant="outline"
@@ -935,18 +1130,19 @@ export default function FileUpload({
 								? "Recent Transcriptions"
 								: "Previous Transcriptions"}
 						</h3>
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={() =>
-								void fetchPreviousTranscriptions()
-							}
-							disabled={loadingPreviousTranscriptions}
-						>
-							{loadingPreviousTranscriptions
-								? "Refreshing..."
-								: "Refresh"}
-						</Button>
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={() => {
+									setHistoryActionError(null);
+									void refetchPreviousTranscriptions();
+								}}
+								disabled={fetchingPreviousTranscriptions}
+							>
+								{fetchingPreviousTranscriptions
+									? "Refreshing..."
+									: "Refresh"}
+							</Button>
 					</div>
 
 					{previousTranscriptionsError && (

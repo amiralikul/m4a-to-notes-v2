@@ -3,13 +3,16 @@ import { inngest } from "../client";
 import { INNGEST_EVENTS } from "../events";
 import {
 	transcriptionsService,
-	storageService,
+	transcriptionChunksService,
 	transcriptionAiService,
 	assemblyAiService,
 } from "@/services";
 import { sendTelegramMessage } from "@/services/telegram";
 import { TranscriptionStatus } from "@/services/transcriptions";
 import { getErrorMessage } from "@/lib/errors";
+import { mergeChunkTranscripts } from "@/lib/transcript-merge";
+import { TranscriptionChunkStatus } from "@/services/transcription-chunks";
+
 export const processTranscription = inngest.createFunction(
 	{
 		id: "process-transcription",
@@ -17,7 +20,7 @@ export const processTranscription = inngest.createFunction(
 		concurrency: { limit: 5 },
 		throttle: { limit: 30, period: "1m" },
 		idempotency: "event.data.transcriptionId",
-		timeouts: { finish: "15m" },
+		timeouts: { finish: "4h" },
 		onFailure: async ({ event, error, logger }) => {
 			const transcriptionId =
 				event.data.event.data.transcriptionId;
@@ -73,9 +76,140 @@ export const processTranscription = inngest.createFunction(
 
 		const { transcription: t } = transcription;
 
+		const chunks = await step.run("fetch-transcription-chunks", async () =>
+			transcriptionChunksService.findByTranscriptionId(transcriptionId),
+		);
+		const isChunked = chunks.length > 0;
+
+		if (!t.enableDiarization && transcriptionAiService.provider !== "groq") {
+			throw new NonRetriableError(
+				'URL-based transcription requires TRANSCRIPTION_PROVIDER="groq"',
+			);
+		}
+
 		let transcriptText: string;
 
-		if (t.enableDiarization) {
+		if (isChunked) {
+			if (t.enableDiarization) {
+				throw new NonRetriableError(
+					"Diarization is not supported for chunked transcriptions",
+				);
+			}
+
+			await step.run("validate-transcription-chunks", async () => {
+				const uniqueIndices = new Set<number>();
+				for (const chunk of chunks) {
+					if (chunk.endMs <= chunk.startMs) {
+						throw new NonRetriableError(
+							`Invalid chunk timing for chunk ${chunk.chunkIndex}`,
+						);
+					}
+					if (uniqueIndices.has(chunk.chunkIndex)) {
+						throw new NonRetriableError(
+							`Duplicate chunk index ${chunk.chunkIndex}`,
+						);
+					}
+					uniqueIndices.add(chunk.chunkIndex);
+				}
+			});
+
+			await step.run("mark-chunked-progress-start", async () => {
+				await transcriptionsService.updateProgress(transcriptionId, 20);
+			});
+
+			for (let i = 0; i < chunks.length; i++) {
+				const chunk = chunks[i];
+
+				await step.run(`transcribe-chunk-${chunk.chunkIndex}`, async () => {
+					await transcriptionChunksService.markProcessing(
+						chunk.id,
+						transcriptionId,
+					);
+
+					try {
+						const chunkText =
+							await transcriptionAiService.transcribeAudioFromUrl(
+								chunk.blobUrl,
+							);
+
+						if (!chunkText.trim()) {
+							throw new NonRetriableError(
+								`No speech detected in chunk ${chunk.chunkIndex}`,
+							);
+						}
+
+						await transcriptionChunksService.markCompleted(
+							chunk.id,
+							transcriptionId,
+							chunkText,
+						);
+					} catch (error) {
+						await transcriptionChunksService.markFailed(
+							chunk.id,
+							transcriptionId,
+							"CHUNK_TRANSCRIPTION_FAILED",
+							getErrorMessage(error),
+						);
+						throw error;
+					}
+
+					const progress = Math.min(
+						20 + Math.round(((i + 1) / chunks.length) * 70),
+						90,
+					);
+					await transcriptionsService.updateProgress(transcriptionId, progress);
+				});
+			}
+
+			transcriptText = await step.run("merge-chunk-transcripts", async () => {
+				const chunkRows = await transcriptionChunksService.findByTranscriptionId(
+					transcriptionId,
+				);
+				const failedChunk = chunkRows.find(
+					(chunk) => chunk.status === TranscriptionChunkStatus.FAILED,
+				);
+				if (failedChunk) {
+					throw new NonRetriableError(
+						failedChunk.errorDetails?.message ||
+							`Chunk ${failedChunk.chunkIndex} failed`,
+					);
+				}
+
+				const missingChunk = chunkRows.find(
+					(chunk) =>
+						chunk.status !== TranscriptionChunkStatus.COMPLETED ||
+						!chunk.transcriptText?.trim(),
+				);
+				if (missingChunk) {
+					throw new Error(
+						`Chunk ${missingChunk.chunkIndex} is not completed yet`,
+					);
+				}
+
+				return mergeChunkTranscripts(
+					chunkRows.map((chunk) => ({
+						chunkIndex: chunk.chunkIndex,
+						text: chunk.transcriptText || "",
+					})),
+				);
+			});
+
+			if (!transcriptText.trim()) {
+				throw new NonRetriableError("No speech detected in audio");
+			}
+
+			await step.run("save-chunked-result", async () => {
+				const preview =
+					transcriptText.substring(0, 150) +
+					(transcriptText.length > 150 ? "..." : "");
+
+				await transcriptionsService.markCompleted(
+					transcriptionId,
+					preview,
+					transcriptText,
+				);
+			});
+		} else if (t.enableDiarization) {
 			// Diarization path: submit to AssemblyAI, then poll with step.sleep
 			const assemblyJobId = await step.run("submit-diarization", async () => {
 				await transcriptionsService.updateProgress(transcriptionId, 20);
@@ -140,24 +274,9 @@ export const processTranscription = inngest.createFunction(
 			transcriptText = await step.run("transcribe-audio", async () => {
 				await transcriptionsService.updateProgress(transcriptionId, 20);
 
-				const text =
-					transcriptionAiService.provider === "groq"
-						? await transcriptionAiService.transcribeAudioFromUrl(t.audioKey)
-						: await (async () => {
-								logger.info("Downloading audio file", {
-									transcriptionId,
-									audioKey: t.audioKey,
-								});
-								const audioBuffer = await storageService.downloadContent(
-									t.audioKey,
-								);
-
-								logger.info("Starting Whisper transcription", {
-									transcriptionId,
-									fileSize: audioBuffer.byteLength,
-								});
-								return transcriptionAiService.transcribeAudio(audioBuffer);
-							})();
+				const text = await transcriptionAiService.transcribeAudioFromUrl(
+					t.audioKey,
+				);
 
 				if (!text.trim()) {
 					throw new NonRetriableError("No speech detected in audio");

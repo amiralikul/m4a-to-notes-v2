@@ -127,6 +127,34 @@
       "when": 1772045850997,
       "tag": "0017_add_diarization_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1772278949800,
+      "tag": "0018_add_transcription_chunks",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1772303728971,
+      "tag": "0019_add_chunks_fk_to_transcriptions",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1772310271989,
+      "tag": "0020_add_transcription_chunks_delete_cascade",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1772310981694,
+      "tag": "0021_add_translations_fk_delete_cascade",
+      "breakpoints": true
     }
   ]
 }

@@ -86,6 +86,43 @@ export const transcriptions = sqliteTable(
 	],
 );
 
+export const transcriptionChunks = sqliteTable(
+	"transcription_chunks",
+	{
+		id: text("id").primaryKey(),
+		transcriptionId: text("transcription_id")
+			.notNull()
+			.references(() => transcriptions.id, { onDelete: "cascade" }),
+		chunkIndex: integer("chunk_index").notNull(),
+		blobUrl: text("blob_url").notNull(),
+		startMs: integer("start_ms").notNull(),
+		endMs: integer("end_ms").notNull(),
+		status: text("status", {
+			enum: ["pending", "processing", "completed", "failed"],
+		}).notNull(),
+		transcriptText: text("transcript_text"),
+		errorDetails: text("error_details", { mode: "json" }).$type<{
+			code?: string;
+			message?: string;
+		}>(),
+		createdAt: text("created_at")
+			.notNull()
+			.default(sql`(CURRENT_TIMESTAMP)`),
+		updatedAt: text("updated_at")
+			.notNull()
+			.default(sql`(CURRENT_TIMESTAMP)`)
+			.$onUpdate(() => sql`(CURRENT_TIMESTAMP)`),
+	},
+	(table) => [
+		index("idx_transcription_chunks_transcription_id").on(table.transcriptionId),
+		index("idx_transcription_chunks_status").on(table.status),
+		uniqueIndex("idx_transcription_chunks_transcription_chunk").on(
+			table.transcriptionId,
+			table.chunkIndex,
+		),
+	],
+);
+
 export const trialDailyUsage = sqliteTable(
 	"trial_daily_usage",
 	{
@@ -298,6 +335,12 @@ export type Transcription = typeof transcriptions.$inferSelect;
 export type InsertTranscription = typeof transcriptions.$inferInsert;
 export type UpdateTranscription = Partial<Omit<Transcription, "id">>;
 
+export type TranscriptionChunk = typeof transcriptionChunks.$inferSelect;
+export type InsertTranscriptionChunk = typeof transcriptionChunks.$inferInsert;
+export type UpdateTranscriptionChunk = Partial<
+	Omit<TranscriptionChunk, "id" | "transcriptionId" | "chunkIndex">
+>;
+
 export type TrialDailyUsage = typeof trialDailyUsage.$inferSelect;
 export type InsertTrialDailyUsage = typeof trialDailyUsage.$inferInsert;
 
@@ -324,7 +367,9 @@ export const translations = sqliteTable(
 	"translations",
 	{
 		id: text("id").primaryKey(),
-		transcriptionId: text("transcription_id").notNull(),
+		transcriptionId: text("transcription_id")
+			.notNull()
+			.references(() => transcriptions.id, { onDelete: "cascade" }),
 		language: text("language").notNull(),
 		status: text("status", {
 			enum: ["pending", "processing", "completed", "failed"],

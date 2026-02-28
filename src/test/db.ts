@@ -56,6 +56,43 @@ export function createTestDb() {
 		CREATE INDEX IF NOT EXISTS idx_transcriptions_user_id ON transcriptions(user_id);
 		CREATE INDEX IF NOT EXISTS idx_transcriptions_owner_id ON transcriptions(owner_id);
 
+		CREATE TABLE IF NOT EXISTS transcription_chunks (
+			id TEXT PRIMARY KEY NOT NULL,
+			transcription_id TEXT NOT NULL REFERENCES transcriptions(id) ON DELETE CASCADE,
+			chunk_index INTEGER NOT NULL,
+			blob_url TEXT NOT NULL,
+			start_ms INTEGER NOT NULL,
+			end_ms INTEGER NOT NULL,
+			status TEXT NOT NULL,
+			transcript_text TEXT,
+			error_details TEXT,
+			created_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
+			updated_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL
+		);
+
+		CREATE INDEX IF NOT EXISTS idx_transcription_chunks_transcription_id
+		ON transcription_chunks(transcription_id);
+		CREATE INDEX IF NOT EXISTS idx_transcription_chunks_status
+		ON transcription_chunks(status);
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_transcription_chunks_transcription_chunk
+		ON transcription_chunks(transcription_id, chunk_index);
+
+		CREATE TABLE IF NOT EXISTS translations (
+			id TEXT PRIMARY KEY NOT NULL,
+			transcription_id TEXT NOT NULL REFERENCES transcriptions(id) ON DELETE CASCADE,
+			language TEXT NOT NULL,
+			status TEXT NOT NULL,
+			translated_text TEXT,
+			translated_summary TEXT,
+			error_details TEXT,
+			created_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
+			completed_at TEXT,
+			updated_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL
+		);
+
+		CREATE UNIQUE INDEX IF NOT EXISTS translations_transcription_language_idx
+		ON translations(transcription_id, language);
+
 		CREATE TABLE IF NOT EXISTS trial_daily_usage (
 			actor_id TEXT NOT NULL,
 			day_key TEXT NOT NULL,
