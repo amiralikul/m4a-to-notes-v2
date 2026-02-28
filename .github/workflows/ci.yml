@@ -92,6 +92,7 @@ jobs:
       INNGEST_SIGNING_KEY: ${{ secrets.INNGEST_SIGNING_KEY }}
       INNGEST_EVENT_KEY: ${{ secrets.INNGEST_EVENT_KEY }}
       INNGEST_DEV: "1"
+      INNGEST_BASE_URL: http://127.0.0.1:8288
       TRIAL_COOKIE_SECRET: ${{ secrets.TRIAL_COOKIE_SECRET }}
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
       CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
@@ -123,21 +124,34 @@ jobs:
             exit 1
           fi
 
-      - name: Start Inngest dev server
-        run: npx inngest-cli@latest dev &
-
       - name: Start Next.js dev server
-        run: npm run dev &
-
-      - name: Wait for Inngest to be ready
-        run: |
-          timeout 60 bash -c 'until curl -sf http://localhost:8288 > /dev/null 2>&1; do sleep 2; done' \
-            || { echo "::error::Inngest dev server failed to start within 60 seconds"; exit 1; }
+        run: npm run dev > /tmp/next-dev.log 2>&1 &
 
       - name: Wait for Next.js to be ready
         run: |
           timeout 60 bash -c 'until curl -sf http://localhost:3000/api/health > /dev/null 2>&1; do sleep 2; done' \
             || { echo "::error::Next.js failed to start within 60 seconds"; exit 1; }
 
+      - name: Wait for Inngest endpoint to be ready
+        run: |
+          timeout 60 bash -c 'until curl -sf http://localhost:3000/api/inngest > /dev/null 2>&1; do sleep 2; done' \
+            || { echo "::error::Inngest route failed to start within 60 seconds"; exit 1; }
+
+      - name: Start Inngest dev server
+        run: npx inngest-cli@latest dev --no-discovery -u http://127.0.0.1:3000/api/inngest > /tmp/inngest-dev.log 2>&1 &
+
+      - name: Wait for Inngest dev server to be ready
+        run: |
+          timeout 60 bash -c 'until curl -sf http://localhost:8288 > /dev/null 2>&1; do sleep 2; done' \
+            || { echo "::error::Inngest dev server failed to start within 60 seconds"; exit 1; }
+
       - name: Run integration tests
         run: npx vitest run --config e2e/vitest.config.ts
+
+      - name: Print server logs on failure
+        if: failure()
+        run: |
+          echo "=== Next.js dev server log (tail) ==="
+          tail -n 200 /tmp/next-dev.log || true
+          echo "=== Inngest dev server log (tail) ==="
+          tail -n 200 /tmp/inngest-dev.log || true
