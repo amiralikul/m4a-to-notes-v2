@@ -91,4 +91,17 @@ describe("TranscriptionChunksService", () => {
 			message: "chunk failed",
 		});
 	});
+
+	it("throws when updating a non-existent chunk", async () => {
+		const transcriptionId = await transcriptionsService.create({
+			audioKey: "https://blob.example/audio.m4a",
+			filename: "audio.m4a",
+		});
+
+		await expect(
+			chunksService.markProcessing("missing-chunk-id", transcriptionId),
+		).rejects.toThrow(
+			`Transcription chunk update matched no rows (chunkId=missing-chunk-id, transcriptionId=${transcriptionId})`,
+		);
+	});
 });

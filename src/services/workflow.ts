@@ -7,6 +7,7 @@ export class WorkflowService {
 
 	async startTranscription(transcriptionId: string) {
 		await inngest.send({
+			id: `transcription-requested-${transcriptionId}`,
 			name: INNGEST_EVENTS.TRANSCRIPTION_REQUESTED,
 			data: { transcriptionId },
 		});

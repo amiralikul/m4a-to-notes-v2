@@ -1,9 +1,9 @@
 import { eq } from "drizzle-orm";
 import { describe, it, expect, beforeEach } from "vitest";
 import { translations } from "@/db/schema";
+import { TranscriptionChunksService } from "@/services/transcription-chunks";
 import { createTestDb } from "@/test/db";
 import { createTestLogger } from "@/test/setup";
-import { TranscriptionChunksService } from "../transcription-chunks";
 import {
 	SummaryStatus,
 	TranscriptionStatus,

@@ -12,8 +12,10 @@ RUN npm install
 COPY tsconfig.json ./
 COPY src ./src
 RUN npm run build
+RUN chown -R node:node /app
 
 ENV NODE_ENV=production
 EXPOSE 8080
+USER node
 
 CMD ["npm", "run", "start"]

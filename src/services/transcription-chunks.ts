@@ -85,7 +85,7 @@ export class TranscriptionChunksService {
 		updates: UpdateTranscriptionChunk,
 	): Promise<void> {
 		try {
-			await this.db
+			const updatedRows = await this.db
 				.update(transcriptionChunks)
 				.set(updates)
 				.where(
@@ -93,7 +93,14 @@ export class TranscriptionChunksService {
 						eq(transcriptionChunks.id, chunkId),
 						eq(transcriptionChunks.transcriptionId, transcriptionId),
 					),
+				)
+				.returning({ id: transcriptionChunks.id });
+
+			if (updatedRows.length === 0) {
+				throw new Error(
+					`Transcription chunk update matched no rows (chunkId=${chunkId}, transcriptionId=${transcriptionId})`,
 				);
+			}
 		} catch (error) {
 			this.logger.error("Failed to update transcription chunk", {
 				chunkId,

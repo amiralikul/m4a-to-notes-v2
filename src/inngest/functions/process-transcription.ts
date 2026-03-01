@@ -13,6 +13,31 @@ import { getErrorMessage } from "@/lib/errors";
 import { mergeChunkTranscripts } from "@/lib/transcript-merge";
 import { TranscriptionChunkStatus } from "@/services/transcription-chunks";
 
+const PROGRESS = {
+	STARTED: 5,
+	PROCESSING_START: 20,
+	PROCESSING_END: 90,
+} as const;
+
+const DIARIZATION_POLL_INTERVAL = "30s";
+const DIARIZATION_MAX_POLLS = 20;
+const INNGEST_MAX_STEPS_PER_RUN = 1000;
+const CHUNKED_FLOW_STEP_OVERHEAD = 8;
+const MAX_CHUNKS_PER_RUN =
+	INNGEST_MAX_STEPS_PER_RUN - CHUNKED_FLOW_STEP_OVERHEAD;
+
+function calculateRangedProgress(
+	completed: number,
+	total: number,
+	start: number,
+	end: number,
+): number {
+	if (total <= 0) return end;
+	const bounded = Math.min(Math.max(completed / total, 0), 1);
+	const value = start + (end - start) * bounded;
+	return Math.min(end, Math.max(start, Math.round(value)));
+}
+
 export const processTranscription = inngest.createFunction(
 	{
 		id: "process-transcription",
@@ -65,7 +90,10 @@ export const processTranscription = inngest.createFunction(
 					return { status: "skipped" as const, transcription: t };
 				}
 
-				await transcriptionsService.markStarted(transcriptionId, 5);
+				await transcriptionsService.markStarted(
+					transcriptionId,
+					PROGRESS.STARTED,
+				);
 				return { status: "proceed" as const, transcription: t };
 			},
 		);
@@ -80,6 +108,12 @@ export const processTranscription = inngest.createFunction(
 			transcriptionChunksService.findByTranscriptionId(transcriptionId),
 		);
 		const isChunked = chunks.length > 0;
+
+		if (isChunked && chunks.length > MAX_CHUNKS_PER_RUN) {
+			throw new NonRetriableError(
+				`Too many chunks for a single workflow run (${chunks.length}). Maximum supported chunks: ${MAX_CHUNKS_PER_RUN}.`,
+			);
+		}
 
 		if (!t.enableDiarization && transcriptionAiService.provider !== "groq") {
 			throw new NonRetriableError(
@@ -114,7 +148,10 @@ export const processTranscription = inngest.createFunction(
 			});
 
 			await step.run("mark-chunked-progress-start", async () => {
-				await transcriptionsService.updateProgress(transcriptionId, 20);
+				await transcriptionsService.updateProgress(
+					transcriptionId,
+					PROGRESS.PROCESSING_START,
+				);
 			});
 
 			for (let i = 0; i < chunks.length; i++) {
@@ -153,11 +190,26 @@ export const processTranscription = inngest.createFunction(
 						throw error;
 					}
 
-					const progress = Math.min(
-						20 + Math.round(((i + 1) / chunks.length) * 70),
-						90,
+					const progress = calculateRangedProgress(
+						i + 1,
+						chunks.length,
+						PROGRESS.PROCESSING_START,
+						PROGRESS.PROCESSING_END,
 					);
-					await transcriptionsService.updateProgress(transcriptionId, progress);
+					try {
+						await transcriptionsService.updateProgress(transcriptionId, progress);
+					} catch (error) {
+						logger.warn(
+							"Failed to update chunked transcription progress; continuing",
+							{
+								transcriptionId,
+								chunkId: chunk.id,
+								chunkIndex: chunk.chunkIndex,
+								progress,
+								error: getErrorMessage(error),
+							},
+						);
+					}
 				});
 			}
 
@@ -212,7 +264,10 @@ export const processTranscription = inngest.createFunction(
 		} else if (t.enableDiarization) {
 			// Diarization path: submit to AssemblyAI, then poll with step.sleep
 			const assemblyJobId = await step.run("submit-diarization", async () => {
-				await transcriptionsService.updateProgress(transcriptionId, 20);
+				await transcriptionsService.updateProgress(
+					transcriptionId,
+					PROGRESS.PROCESSING_START,
+				);
 				return assemblyAiService.submit(t.audioKey);
 			});
 
@@ -220,13 +275,18 @@ export const processTranscription = inngest.createFunction(
 			let finalError: string | null = null;
 			let completedText = "";
 
-			for (let i = 0; i < 20; i++) {
+			for (let i = 0; i < DIARIZATION_MAX_POLLS; i++) {
 				if (i > 0) {
-					await step.sleep(`poll-wait-${i}`, "30s");
+					await step.sleep(`poll-wait-${i}`, DIARIZATION_POLL_INTERVAL);
 				}
 
 				const pollState = await step.run(`poll-and-save-${i}`, async () => {
-					const progress = Math.min(20 + (i + 1) * 3, 90);
+					const progress = calculateRangedProgress(
+						i + 1,
+						DIARIZATION_MAX_POLLS,
+						PROGRESS.PROCESSING_START,
+						PROGRESS.PROCESSING_END,
+					);
 					await transcriptionsService.updateProgress(transcriptionId, progress);
 
 					const result = await assemblyAiService.getTranscript(assemblyJobId);
@@ -272,7 +332,10 @@ export const processTranscription = inngest.createFunction(
 		} else {
 			// Standard path: Groq/OpenAI Whisper
 			transcriptText = await step.run("transcribe-audio", async () => {
-				await transcriptionsService.updateProgress(transcriptionId, 20);
+				await transcriptionsService.updateProgress(
+					transcriptionId,
+					PROGRESS.PROCESSING_START,
+				);
 
 				const text = await transcriptionAiService.transcribeAudioFromUrl(
 					t.audioKey,
@@ -282,7 +345,21 @@ export const processTranscription = inngest.createFunction(
 					throw new NonRetriableError("No speech detected in audio");
 				}
 
-				await transcriptionsService.updateProgress(transcriptionId, 90);
+				try {
+					await transcriptionsService.updateProgress(
+						transcriptionId,
+						PROGRESS.PROCESSING_END,
+					);
+				} catch (error) {
+					logger.warn(
+						"Failed to update standard transcription progress; continuing",
+						{
+							transcriptionId,
+							progress: PROGRESS.PROCESSING_END,
+							error: getErrorMessage(error),
+						},
+					);
+				}
 				return text;
 			});
 

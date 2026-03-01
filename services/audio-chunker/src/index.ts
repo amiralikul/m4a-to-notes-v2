@@ -22,6 +22,9 @@ const DEFAULT_OVERLAP_SECONDS = 10;
 const MAX_CHUNK_SECONDS = 20 * 60;
 const MAX_OVERLAP_SECONDS = 30;
 const MAX_CHUNKS = 1000;
+const FFPROBE_TIMEOUT_MS = 30_000;
+const FFMPEG_TIMEOUT_MS = 120_000;
+const SUBPROCESS_KILL_SIGNAL: NodeJS.Signals = "SIGKILL";
 
 const upload = multer({
 	dest: tmpdir(),
@@ -120,7 +123,10 @@ async function getDurationSeconds(inputPath: string): Promise<number> {
 		"-of",
 		"default=noprint_wrappers=1:nokey=1",
 		inputPath,
-	]);
+	], {
+		timeout: FFPROBE_TIMEOUT_MS,
+		killSignal: SUBPROCESS_KILL_SIGNAL,
+	});
 
 	const duration = Number.parseFloat(stdout.trim());
 	if (!Number.isFinite(duration) || duration <= 0) {
@@ -155,7 +161,10 @@ async function createChunkFile(params: {
 		"-c:a",
 		"flac",
 		params.outputPath,
-	]);
+	], {
+		timeout: FFMPEG_TIMEOUT_MS,
+		killSignal: SUBPROCESS_KILL_SIGNAL,
+	});
 }
 
 async function uploadChunkToBlob(params: {
@@ -206,15 +215,16 @@ app.post(
 		}
 
 		let requestOptions: z.infer<typeof requestSchema>;
-		try {
-			requestOptions = requestSchema.parse(req.body);
-		} catch (error) {
-			if (error instanceof z.ZodError) {
-				res.status(400).json({
-					error: "Invalid chunk options",
-					details: error.issues,
-				});
-				return;
+			try {
+				requestOptions = requestSchema.parse(req.body);
+			} catch (error) {
+				if (error instanceof z.ZodError) {
+					await removePath(file.path);
+					res.status(400).json({
+						error: "Invalid chunk options",
+						details: error.issues,
+					});
+					return;
 			}
 			throw error;
 		}

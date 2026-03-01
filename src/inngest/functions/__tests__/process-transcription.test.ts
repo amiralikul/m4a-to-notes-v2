@@ -469,6 +469,45 @@ describe("process-transcription Inngest function", () => {
 		);
 	});
 
+	it("fails fast when chunk count exceeds the Inngest step budget", async () => {
+		const mockTranscription = {
+			id: "tx-chunked-limit",
+			status: "pending",
+			audioKey: "https://blob.vercel/chunk-0.m4a",
+			filename: "very-large-file.m4a",
+			source: "web",
+			enableDiarization: false,
+			userMetadata: {},
+		};
+
+		vi.mocked(transcriptionsService.findById).mockResolvedValue(
+			mockTranscription as unknown as Awaited<
+				ReturnType<typeof transcriptionsService.findById>
+			>,
+		);
+		vi.mocked(transcriptionsService.markStarted).mockResolvedValue({} as never);
+
+		const tooManyChunks = Array.from({ length: 1000 }, (_, index) => ({
+			id: `chunk-${index}`,
+			transcriptionId: "tx-chunked-limit",
+			chunkIndex: index,
+			blobUrl: `https://blob.vercel/chunk-${index}.m4a`,
+			startMs: index * 1000,
+			endMs: (index + 1) * 1000,
+			status: "pending",
+		}));
+
+		vi.mocked(transcriptionChunksService.findByTranscriptionId).mockResolvedValue(
+			tooManyChunks as never,
+		);
+
+		await expect(runProcessTranscription("tx-chunked-limit")).rejects.toThrow(
+			"Too many chunks for a single workflow run",
+		);
+		expect(transcriptionAiService.transcribeAudioFromUrl).not.toHaveBeenCalled();
+		expect(transcriptionsService.markCompleted).not.toHaveBeenCalled();
+	});
+
 	it("fails fast when provider is not groq for non-diarization transcription", async () => {
 		const mockTranscription = {
 			id: "tx-7",

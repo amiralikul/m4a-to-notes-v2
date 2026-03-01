@@ -4,6 +4,7 @@ import * as schema from "@/db/schema";
 
 export function createTestDb() {
 	const sqlite = new Database(":memory:");
+	sqlite.pragma("foreign_keys = ON");
 
 	// Apply schema (inline DDL matching the migrations)
 	sqlite.exec(`

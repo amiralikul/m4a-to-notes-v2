@@ -1,0 +1,12 @@
+services:
+  audio-chunker:
+    build: .
+    image: audio-chunker:local
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+      LOG_LEVEL: "info"
+      ALLOWED_ORIGINS: "http://localhost:3000"
+      BLOB_READ_WRITE_TOKEN: "${BLOB_READ_WRITE_TOKEN}"
+      M4A_TO_NOTES_READ_WRITE_TOKEN: "${BLOB_READ_WRITE_TOKEN}"
