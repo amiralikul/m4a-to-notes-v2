@@ -19,8 +19,10 @@ import {
 } from "./ai";
 import { TranslationsService } from "./translations";
 import { BillingSubscriptionsService } from "./billing-subscriptions";
+import { TranscriptionChunksService } from "./transcription-chunks";
 
 export const transcriptionsService = new TranscriptionsService(db, logger);
+export const transcriptionChunksService = new TranscriptionChunksService(db, logger);
 export const usersService = new UsersService(db, logger);
 export const conversationService = new ConversationService(db, logger);
 

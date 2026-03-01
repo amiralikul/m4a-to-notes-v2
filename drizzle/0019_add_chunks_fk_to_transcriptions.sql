@@ -1,0 +1,1 @@
+ALTER TABLE `transcription_chunks` ALTER COLUMN "transcription_id" TO "transcription_id" text NOT NULL REFERENCES transcriptions(id) ON DELETE no action ON UPDATE no action;

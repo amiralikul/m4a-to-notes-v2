@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+/services/audio-chunker/node_modules
 /.pnp
 .pnp.*
 .yarn/*
@@ -19,6 +20,8 @@
 
 # production
 /build
+/services/audio-chunker/dist
+/services/audio-chunker/.env
 
 # misc
 .DS_Store
@@ -43,3 +46,9 @@ next-env.d.ts
 # clerk configuration (can include secrets)
 /.clerk/
 .idea
+
+# local agent / MCP config
+/.codex/
+/.gemini/
+/.mcp.json
+/opencode.json

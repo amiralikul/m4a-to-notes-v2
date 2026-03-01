@@ -19,7 +19,10 @@
     "inngest:dev": "npx inngest-cli@latest dev",
     "test:integration": "node --env-file=.env.development node_modules/.bin/vitest run --config e2e/vitest.config.ts",
     "knip": "knip",
-    "knip:fix": "knip --fix --allow-remove-files"
+    "knip:fix": "knip --fix --allow-remove-files",
+    "chunker:dev": "npm --prefix services/audio-chunker run dev",
+    "chunker:build": "npm --prefix services/audio-chunker run build",
+    "chunker:start": "npm --prefix services/audio-chunker run start"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.46",

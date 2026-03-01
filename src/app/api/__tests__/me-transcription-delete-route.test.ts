@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { auth } from "@clerk/nextjs/server";
 import { resolveActorIdentity } from "@/lib/trial-identity";
-import { actorsService, storageService, transcriptionsService, translationsService } from "@/services";
+import { actorsService, storageService, transcriptionsService } from "@/services";
 import { DELETE as deleteTranscription } from "@/app/api/me/transcriptions/[transcriptionId]/route";
 
 vi.mock("@clerk/nextjs/server", () => ({
@@ -23,9 +23,6 @@ vi.mock("@/services", () => ({
 	transcriptionsService: {
 		findByIdForOwner: vi.fn(),
 		delete: vi.fn().mockResolvedValue(undefined),
-	},
-	translationsService: {
-		deleteByTranscriptionId: vi.fn().mockResolvedValue(undefined),
 	},
 }));
 

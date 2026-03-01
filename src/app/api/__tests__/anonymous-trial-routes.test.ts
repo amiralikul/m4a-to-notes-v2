@@ -5,6 +5,7 @@ import { TRIAL_ERROR_CODES } from "@/lib/trial-errors";
 import { getUtcDayKey, resolveActorIdentity } from "@/lib/trial-identity";
 import {
 	actorsService,
+	transcriptionChunksService,
 	transcriptionsService,
 	trialUsageService,
 	workflowService,
@@ -40,6 +41,9 @@ vi.mock("@/services", () => ({
 		findByIdForOwner: vi.fn(),
 		getStatusForOwner: vi.fn(),
 	},
+	transcriptionChunksService: {
+		createMany: vi.fn().mockResolvedValue(undefined),
+	},
 	trialUsageService: {
 		getRemaining: vi.fn().mockResolvedValue(3),
 		consumeSlot: vi.fn().mockResolvedValue(true),
@@ -62,6 +66,10 @@ describe("Anonymous trial routes", () => {
 		vi.mocked(getUtcDayKey).mockReturnValue("2026-02-16");
 		vi.mocked(trialUsageService.getRemaining).mockResolvedValue(3);
 		vi.mocked(trialUsageService.consumeSlot).mockResolvedValue(true);
+		vi.mocked(transcriptionsService.create).mockResolvedValue("tr-1");
+		vi.mocked(transcriptionChunksService.createMany).mockResolvedValue(
+			undefined,
+		);
 	});
 
 	it("allows anonymous upload token creation when quota remains", async () => {
@@ -88,9 +96,6 @@ describe("Anonymous trial routes", () => {
 			attempts += 1;
 			return attempts <= 3;
 		});
-		vi.mocked(transcriptionsService.create).mockImplementation(
-			async () => `tr-${crypto.randomUUID()}`,
-		);
 
 		const responses: Response[] = [];
 		const statuses: number[] = [];
@@ -120,12 +125,57 @@ describe("Anonymous trial routes", () => {
 			expect.objectContaining({
 				userId: undefined,
 				ownerId: "actor-1",
-				userMetadata: { actorId: "actor-1" },
+				userMetadata: expect.objectContaining({ actorId: "actor-1" }),
 			}),
 		);
 
 		const fourthBody = await responses[3].json();
 		expect(fourthBody.code).toBe(TRIAL_ERROR_CODES.DAILY_LIMIT_REACHED);
+	});
+
+	it("starts chunked transcription and persists chunk manifest", async () => {
+		const request = new Request("http://localhost:3000/api/start-transcription", {
+			method: "POST",
+			body: JSON.stringify({
+				filename: "big-audio.m4a",
+				chunks: [
+					{
+						chunkIndex: 0,
+						blobUrl: "https://blob.test/chunk-0.m4a",
+						startMs: 0,
+						endMs: 600000,
+					},
+					{
+						chunkIndex: 1,
+						blobUrl: "https://blob.test/chunk-1.m4a",
+						startMs: 590000,
+						endMs: 1200000,
+					},
+				],
+			}),
+			headers: { "Content-Type": "application/json" },
+		});
+
+		const response = await startTranscription(request);
+
+		expect(response.status).toBe(201);
+		expect(transcriptionsService.create).toHaveBeenCalledWith(
+			expect.objectContaining({
+				audioKey: "https://blob.test/chunk-0.m4a",
+				userMetadata: expect.objectContaining({
+					uploadMode: "chunked",
+					chunkCount: 2,
+				}),
+			}),
+		);
+		expect(transcriptionChunksService.createMany).toHaveBeenCalledWith(
+			"tr-1",
+			expect.arrayContaining([
+				expect.objectContaining({ chunkIndex: 0 }),
+				expect.objectContaining({ chunkIndex: 1 }),
+			]),
+		);
+		expect(workflowService.startTranscription).toHaveBeenCalledWith("tr-1");
 	});
 
 	it("returns 429 for anonymous upload when daily quota is exhausted", async () => {
