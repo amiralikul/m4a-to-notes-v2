@@ -13,19 +13,6 @@ import {
 import { TranslationStatus } from "@/services/translations";
 import { isValidLanguage } from "@/lib/constants/languages";
 
-function getErrorCode(error: unknown): string | null {
-	if (
-		typeof error === "object" &&
-		error !== null &&
-		"code" in error &&
-		typeof (error as { code?: unknown }).code === "string"
-	) {
-		return (error as { code: string }).code;
-	}
-
-	return null;
-}
-
 export const GET = route({
 	auth: "required",
 	params: z.object({ transcriptionId: z.string() }),
@@ -81,39 +68,43 @@ export const POST = route({
 			);
 		}
 
-		let translationId: string;
-		try {
-			translationId = await translationsService.create(
+		const existing =
+			await translationsService.findByTranscriptionAndLanguage(
 				params.transcriptionId,
 				body.language,
 			);
-		} catch (insertError) {
-			const errorCode = getErrorCode(insertError);
-			if (errorCode?.startsWith("SQLITE_CONSTRAINT")) {
-				const existing =
+
+		let translationId: string;
+
+		if (existing) {
+			if (
+				existing.status === TranslationStatus.PENDING ||
+				existing.status === TranslationStatus.PROCESSING ||
+				existing.status === TranslationStatus.COMPLETED
+			) {
+				return { translation: existing };
+			}
+
+			await translationsService.resetForRetry(existing.id);
+			translationId = existing.id;
+		} else {
+			try {
+				translationId = await translationsService.create(
+					params.transcriptionId,
+					body.language,
+				);
+			} catch {
+				// Concurrent request may have inserted between our check and insert.
+				// Re-fetch and return the existing translation.
+				const raced =
 					await translationsService.findByTranscriptionAndLanguage(
 						params.transcriptionId,
 						body.language,
 					);
-				if (existing) {
-					if (
-						existing.status === TranslationStatus.PENDING ||
-						existing.status === TranslationStatus.PROCESSING ||
-						existing.status === TranslationStatus.COMPLETED
-					) {
-						return { translation: existing };
-					}
-
-					if (existing.status === TranslationStatus.FAILED) {
-						await translationsService.resetForRetry(existing.id);
-					}
-
-					translationId = existing.id;
-				} else {
-					throw insertError;
+				if (raced) {
+					return { translation: raced };
 				}
-			} else {
-				throw insertError;
+				throw new Error("Failed to create translation");
 			}
 		}
 
