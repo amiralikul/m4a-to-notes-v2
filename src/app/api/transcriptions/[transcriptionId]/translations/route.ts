@@ -97,6 +97,7 @@ export const POST = route({
 					);
 				if (existing) {
 					if (
+						existing.status === TranslationStatus.PENDING ||
 						existing.status === TranslationStatus.PROCESSING ||
 						existing.status === TranslationStatus.COMPLETED
 					) {
