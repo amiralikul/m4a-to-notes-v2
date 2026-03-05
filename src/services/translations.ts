@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, count, eq, inArray } from "drizzle-orm";
 import type {
 	InsertTranslation,
 	Translation,
@@ -213,6 +213,35 @@ export class TranslationsService {
 		} catch (error) {
 			this.logger.error("Failed to mark translation as failed", {
 				translationId,
+				error: getErrorMessage(error),
+			});
+			throw error;
+		}
+	}
+
+	async countByTranscriptionIds(
+		transcriptionIds: string[],
+	): Promise<Map<string, number>> {
+		if (transcriptionIds.length === 0) return new Map();
+
+		try {
+			const rows = await this.db
+				.select({
+					transcriptionId: translations.transcriptionId,
+					count: count(),
+				})
+				.from(translations)
+				.where(inArray(translations.transcriptionId, transcriptionIds))
+				.groupBy(translations.transcriptionId);
+
+			return new Map(
+				rows.map((r: { transcriptionId: string; count: number }) => [
+					r.transcriptionId,
+					r.count,
+				]),
+			);
+		} catch (error) {
+			this.logger.error("Failed to count translations by transcription IDs", {
 				error: getErrorMessage(error),
 			});
 			throw error;

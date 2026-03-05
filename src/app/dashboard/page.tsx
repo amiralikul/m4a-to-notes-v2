@@ -8,7 +8,9 @@ import {
 	ExternalLink,
 	FileAudio,
 	FileText,
+	Languages,
 	Loader2,
+	Mic,
 	RefreshCw,
 	Trash2,
 } from "lucide-react";
@@ -42,6 +44,8 @@ interface TranscriptionItem {
 	createdAt: string;
 	completedAt: string | null;
 	audioKey: string;
+	enableDiarization: boolean;
+	translationCount: number;
 }
 
 interface SummaryActionItem {
@@ -358,6 +362,18 @@ export default function DashboardPage() {
 																t.summaryStatus ?? "not_generated"
 															].label
 													}
+												</Badge>
+											)}
+											{t.enableDiarization && (
+												<Badge className="bg-violet-100 text-violet-800">
+													<Mic className="w-3 h-3 mr-1" />
+													Diarization
+												</Badge>
+											)}
+											{t.translationCount > 0 && (
+												<Badge className="bg-indigo-100 text-indigo-800">
+													<Languages className="w-3 h-3 mr-1" />
+													{t.translationCount} translation{t.translationCount !== 1 ? "s" : ""}
 												</Badge>
 											)}
 										</div>
