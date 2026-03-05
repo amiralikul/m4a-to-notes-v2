@@ -1,4 +1,7 @@
+import { eq } from "drizzle-orm";
 import { describe, it, expect, beforeEach } from "vitest";
+import { translations } from "@/db/schema";
+import { TranscriptionChunksService } from "@/services/transcription-chunks";
 import { createTestDb } from "@/test/db";
 import { createTestLogger } from "@/test/setup";
 import {
@@ -8,12 +11,15 @@ import {
 } from "../transcriptions";
 
 describe("TranscriptionsService", () => {
+	let db: ReturnType<typeof createTestDb>;
 	let service: TranscriptionsService;
+	let chunksService: TranscriptionChunksService;
 
 	beforeEach(() => {
-		const db = createTestDb();
+		db = createTestDb();
 		const logger = createTestLogger();
 		service = new TranscriptionsService(db, logger);
+		chunksService = new TranscriptionChunksService(db, logger);
 	});
 
 	describe("create", () => {
@@ -351,6 +357,181 @@ describe("TranscriptionsService", () => {
 		});
 	});
 
+	describe("diarization", () => {
+		it("creates a transcription with enableDiarization: true", async () => {
+			const id = await service.create({
+				audioKey: "blob://test.m4a",
+				filename: "meeting.m4a",
+				enableDiarization: true,
+			});
+
+			const t = await service.findById(id);
+			expect(t!.enableDiarization).toBe(true);
+		});
+
+		it("defaults enableDiarization to false", async () => {
+			const id = await service.create({
+				audioKey: "blob://test.m4a",
+				filename: "test.m4a",
+			});
+
+			const t = await service.findById(id);
+			expect(t!.enableDiarization).toBe(false);
+		});
+
+		it("saves diarizationData via markCompleted", async () => {
+			const id = await service.create({
+				audioKey: "blob://test.m4a",
+				filename: "meeting.m4a",
+				enableDiarization: true,
+			});
+
+			const segments = [
+				{ speaker: "A", text: "Hello", start: 0, end: 1500 },
+				{ speaker: "B", text: "Hi there", start: 1500, end: 3000 },
+			];
+
+			await service.markCompleted(id, "Hello...", "Hello Hi there", segments);
+
+			const t = await service.findById(id);
+			expect(t!.diarizationData).toEqual(segments);
+			expect(t!.transcriptText).toBe("Hello Hi there");
+		});
+
+		it("preserves null diarizationData when not provided", async () => {
+			const id = await service.create({
+				audioKey: "blob://test.m4a",
+				filename: "mono.m4a",
+			});
+
+			await service.markCompleted(id, "Preview", "Full text");
+
+			const t = await service.findById(id);
+			expect(t!.diarizationData).toBeNull();
+		});
+
+		it("getStatus does not include diarizationData", async () => {
+			const id = await service.create({
+				audioKey: "blob://test.m4a",
+				filename: "meeting.m4a",
+				enableDiarization: true,
+			});
+
+			const segments = [
+				{ speaker: "A", text: "Hello", start: 0, end: 1500 },
+			];
+			await service.markCompleted(id, "Hello...", "Hello", segments);
+
+			const status = await service.getStatus(id);
+			expect(status).not.toBeNull();
+			expect(status).not.toHaveProperty("diarizationData");
+			expect(status).not.toHaveProperty("transcriptText");
+		});
+
+		it("getDetail includes diarization fields", async () => {
+			const id = await service.create({
+				audioKey: "blob://test.m4a",
+				filename: "meeting.m4a",
+				enableDiarization: true,
+			});
+
+			const segments = [
+				{ speaker: "A", text: "Hello", start: 0, end: 1500 },
+			];
+			await service.markCompleted(id, "Hello...", "Hello", segments);
+
+			const detail = await service.getDetail(id);
+			expect(detail).not.toBeNull();
+			expect(detail!.enableDiarization).toBe(true);
+			expect(detail!.diarizationData).toEqual(segments);
+			expect(detail!.transcriptText).toBe("Hello");
+		});
+	});
+
+	describe("findByIdForOwner", () => {
+		it("returns transcription owned by userId", async () => {
+			const id = await service.create({
+				audioKey: "a1",
+				filename: "test.m4a",
+				userId: "user_1",
+			});
+
+			const result = await service.findByIdForOwner(id, {
+				userId: "user_1",
+				actorId: null,
+			});
+			expect(result).not.toBeNull();
+			expect(result!.id).toBe(id);
+		});
+
+		it("returns null when userId does not match", async () => {
+			const id = await service.create({
+				audioKey: "a1",
+				filename: "test.m4a",
+				userId: "user_1",
+			});
+
+			const result = await service.findByIdForOwner(id, {
+				userId: "user_2",
+				actorId: null,
+			});
+			expect(result).toBeNull();
+		});
+
+		it("returns transcription owned by actorId when userId is null", async () => {
+			const id = await service.create({
+				audioKey: "a1",
+				filename: "test.m4a",
+				ownerId: "actor_1",
+			});
+
+			const result = await service.findByIdForOwner(id, {
+				userId: null,
+				actorId: "actor_1",
+			});
+			expect(result).not.toBeNull();
+			expect(result!.id).toBe(id);
+		});
+
+		it("returns null when actorId does not match", async () => {
+			const id = await service.create({
+				audioKey: "a1",
+				filename: "test.m4a",
+				ownerId: "actor_1",
+			});
+
+			const result = await service.findByIdForOwner(id, {
+				userId: null,
+				actorId: "actor_2",
+			});
+			expect(result).toBeNull();
+		});
+
+		it("blocks anonymous access to claimed transcriptions (strict rule)", async () => {
+			const id = await service.create({
+				audioKey: "a1",
+				filename: "test.m4a",
+				userId: "user_1",
+				ownerId: "actor_1",
+			});
+
+			const result = await service.findByIdForOwner(id, {
+				userId: null,
+				actorId: "actor_1",
+			});
+			expect(result).toBeNull();
+		});
+
+		it("returns null for non-existent transcription", async () => {
+			const result = await service.findByIdForOwner("non-existent", {
+				userId: "user_1",
+				actorId: null,
+			});
+			expect(result).toBeNull();
+		});
+
+	});
+
 	describe("delete", () => {
 		it("deletes a transcription", async () => {
 			const id = await service.create({
@@ -362,5 +543,54 @@ describe("TranscriptionsService", () => {
 			const result = await service.findById(id);
 			expect(result).toBeNull();
 		});
+
+		it("deletes chunk rows via FK cascade when deleting transcription", async () => {
+			const id = await service.create({
+				audioKey: "blob://test.m4a",
+				filename: "test.m4a",
+			});
+
+			await chunksService.createMany(id, [
+				{
+					chunkIndex: 0,
+					blobUrl: "https://blob.example/chunk-0.flac",
+					startMs: 0,
+					endMs: 600000,
+				},
+			]);
+
+			await service.delete(id);
+
+			const result = await service.findById(id);
+			expect(result).toBeNull();
+
+			const chunks = await chunksService.findByTranscriptionId(id);
+			expect(chunks).toHaveLength(0);
+		});
+
+		it("deletes translations for the transcription", async () => {
+			const id = await service.create({
+				audioKey: "blob://test.m4a",
+				filename: "test.m4a",
+			});
+
+			await db.insert(translations).values({
+				id: crypto.randomUUID(),
+				transcriptionId: id,
+				language: "es",
+				status: "pending",
+				createdAt: new Date().toISOString(),
+				updatedAt: new Date().toISOString(),
+			});
+
+			await service.delete(id);
+
+			const rows = await db
+				.select()
+				.from(translations)
+				.where(eq(translations.transcriptionId, id));
+			expect(rows).toHaveLength(0);
+		});
+
 	});
 });

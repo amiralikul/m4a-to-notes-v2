@@ -7,9 +7,9 @@ vi.mock("@/services", () => ({
 		markSummaryCompleted: vi.fn(),
 		markSummaryFailed: vi.fn(),
 	},
-	aiService: {
-		summaryProvider: "openai",
-		summaryModel: "gpt-5-mini",
+	textAiService: {
+		provider: "openai",
+		model: "gpt-5-mini",
 		generateSummary: vi.fn(),
 	},
 }));
@@ -23,7 +23,7 @@ vi.mock("@/lib/logger", () => ({
 	},
 }));
 
-import { aiService, transcriptionsService } from "@/services";
+import { textAiService, transcriptionsService } from "@/services";
 
 async function runProcessSummary(transcriptionId: string) {
 	const { processSummary } = await import("../process-summary");
@@ -64,7 +64,7 @@ describe("process-summary Inngest function", () => {
 		vi.mocked(transcriptionsService.markSummaryStarted).mockResolvedValue(
 			{} as never,
 		);
-		vi.mocked(aiService.generateSummary).mockResolvedValue({
+		vi.mocked(textAiService.generateSummary).mockResolvedValue({
 			summary: "Discussed release readiness.",
 			keyPoints: ["QA complete", "Deploy Friday"],
 			actionItems: [{ task: "Prepare release notes", owner: "Alex" }],
@@ -87,7 +87,7 @@ describe("process-summary Inngest function", () => {
 			"openai",
 			"gpt-5-mini",
 		);
-		expect(aiService.generateSummary).toHaveBeenCalledWith(
+		expect(textAiService.generateSummary).toHaveBeenCalledWith(
 			"Meeting transcript text",
 		);
 		expect(transcriptionsService.markSummaryCompleted).toHaveBeenCalled();
@@ -114,7 +114,7 @@ describe("process-summary Inngest function", () => {
 			transcriptionId: "tx-2",
 		});
 		expect(transcriptionsService.markSummaryStarted).not.toHaveBeenCalled();
-		expect(aiService.generateSummary).not.toHaveBeenCalled();
+		expect(textAiService.generateSummary).not.toHaveBeenCalled();
 	});
 
 	it("throws when transcription is not ready for summary", async () => {

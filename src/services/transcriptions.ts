@@ -1,5 +1,6 @@
 import { and, count, desc, eq, isNull } from "drizzle-orm";
 import type {
+	DiarizationSegment,
 	InsertTranscription,
 	Transcription,
 	TranscriptionSummaryData,
@@ -8,6 +9,7 @@ import type {
 import { transcriptions } from "@/db/schema";
 import { getErrorMessage } from "@/lib/errors";
 import type { Logger } from "@/lib/logger";
+import type { OwnerIdentity } from "@/lib/route";
 
 export const TranscriptionStatus = {
 	PENDING: "pending",
@@ -55,6 +57,7 @@ export class TranscriptionsService {
 		userMetadata = {},
 		userId,
 		ownerId,
+		enableDiarization = false,
 	}: {
 		audioKey: string;
 		filename: string;
@@ -62,6 +65,7 @@ export class TranscriptionsService {
 		userMetadata?: Record<string, unknown>;
 		userId?: string;
 		ownerId?: string;
+		enableDiarization?: boolean;
 	}): Promise<string> {
 		try {
 			const transcriptionId = crypto.randomUUID();
@@ -77,6 +81,7 @@ export class TranscriptionsService {
 				userMetadata,
 				userId,
 				ownerId,
+				enableDiarization,
 				createdAt: now,
 				updatedAt: now,
 			};
@@ -96,6 +101,55 @@ export class TranscriptionsService {
 				audioKey,
 				filename,
 				source,
+				error: getErrorMessage(error),
+			});
+			throw error;
+		}
+	}
+
+	async findByIdForOwner(
+		transcriptionId: string,
+		owner: OwnerIdentity,
+	): Promise<Transcription | null> {
+		try {
+			if (owner.userId === null && owner.actorId === null) {
+				this.logger.warn("Cannot find transcription without owner identity", {
+					transcriptionId,
+				});
+				return null;
+			}
+
+			let conditions: ReturnType<typeof and>;
+			if (owner.userId !== null) {
+				conditions = and(
+					eq(transcriptions.id, transcriptionId),
+					eq(transcriptions.userId, owner.userId),
+				);
+			} else {
+				if (owner.actorId === null) {
+					this.logger.warn("Cannot find transcription without actor identity", {
+						transcriptionId,
+					});
+					return null;
+				}
+
+				conditions = and(
+					eq(transcriptions.id, transcriptionId),
+					isNull(transcriptions.userId),
+					eq(transcriptions.ownerId, owner.actorId),
+				);
+			}
+
+			const result = await this.db
+				.select()
+				.from(transcriptions)
+				.where(conditions)
+				.limit(1);
+
+			return result[0] || null;
+		} catch (error) {
+			this.logger.error("Failed to find transcription for owner", {
+				transcriptionId,
 				error: getErrorMessage(error),
 			});
 			throw error;
@@ -175,12 +229,14 @@ export class TranscriptionsService {
 		transcriptionId: string,
 		preview: string | null = null,
 		transcriptText: string,
+		diarizationData?: DiarizationSegment[] | null,
 	): Promise<Transcription> {
 		return this.update(transcriptionId, {
 			status: TranscriptionStatus.COMPLETED,
 			progress: 100,
 			preview,
 			transcriptText,
+			diarizationData: diarizationData ?? null,
 			summaryStatus: SummaryStatus.PENDING,
 			summaryError: null,
 			summaryUpdatedAt: new Date().toISOString(),
@@ -389,6 +445,29 @@ export class TranscriptionsService {
 		}
 	}
 
+	async getDetail(transcriptionId: string) {
+		const transcription = await this.findById(transcriptionId);
+
+		if (!transcription) {
+			return null;
+		}
+
+		return this.mapDetail(transcription);
+	}
+
+	async getDetailForOwner(
+		transcriptionId: string,
+		owner: OwnerIdentity,
+	) {
+		const transcription = await this.findByIdForOwner(transcriptionId, owner);
+
+		if (!transcription) {
+			return null;
+		}
+
+		return this.mapDetail(transcription);
+	}
+
 	async getStatus(transcriptionId: string) {
 		const transcription = await this.findById(transcriptionId);
 
@@ -396,6 +475,52 @@ export class TranscriptionsService {
 			return null;
 		}
 
+		return this.mapStatus(transcription);
+	}
+
+	async getStatusForOwner(
+		transcriptionId: string,
+		owner: OwnerIdentity,
+	) {
+		const transcription = await this.findByIdForOwner(transcriptionId, owner);
+
+		if (!transcription) {
+			return null;
+		}
+
+		return this.mapStatus(transcription);
+	}
+
+	private mapDetail(transcription: Transcription) {
+		return {
+			transcriptionId: transcription.id,
+			status: transcription.status,
+			progress: transcription.progress,
+			filename: transcription.filename,
+			createdAt: transcription.createdAt,
+			completedAt: transcription.completedAt,
+			preview: transcription.preview,
+			enableDiarization: transcription.enableDiarization,
+			diarizationData: transcription.diarizationData ?? null,
+			transcriptText: transcription.transcriptText,
+			summaryStatus: transcription.summaryStatus,
+			summaryUpdatedAt: transcription.summaryUpdatedAt,
+			error: transcription.errorDetails
+				? {
+						code: transcription.errorDetails.code,
+						message: transcription.errorDetails.message,
+					}
+				: undefined,
+			summaryError: transcription.summaryError
+				? {
+						code: transcription.summaryError.code,
+						message: transcription.summaryError.message,
+					}
+				: undefined,
+		};
+	}
+
+	private mapStatus(transcription: Transcription) {
 		return {
 			transcriptionId: transcription.id,
 			jobId: transcription.id,

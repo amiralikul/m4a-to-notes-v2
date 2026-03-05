@@ -2,7 +2,7 @@ import { NonRetriableError } from "inngest";
 import { INNGEST_EVENTS } from "../events";
 import { inngest } from "../client";
 import {
-	aiService,
+	textAiService,
 	transcriptionsService,
 } from "@/services";
 import {
@@ -31,8 +31,8 @@ export const processSummary = inngest.createFunction(
 					transcriptionId,
 					"MAX_RETRIES_EXCEEDED",
 					getErrorMessage(error),
-					aiService.summaryProvider,
-					aiService.summaryModel,
+					textAiService.provider,
+					textAiService.model,
 				);
 			} catch (dbError) {
 				logger.error("Failed to mark summary as failed in DLQ handler", {
@@ -78,8 +78,8 @@ export const processSummary = inngest.createFunction(
 
 				await transcriptionsService.markSummaryStarted(
 					transcriptionId,
-					aiService.summaryProvider,
-					aiService.summaryModel,
+					textAiService.provider,
+					textAiService.model,
 				);
 
 				return {
@@ -97,7 +97,7 @@ export const processSummary = inngest.createFunction(
 		}
 
 		const summary = await step.run("generate-summary", async () => {
-			return aiService.generateSummary(
+			return textAiService.generateSummary(
 				transcriptionResult.transcription.transcriptText as string,
 			);
 		});
@@ -106,8 +106,8 @@ export const processSummary = inngest.createFunction(
 			await transcriptionsService.markSummaryCompleted(
 				transcriptionId,
 				summary,
-				aiService.summaryProvider,
-				aiService.summaryModel,
+				textAiService.provider,
+				textAiService.model,
 			);
 		});
 

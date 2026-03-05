@@ -9,14 +9,20 @@ vi.mock("@/services", () => ({
 		markCompleted: vi.fn(),
 		markFailed: vi.fn(),
 	},
-	storageService: {
-		downloadContent: vi.fn(),
-		deleteObject: vi.fn(),
+	transcriptionChunksService: {
+		findByTranscriptionId: vi.fn(),
+		markProcessing: vi.fn(),
+		markCompleted: vi.fn(),
+		markFailed: vi.fn(),
 	},
-	aiService: {
+	transcriptionAiService: {
 		provider: "groq",
 		transcribeAudio: vi.fn(),
 		transcribeAudioFromUrl: vi.fn(),
+	},
+	assemblyAiService: {
+		submit: vi.fn(),
+		getTranscript: vi.fn(),
 	},
 }));
 
@@ -35,8 +41,9 @@ vi.mock("@/lib/logger", () => ({
 
 import {
 	transcriptionsService,
-	storageService,
-	aiService,
+	transcriptionChunksService,
+	transcriptionAiService,
+	assemblyAiService,
 } from "@/services";
 import { INNGEST_EVENTS } from "@/inngest/events";
 import { sendTelegramMessage } from "@/services/telegram";
@@ -51,7 +58,7 @@ async function runProcessTranscription(transcriptionId: string) {
 	// Extract the handler function from the Inngest function config
 	const fn = processTranscription as unknown as {
 		["~trigger"]: { event: string };
-		fn: (args: { event: { data: { transcriptionId: string } }; step: { run: <T>(name: string, fn: () => Promise<T>) => Promise<T>; sendEvent: (id: string, payload: unknown) => Promise<void> }; logger: { info: typeof vi.fn; warn: typeof vi.fn; error: typeof vi.fn; debug: typeof vi.fn } }) => Promise<unknown>;
+		fn: (args: { event: { data: { transcriptionId: string } }; step: { run: <T>(name: string, fn: () => Promise<T>) => Promise<T>; sleep: (name: string, duration: string) => Promise<void>; sendEvent: (id: string, payload: unknown) => Promise<void> }; logger: { info: typeof vi.fn; warn: typeof vi.fn; error: typeof vi.fn; debug: typeof vi.fn } }) => Promise<unknown>;
 	};
 
 	// Simple step.run that just executes the function
@@ -59,6 +66,7 @@ async function runProcessTranscription(transcriptionId: string) {
 		run: async <T>(_name: string, handler: () => Promise<T>): Promise<T> => {
 			return handler();
 		},
+		sleep: vi.fn().mockResolvedValue(undefined),
 		sendEvent: mockSendEvent,
 	};
 
@@ -80,8 +88,11 @@ describe("process-transcription Inngest function", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		mockSendEvent.mockResolvedValue(undefined);
+		vi.mocked(transcriptionChunksService.findByTranscriptionId).mockResolvedValue(
+			[],
+		);
 		(
-			aiService as unknown as {
+			transcriptionAiService as unknown as {
 				provider: "groq" | "openai";
 			}
 		).provider = "groq";
@@ -100,7 +111,7 @@ describe("process-transcription Inngest function", () => {
 		vi.mocked(transcriptionsService.findById).mockResolvedValue(
 			mockTranscription as unknown as Awaited<ReturnType<typeof transcriptionsService.findById>>,
 		);
-		vi.mocked(aiService.transcribeAudioFromUrl).mockResolvedValue(
+		vi.mocked(transcriptionAiService.transcribeAudioFromUrl).mockResolvedValue(
 			"This is the transcribed text from the audio file.",
 		);
 		vi.mocked(transcriptionsService.markStarted).mockResolvedValue({} as never);
@@ -116,10 +127,9 @@ describe("process-transcription Inngest function", () => {
 		});
 
 		expect(transcriptionsService.markStarted).toHaveBeenCalledWith("tx-1", 5);
-		expect(aiService.transcribeAudioFromUrl).toHaveBeenCalledWith(
+		expect(transcriptionAiService.transcribeAudioFromUrl).toHaveBeenCalledWith(
 			"https://blob.vercel/audio.m4a",
 		);
-		expect(storageService.downloadContent).not.toHaveBeenCalled();
 		expect(transcriptionsService.markCompleted).toHaveBeenCalledWith(
 			"tx-1",
 			expect.any(String),
@@ -130,7 +140,6 @@ describe("process-transcription Inngest function", () => {
 			data: { transcriptionId: "tx-1" },
 			id: "summary-requested-tx-1",
 		});
-		expect(storageService.deleteObject).not.toHaveBeenCalled();
 	});
 
 	it("skips already completed transcription", async () => {
@@ -148,7 +157,6 @@ describe("process-transcription Inngest function", () => {
 		});
 
 		expect(transcriptionsService.markStarted).not.toHaveBeenCalled();
-		expect(storageService.downloadContent).not.toHaveBeenCalled();
 		expect(mockSendEvent).not.toHaveBeenCalled();
 	});
 
@@ -180,7 +188,7 @@ describe("process-transcription Inngest function", () => {
 		vi.mocked(transcriptionsService.findById).mockResolvedValue(
 			mockTranscription as unknown as Awaited<ReturnType<typeof transcriptionsService.findById>>,
 		);
-		vi.mocked(aiService.transcribeAudioFromUrl).mockResolvedValue(
+		vi.mocked(transcriptionAiService.transcribeAudioFromUrl).mockResolvedValue(
 			"Telegram transcript text",
 		);
 		vi.mocked(transcriptionsService.markStarted).mockResolvedValue({} as never);
@@ -219,7 +227,7 @@ describe("process-transcription Inngest function", () => {
 		vi.mocked(transcriptionsService.findById).mockResolvedValue(
 			mockTranscription as unknown as Awaited<ReturnType<typeof transcriptionsService.findById>>,
 		);
-		vi.mocked(aiService.transcribeAudioFromUrl).mockResolvedValue(
+		vi.mocked(transcriptionAiService.transcribeAudioFromUrl).mockResolvedValue(
 			"Web transcript",
 		);
 		vi.mocked(transcriptionsService.markStarted).mockResolvedValue({} as never);
@@ -244,7 +252,7 @@ describe("process-transcription Inngest function", () => {
 		vi.mocked(transcriptionsService.findById).mockResolvedValue(
 			mockTranscription as unknown as Awaited<ReturnType<typeof transcriptionsService.findById>>,
 		);
-		vi.mocked(aiService.transcribeAudioFromUrl).mockResolvedValue(
+		vi.mocked(transcriptionAiService.transcribeAudioFromUrl).mockResolvedValue(
 			"Transcript text",
 		);
 		vi.mocked(transcriptionsService.markStarted).mockResolvedValue({} as never);
@@ -253,11 +261,254 @@ describe("process-transcription Inngest function", () => {
 
 		await runProcessTranscription("tx-6");
 
-		expect(storageService.deleteObject).not.toHaveBeenCalled();
 		expect(transcriptionsService.markCompleted).toHaveBeenCalled();
 	});
 
-	it("falls back to file upload transcription for openai provider", async () => {
+	describe("diarization path", () => {
+		it("uses AssemblyAI when enableDiarization is true", async () => {
+			const mockTranscription = {
+				id: "tx-diar-1",
+				status: "pending",
+				audioKey: "https://blob.vercel/meeting.m4a",
+				filename: "meeting.m4a",
+				source: "web",
+				enableDiarization: true,
+				userMetadata: {},
+			};
+
+			vi.mocked(transcriptionsService.findById).mockResolvedValue(
+				mockTranscription as unknown as Awaited<ReturnType<typeof transcriptionsService.findById>>,
+			);
+			vi.mocked(transcriptionsService.markStarted).mockResolvedValue({} as never);
+			vi.mocked(transcriptionsService.updateProgress).mockResolvedValue({} as never);
+			vi.mocked(transcriptionsService.markCompleted).mockResolvedValue({} as never);
+
+			vi.mocked(assemblyAiService.submit).mockResolvedValue("aai-job-1");
+			vi.mocked(assemblyAiService.getTranscript).mockResolvedValue({
+				status: "completed",
+				text: "Speaker A said hello. Speaker B replied.",
+				segments: [
+					{ speaker: "A", text: "Hello", start: 0, end: 1500 },
+					{ speaker: "B", text: "Hi there", start: 1500, end: 3000 },
+				],
+			});
+
+			const result = await runProcessTranscription("tx-diar-1");
+
+			expect(result).toEqual({
+				status: "completed",
+				transcriptionId: "tx-diar-1",
+				transcriptionLength: "Speaker A said hello. Speaker B replied.".length,
+			});
+
+			expect(assemblyAiService.submit).toHaveBeenCalledWith("https://blob.vercel/meeting.m4a");
+			expect(assemblyAiService.getTranscript).toHaveBeenCalledWith("aai-job-1");
+			expect(transcriptionsService.markCompleted).toHaveBeenCalledWith(
+				"tx-diar-1",
+				expect.any(String),
+				"Speaker A said hello. Speaker B replied.",
+				[
+					{ speaker: "A", text: "Hello", start: 0, end: 1500 },
+					{ speaker: "B", text: "Hi there", start: 1500, end: 3000 },
+				],
+			);
+			// Should NOT use Groq/OpenAI
+			expect(transcriptionAiService.transcribeAudioFromUrl).not.toHaveBeenCalled();
+			expect(transcriptionAiService.transcribeAudio).not.toHaveBeenCalled();
+		});
+
+		it("throws NonRetriableError when AssemblyAI returns error", async () => {
+			const mockTranscription = {
+				id: "tx-diar-err",
+				status: "pending",
+				audioKey: "https://blob.vercel/bad.m4a",
+				filename: "bad.m4a",
+				source: "web",
+				enableDiarization: true,
+				userMetadata: {},
+			};
+
+			vi.mocked(transcriptionsService.findById).mockResolvedValue(
+				mockTranscription as unknown as Awaited<ReturnType<typeof transcriptionsService.findById>>,
+			);
+			vi.mocked(transcriptionsService.markStarted).mockResolvedValue({} as never);
+			vi.mocked(transcriptionsService.updateProgress).mockResolvedValue({} as never);
+
+			vi.mocked(assemblyAiService.submit).mockResolvedValue("aai-job-err");
+			vi.mocked(assemblyAiService.getTranscript).mockResolvedValue({
+				status: "error",
+				error: "Audio too short",
+			});
+
+			await expect(runProcessTranscription("tx-diar-err")).rejects.toThrow("Audio too short");
+		});
+
+		it("does not call AssemblyAI when enableDiarization is false", async () => {
+			const mockTranscription = {
+				id: "tx-no-diar",
+				status: "pending",
+				audioKey: "https://blob.vercel/audio.m4a",
+				filename: "test.m4a",
+				source: "web",
+				enableDiarization: false,
+				userMetadata: {},
+			};
+
+			vi.mocked(transcriptionsService.findById).mockResolvedValue(
+				mockTranscription as unknown as Awaited<ReturnType<typeof transcriptionsService.findById>>,
+			);
+			vi.mocked(transcriptionAiService.transcribeAudioFromUrl).mockResolvedValue("Transcript text");
+			vi.mocked(transcriptionsService.markStarted).mockResolvedValue({} as never);
+			vi.mocked(transcriptionsService.updateProgress).mockResolvedValue({} as never);
+			vi.mocked(transcriptionsService.markCompleted).mockResolvedValue({} as never);
+
+			await runProcessTranscription("tx-no-diar");
+
+			expect(assemblyAiService.submit).not.toHaveBeenCalled();
+			expect(assemblyAiService.getTranscript).not.toHaveBeenCalled();
+			expect(transcriptionAiService.transcribeAudioFromUrl).toHaveBeenCalled();
+		});
+	});
+
+	it("processes chunked transcription manifest and merges chunk texts", async () => {
+		const mockTranscription = {
+			id: "tx-chunked-1",
+			status: "pending",
+			audioKey: "https://blob.vercel/chunk-0.m4a",
+			filename: "large-file.m4a",
+			source: "web",
+			enableDiarization: false,
+			userMetadata: {},
+		};
+
+		vi.mocked(transcriptionsService.findById).mockResolvedValue(
+			mockTranscription as unknown as Awaited<
+				ReturnType<typeof transcriptionsService.findById>
+			>,
+		);
+		vi.mocked(transcriptionsService.markStarted).mockResolvedValue({} as never);
+		vi.mocked(transcriptionsService.updateProgress).mockResolvedValue({} as never);
+		vi.mocked(transcriptionsService.markCompleted).mockResolvedValue({} as never);
+
+		vi.mocked(transcriptionChunksService.findByTranscriptionId)
+			.mockResolvedValueOnce([
+				{
+					id: "chunk-0",
+					transcriptionId: "tx-chunked-1",
+					chunkIndex: 0,
+					blobUrl: "https://blob.vercel/chunk-0.m4a",
+					startMs: 0,
+					endMs: 600000,
+					status: "pending",
+				},
+				{
+					id: "chunk-1",
+					transcriptionId: "tx-chunked-1",
+					chunkIndex: 1,
+					blobUrl: "https://blob.vercel/chunk-1.m4a",
+					startMs: 590000,
+					endMs: 1200000,
+					status: "pending",
+				},
+			] as never)
+			.mockResolvedValueOnce([
+				{
+					id: "chunk-0",
+					transcriptionId: "tx-chunked-1",
+					chunkIndex: 0,
+					blobUrl: "https://blob.vercel/chunk-0.m4a",
+					startMs: 0,
+					endMs: 600000,
+					status: "completed",
+					transcriptText: "Hello team this is a status update",
+				},
+				{
+					id: "chunk-1",
+					transcriptionId: "tx-chunked-1",
+					chunkIndex: 1,
+					blobUrl: "https://blob.vercel/chunk-1.m4a",
+					startMs: 590000,
+					endMs: 1200000,
+					status: "completed",
+					transcriptText: "is a status update for the project",
+				},
+			] as never);
+
+		vi.mocked(transcriptionAiService.transcribeAudioFromUrl)
+			.mockResolvedValueOnce("Hello team this is a status update")
+			.mockResolvedValueOnce("is a status update for the project");
+		vi.mocked(transcriptionChunksService.markProcessing).mockResolvedValue(
+			undefined,
+		);
+		vi.mocked(transcriptionChunksService.markCompleted).mockResolvedValue(
+			undefined,
+		);
+		vi.mocked(transcriptionChunksService.markFailed).mockResolvedValue(
+			undefined,
+		);
+
+		const result = await runProcessTranscription("tx-chunked-1");
+
+		expect(result).toEqual({
+			status: "completed",
+			transcriptionId: "tx-chunked-1",
+			transcriptionLength:
+				"Hello team this is a status update for the project".length,
+		});
+		expect(transcriptionAiService.transcribeAudioFromUrl).toHaveBeenCalledWith(
+			"https://blob.vercel/chunk-0.m4a",
+		);
+		expect(transcriptionAiService.transcribeAudioFromUrl).toHaveBeenCalledWith(
+			"https://blob.vercel/chunk-1.m4a",
+		);
+		expect(transcriptionChunksService.markCompleted).toHaveBeenCalledTimes(2);
+		expect(transcriptionsService.markCompleted).toHaveBeenCalledWith(
+			"tx-chunked-1",
+			expect.any(String),
+			"Hello team this is a status update for the project",
+		);
+	});
+
+	it("fails fast when chunk count exceeds the Inngest step budget", async () => {
+		const mockTranscription = {
+			id: "tx-chunked-limit",
+			status: "pending",
+			audioKey: "https://blob.vercel/chunk-0.m4a",
+			filename: "very-large-file.m4a",
+			source: "web",
+			enableDiarization: false,
+			userMetadata: {},
+		};
+
+		vi.mocked(transcriptionsService.findById).mockResolvedValue(
+			mockTranscription as unknown as Awaited<
+				ReturnType<typeof transcriptionsService.findById>
+			>,
+		);
+		vi.mocked(transcriptionsService.markStarted).mockResolvedValue({} as never);
+
+		const tooManyChunks = Array.from({ length: 1000 }, (_, index) => ({
+			id: `chunk-${index}`,
+			transcriptionId: "tx-chunked-limit",
+			chunkIndex: index,
+			blobUrl: `https://blob.vercel/chunk-${index}.m4a`,
+			startMs: index * 1000,
+			endMs: (index + 1) * 1000,
+			status: "pending",
+		}));
+
+		vi.mocked(transcriptionChunksService.findByTranscriptionId).mockResolvedValue(
+			tooManyChunks as never,
+		);
+
+		await expect(runProcessTranscription("tx-chunked-limit")).rejects.toThrow(
+			"Too many chunks for a single workflow run",
+		);
+		expect(transcriptionAiService.transcribeAudioFromUrl).not.toHaveBeenCalled();
+		expect(transcriptionsService.markCompleted).not.toHaveBeenCalled();
+	});
+
+	it("fails fast when provider is not groq for non-diarization transcription", async () => {
 		const mockTranscription = {
 			id: "tx-7",
 			status: "pending",
@@ -268,7 +519,7 @@ describe("process-transcription Inngest function", () => {
 		};
 
 		(
-			aiService as unknown as {
+			transcriptionAiService as unknown as {
 				provider: "groq" | "openai";
 			}
 		).provider = "openai";
@@ -276,25 +527,14 @@ describe("process-transcription Inngest function", () => {
 		vi.mocked(transcriptionsService.findById).mockResolvedValue(
 			mockTranscription as unknown as Awaited<ReturnType<typeof transcriptionsService.findById>>,
 		);
-		vi.mocked(storageService.downloadContent).mockResolvedValue(
-			new ArrayBuffer(100),
-		);
-		vi.mocked(aiService.transcribeAudio).mockResolvedValue("OpenAI transcript");
 		vi.mocked(transcriptionsService.markStarted).mockResolvedValue({} as never);
 		vi.mocked(transcriptionsService.updateProgress).mockResolvedValue({} as never);
 		vi.mocked(transcriptionsService.markCompleted).mockResolvedValue({} as never);
 
-		const result = await runProcessTranscription("tx-7");
-
-		expect(result).toEqual({
-			status: "completed",
-			transcriptionId: "tx-7",
-			transcriptionLength: "OpenAI transcript".length,
-		});
-		expect(storageService.downloadContent).toHaveBeenCalledWith(
-			"https://blob.vercel/audio-openai.m4a",
+		await expect(runProcessTranscription("tx-7")).rejects.toThrow(
+			'URL-based transcription requires TRANSCRIPTION_PROVIDER="groq"',
 		);
-		expect(aiService.transcribeAudio).toHaveBeenCalled();
-		expect(aiService.transcribeAudioFromUrl).not.toHaveBeenCalled();
+		expect(transcriptionAiService.transcribeAudioFromUrl).not.toHaveBeenCalled();
+		expect(transcriptionsService.markCompleted).not.toHaveBeenCalled();
 	});
 });

@@ -68,6 +68,8 @@ export const transcriptions = sqliteTable(
 			code?: string;
 			message?: string;
 		}>(),
+		enableDiarization: integer("enable_diarization", { mode: "boolean" }).default(false).notNull(),
+		diarizationData: text("diarization_data", { mode: "json" }).$type<DiarizationSegment[] | null>(),
 		summaryProvider: text("summary_provider"),
 		summaryModel: text("summary_model"),
 		summaryUpdatedAt: text("summary_updated_at"),
@@ -81,6 +83,43 @@ export const transcriptions = sqliteTable(
 		index("idx_transcriptions_created_at").on(table.createdAt),
 		index("idx_transcriptions_user_id").on(table.userId),
 		index("idx_transcriptions_owner_id").on(table.ownerId),
+	],
+);
+
+export const transcriptionChunks = sqliteTable(
+	"transcription_chunks",
+	{
+		id: text("id").primaryKey(),
+		transcriptionId: text("transcription_id")
+			.notNull()
+			.references(() => transcriptions.id, { onDelete: "cascade" }),
+		chunkIndex: integer("chunk_index").notNull(),
+		blobUrl: text("blob_url").notNull(),
+		startMs: integer("start_ms").notNull(),
+		endMs: integer("end_ms").notNull(),
+		status: text("status", {
+			enum: ["pending", "processing", "completed", "failed"],
+		}).notNull(),
+		transcriptText: text("transcript_text"),
+		errorDetails: text("error_details", { mode: "json" }).$type<{
+			code?: string;
+			message?: string;
+		}>(),
+		createdAt: text("created_at")
+			.notNull()
+			.default(sql`(CURRENT_TIMESTAMP)`),
+		updatedAt: text("updated_at")
+			.notNull()
+			.default(sql`(CURRENT_TIMESTAMP)`)
+			.$onUpdate(() => sql`(CURRENT_TIMESTAMP)`),
+	},
+	(table) => [
+		index("idx_transcription_chunks_transcription_id").on(table.transcriptionId),
+		index("idx_transcription_chunks_status").on(table.status),
+		uniqueIndex("idx_transcription_chunks_transcription_chunk").on(
+			table.transcriptionId,
+			table.chunkIndex,
+		),
 	],
 );
 
@@ -209,6 +248,13 @@ export interface ConversationData {
 	updatedAt: string;
 }
 
+export interface DiarizationSegment {
+	speaker: string;   // "A", "B", etc.
+	text: string;
+	start: number;     // milliseconds
+	end: number;       // milliseconds
+}
+
 export interface TranscriptionSummaryActionItem {
 	task: string;
 	owner?: string;
@@ -222,6 +268,64 @@ export interface TranscriptionSummaryData {
 	keyTakeaways: string[];
 }
 
+export interface JobAnalysisOneWeekPlanDay {
+	day: number;
+	title: string;
+	tasks: string[];
+}
+
+export interface JobAnalysisResultData {
+	compatibilityScore: number;
+	compatibilitySummary: string;
+	strengths: string[];
+	gaps: string[];
+	interviewQuestions: string[];
+	interviewPreparation: string[];
+	oneWeekPlan: JobAnalysisOneWeekPlanDay[];
+}
+
+export const jobAnalyses = sqliteTable(
+	"job_analyses",
+	{
+		id: text("id").primaryKey(),
+		userId: text("user_id"),
+		status: text("status", {
+			enum: ["queued", "processing", "completed", "failed"],
+		}).notNull(),
+		jobSourceType: text("job_source_type", {
+			enum: ["url", "text"],
+		}).notNull(),
+		jobUrl: text("job_url"),
+		resumeText: text("resume_text").notNull(),
+		jobDescriptionInput: text("job_description_input"),
+		resolvedJobDescription: text("resolved_job_description"),
+		brightDataSnapshotId: text("brightdata_snapshot_id"),
+		brightDataRawPayload: text("brightdata_raw_payload", {
+			mode: "json",
+		}).$type<unknown>(),
+		resultData: text("result_data", { mode: "json" }).$type<JobAnalysisResultData>(),
+		compatibilityScore: integer("compatibility_score"),
+		modelProvider: text("model_provider"),
+		modelName: text("model_name"),
+		errorCode: text("error_code"),
+		errorMessage: text("error_message"),
+		createdAt: text("created_at")
+			.notNull()
+			.default(sql`(CURRENT_TIMESTAMP)`),
+		startedAt: text("started_at"),
+		completedAt: text("completed_at"),
+		updatedAt: text("updated_at")
+			.notNull()
+			.default(sql`(CURRENT_TIMESTAMP)`)
+			.$onUpdate(() => sql`(CURRENT_TIMESTAMP)`),
+	},
+	(table) => [
+		index("idx_job_analyses_user_id").on(table.userId),
+		index("idx_job_analyses_status").on(table.status),
+		index("idx_job_analyses_created_at").on(table.createdAt),
+	],
+);
+
 // Type inference exports
 export type Job = typeof jobs.$inferSelect;
 export type InsertJob = typeof jobs.$inferInsert;
@@ -230,6 +334,12 @@ export type UpdateJob = Partial<Omit<Job, "id">>;
 export type Transcription = typeof transcriptions.$inferSelect;
 export type InsertTranscription = typeof transcriptions.$inferInsert;
 export type UpdateTranscription = Partial<Omit<Transcription, "id">>;
+
+export type TranscriptionChunk = typeof transcriptionChunks.$inferSelect;
+export type InsertTranscriptionChunk = typeof transcriptionChunks.$inferInsert;
+export type UpdateTranscriptionChunk = Partial<
+	Omit<TranscriptionChunk, "id" | "transcriptionId" | "chunkIndex">
+>;
 
 export type TrialDailyUsage = typeof trialDailyUsage.$inferSelect;
 export type InsertTrialDailyUsage = typeof trialDailyUsage.$inferInsert;
@@ -248,12 +358,18 @@ export type UpdateUserEntitlement = Partial<Omit<UserEntitlement, "userId">>;
 export type BillingSubscription = typeof billingSubscriptions.$inferSelect;
 export type InsertBillingSubscription = typeof billingSubscriptions.$inferInsert;
 
+export type JobAnalysis = typeof jobAnalyses.$inferSelect;
+export type InsertJobAnalysis = typeof jobAnalyses.$inferInsert;
+export type UpdateJobAnalysis = Partial<Omit<JobAnalysis, "id">>;
+
 // Translations table - stores translated versions of transcriptions
 export const translations = sqliteTable(
 	"translations",
 	{
 		id: text("id").primaryKey(),
-		transcriptionId: text("transcription_id").notNull(),
+		transcriptionId: text("transcription_id")
+			.notNull()
+			.references(() => transcriptions.id, { onDelete: "cascade" }),
 		language: text("language").notNull(),
 		status: text("status", {
 			enum: ["pending", "processing", "completed", "failed"],

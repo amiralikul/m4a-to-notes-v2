@@ -1,29 +1,19 @@
-import { auth, currentUser } from "@clerk/nextjs/server";
-import { usersService } from "@/services";
-import { PRICING_PLANS } from "@/lib/pricing";
-import { PLAN_HIERARCHY } from "@/lib/constants/plans";
-import { getErrorMessage } from "@/lib/errors";
+import { currentUser } from "@clerk/nextjs/server";
+import { z } from "zod";
+import { route } from "@/lib/route";
+import { ValidationError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
+import { usersService } from "@/services";
+import { findPlanKeyByVariantId } from "@/lib/pricing";
+import { PLAN_HIERARCHY } from "@/lib/constants/plans";
 
-export async function POST(request: Request) {
-	const { userId } = await auth();
-	if (!userId) {
-		return Response.json({ error: "Unauthorized" }, { status: 401 });
-	}
-
-	try {
-		const { variantId, planKey } = (await request.json()) as {
-			variantId?: string;
-			planKey?: string;
-		};
-
-		if (!variantId) {
-			return Response.json(
-				{ error: "Variant ID is required" },
-				{ status: 400 },
-			);
-		}
-
+export const POST = route({
+	auth: "required",
+	body: z.object({
+		variantId: z.string(),
+		planKey: z.string().optional(),
+	}),
+	handler: async ({ userId, body }) => {
 		const apiKey = process.env.LEMONSQUEEZY_API_KEY;
 		const storeId = process.env.LEMONSQUEEZY_STORE_ID;
 
@@ -33,22 +23,18 @@ export async function POST(request: Request) {
 			);
 		}
 
-		// Pre-purchase validation
 		const entitlements = await usersService.getWithDefaults(userId);
-		let targetPlan = planKey;
-		if (!targetPlan) {
-			for (const [key, plan] of Object.entries(PRICING_PLANS)) {
-				if (plan.monthlyVariantId === variantId || plan.yearlyVariantId === variantId) {
-					targetPlan = key.toLowerCase();
-					break;
-				}
-			}
+		const derivedPlanKey = findPlanKeyByVariantId(body.variantId);
+		if (!derivedPlanKey) {
+			throw new ValidationError("Unknown plan/variant");
 		}
-
-			if (!targetPlan) {
-			return Response.json(
-				{ error: "Unknown plan/variant" },
-				{ status: 400 },
+		const targetPlan = derivedPlanKey.toLowerCase();
+		if (
+			body.planKey &&
+			body.planKey.toLowerCase() !== targetPlan
+		) {
+			throw new ValidationError(
+				"Provided planKey does not match selected variant",
 			);
 		}
 
@@ -58,10 +44,7 @@ export async function POST(request: Request) {
 		const currentPlan = entitlements.plan || "free";
 
 		if (hasActive && targetPlan === currentPlan) {
-			return Response.json(
-				{ error: "You already have this plan" },
-				{ status: 400 },
-			);
+			throw new ValidationError("You already have this plan");
 		}
 
 		if (
@@ -69,9 +52,8 @@ export async function POST(request: Request) {
 			(PLAN_HIERARCHY[targetPlan] ?? 0) <=
 				(PLAN_HIERARCHY[currentPlan] ?? 0)
 		) {
-			return Response.json(
-				{ error: "Cannot downgrade. Cancel current subscription first." },
-				{ status: 400 },
+			throw new ValidationError(
+				"Cannot downgrade. Cancel current subscription first.",
 			);
 		}
 
@@ -103,12 +85,12 @@ export async function POST(request: Request) {
 								embed: true,
 							},
 							...(process.env.NEXT_PUBLIC_APP_URL
-							? {
-									product_options: {
-										redirect_url: `${process.env.NEXT_PUBLIC_APP_URL}/checkout/success`,
-									},
-								}
-							: {}),
+								? {
+										product_options: {
+											redirect_url: `${process.env.NEXT_PUBLIC_APP_URL}/checkout/success`,
+										},
+									}
+								: {}),
 						},
 						relationships: {
 							store: {
@@ -120,7 +102,7 @@ export async function POST(request: Request) {
 							variant: {
 								data: {
 									type: "variants",
-									id: variantId,
+									id: body.variantId,
 								},
 							},
 						},
@@ -134,7 +116,7 @@ export async function POST(request: Request) {
 			logger.error("Lemon Squeezy checkout API error", {
 				status: response.status,
 				error: errorText,
-				variantId,
+				variantId: body.variantId,
 				storeId,
 			});
 			return Response.json(
@@ -147,18 +129,8 @@ export async function POST(request: Request) {
 			data: { attributes: { url: string } };
 		};
 
-		return Response.json({
+		return {
 			checkoutUrl: data.data.attributes.url,
-		});
-	} catch (error) {
-		logger.error("Failed to create checkout", {
-			userId,
-			error: getErrorMessage(error),
-		});
-
-		return Response.json(
-			{ error: "Failed to create checkout" },
-			{ status: 500 },
-		);
-	}
-}
+		};
+	},
+});

@@ -7,6 +7,7 @@ export class WorkflowService {
 
 	async startTranscription(transcriptionId: string) {
 		await inngest.send({
+			id: `transcription-requested-${transcriptionId}`,
 			name: INNGEST_EVENTS.TRANSCRIPTION_REQUESTED,
 			data: { transcriptionId },
 		});
@@ -38,6 +39,16 @@ export class WorkflowService {
 			translationId,
 			transcriptionId,
 			language,
+		});
+	}
+
+	async requestJobAnalysis(analysisId: string) {
+		await inngest.send({
+			name: INNGEST_EVENTS.JOB_ANALYSIS_REQUESTED,
+			data: { analysisId },
+		});
+		this.logger.info("Workflow: job analysis requested", {
+			analysisId,
 		});
 	}
 }

@@ -12,6 +12,7 @@ import {
 	RefreshCw,
 	Trash2,
 } from "lucide-react";
+import { AudioPlayer } from "@/components/audio-player";
 import { CopyButton } from "@/components/copy-button";
 import { useRef, useState } from "react";
 import Link from "next/link";
@@ -135,7 +136,7 @@ async function deleteTranscriptionApi(id: string): Promise<void> {
 }
 
 export default function DashboardPage() {
-	const { isLoaded, isSignedIn } = useUser();
+	const { isLoaded } = useUser();
 	const queryClient = useQueryClient();
 	const [expandedSummaryIds, setExpandedSummaryIds] = useState<Set<string>>(
 		new Set(),
@@ -229,8 +230,6 @@ export default function DashboardPage() {
 	});
 
 	const handleToggleSummary = (transcription: TranscriptionItem) => {
-		if (!isSignedIn) return;
-
 		const id = transcription.id;
 		setExpandedSummaryIds((prev) => {
 			const next = new Set(prev);
@@ -244,7 +243,6 @@ export default function DashboardPage() {
 	};
 
 	const renderSummarySection = (transcription: TranscriptionItem) => {
-		if (!isSignedIn) return null;
 		if (!expandedSummaryIds.has(transcription.id)) return null;
 
 		return <SummarySection transcription={transcription} />;
@@ -347,7 +345,7 @@ export default function DashboardPage() {
 													t.status === "pending") &&
 													` ${t.progress}%`}
 											</Badge>
-											{isSignedIn && t.status === "completed" && (
+											{t.status === "completed" && (
 												<Badge
 													className={
 														summaryStatusConfig[
@@ -380,10 +378,15 @@ export default function DashboardPage() {
 												{t.preview}
 											</p>
 										)}
+										{t.audioKey && (
+											<div className="mt-3">
+												<AudioPlayer src={t.audioKey} />
+											</div>
+										)}
 									</div>
 
 										<div className="flex items-center gap-2 shrink-0">
-											{isSignedIn && t.status === "completed" && (
+											{t.status === "completed" && (
 												<Button variant="outline" size="sm" asChild>
 													<Link href={`/dashboard/${t.id}`}>
 														<ExternalLink className="w-4 h-4 mr-1" />
@@ -391,7 +394,7 @@ export default function DashboardPage() {
 													</Link>
 												</Button>
 											)}
-											{isSignedIn && t.status === "completed" && (
+											{t.status === "completed" && (
 												<Button
 													variant="outline"
 													size="sm"

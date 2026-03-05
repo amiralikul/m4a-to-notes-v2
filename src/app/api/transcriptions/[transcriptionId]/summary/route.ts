@@ -1,39 +1,29 @@
-import { auth } from "@clerk/nextjs/server";
+import { z } from "zod";
+import { route, type OwnerIdentity } from "@/lib/route";
+import { NotFoundError } from "@/lib/errors";
 import { transcriptionsService } from "@/services";
-import { getErrorMessage } from "@/lib/errors";
-import { logger } from "@/lib/logger";
 
-export async function GET(
-	_request: Request,
-	{ params }: { params: Promise<{ transcriptionId: string }> },
-) {
-	const { userId } = await auth();
-	if (!userId) {
-		return Response.json({ error: "Unauthorized" }, { status: 401 });
-	}
+export const GET = route({
+	auth: "optional",
+	params: z.object({ transcriptionId: z.string() }),
+	handler: async ({ userId, actorId, params }) => {
+		const transcription = await transcriptionsService.findByIdForOwner(
+			params.transcriptionId,
+			{ userId, actorId } as OwnerIdentity,
+		);
 
-	let transcriptionId: string | undefined;
-	try {
-		const resolvedParams = await params;
-		transcriptionId = resolvedParams.transcriptionId;
-		const transcription =
-			await transcriptionsService.findById(transcriptionId);
-
-		if (!transcription || transcription.userId !== userId) {
-			return Response.json(
-				{ error: "Transcription not found" },
-				{ status: 404 },
-			);
+		if (!transcription) {
+			throw new NotFoundError("Transcription not found");
 		}
 
-		if (!transcription.summaryStatus || transcription.summaryStatus === "pending") {
-			return Response.json(
-				{ error: "Summary not yet available" },
-				{ status: 404 },
-			);
+		if (
+			!transcription.summaryStatus ||
+			transcription.summaryStatus === "pending"
+		) {
+			throw new NotFoundError("Summary not yet available");
 		}
 
-		return Response.json({
+		return {
 			transcriptionId: transcription.id,
 			summaryStatus: transcription.summaryStatus,
 			summaryData: transcription.summaryData,
@@ -41,16 +31,6 @@ export async function GET(
 			summaryProvider: transcription.summaryProvider,
 			summaryModel: transcription.summaryModel,
 			summaryUpdatedAt: transcription.summaryUpdatedAt,
-		});
-	} catch (error) {
-		logger.error("Failed to fetch summary", {
-			userId,
-			transcriptionId,
-			error: getErrorMessage(error),
-		});
-		return Response.json(
-			{ error: "Failed to fetch summary" },
-			{ status: 500 },
-		);
-	}
-}
+		};
+	},
+});

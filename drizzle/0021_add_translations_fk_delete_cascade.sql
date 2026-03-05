@@ -1,0 +1,1 @@
+ALTER TABLE `translations` ALTER COLUMN "transcription_id" TO "transcription_id" text NOT NULL REFERENCES transcriptions(id) ON DELETE cascade ON UPDATE no action;

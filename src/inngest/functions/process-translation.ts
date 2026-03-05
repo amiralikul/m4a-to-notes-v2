@@ -2,7 +2,7 @@ import { NonRetriableError } from "inngest";
 import { inngest } from "../client";
 import { INNGEST_EVENTS } from "../events";
 import {
-	aiService,
+	textAiService,
 	transcriptionsService,
 	translationsService,
 } from "@/services";
@@ -101,13 +101,16 @@ export const processTranslation = inngest.createFunction(
 			SUPPORTED_LANGUAGES[language as LanguageCode] || language;
 
 		const translatedText = await step.run("translate-text", async () => {
-			return aiService.translateText(fetchResult.transcriptText, languageName);
+			return textAiService.translateText(
+				fetchResult.transcriptText,
+				languageName,
+			);
 		});
 
 		const translatedSummary = await step.run(
 			"translate-summary",
 			async () => {
-				return aiService.translateSummary(
+				return textAiService.translateSummary(
 					fetchResult.summaryData,
 					languageName,
 				);

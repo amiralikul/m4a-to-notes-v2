@@ -1,46 +1,42 @@
-import { auth } from "@clerk/nextjs/server";
-import { resolveActorIdentity } from "@/lib/trial-identity";
-import { actorsService, transcriptionsService } from "@/services";
+import { z } from "zod";
+import { route, type OwnerIdentity } from "@/lib/route";
+import { NotFoundError } from "@/lib/errors";
+import { transcriptionsService } from "@/services";
 
-export async function GET(
-	_request: Request,
-	{ params }: { params: Promise<{ transcriptionId: string }> },
-) {
-	const { userId } = await auth();
-	const actorId = userId ? null : (await resolveActorIdentity()).actorId;
-	if (actorId) {
-		await actorsService.ensureActor(actorId);
-	}
+function sanitizeDownloadFilename(filename: string): string {
+	const withoutExtension = filename.replace(/\.[^.]+$/, "");
+	const basename = withoutExtension.split(/[\\/]/).pop() ?? "";
+	const sanitized = basename
+		.replace(/[\r\n"]/g, "")
+		.replace(/[^a-zA-Z0-9._-]+/g, "_")
+		.replace(/^_+|_+$/g, "")
+		.slice(0, 120);
 
-	const { transcriptionId } = await params;
-	const transcription =
-		await transcriptionsService.findById(transcriptionId);
-	const transcriptionActorId =
-		typeof transcription?.ownerId === "string"
-			? transcription.ownerId
-			: null;
-	const isOwner = userId
-		? transcription?.userId === userId
-		: transcriptionActorId === actorId;
-
-	if (!transcription || !isOwner) {
-		return Response.json(
-			{ error: "Transcription not found" },
-			{ status: 404 },
-		);
-	}
-
-	if (!transcription.transcriptText) {
-		return Response.json(
-			{ error: "Transcript not yet available" },
-			{ status: 404 },
-		);
-	}
-
-	return new Response(transcription.transcriptText, {
-		headers: {
-			"Content-Type": "text/plain; charset=utf-8",
-			"Content-Disposition": `attachment; filename="${transcription.filename.replace(/\.[^.]+$/, "")}.txt"`,
-		},
-	});
+	return sanitized || "transcript";
 }
+
+export const GET = route({
+	auth: "optional",
+	params: z.object({ transcriptionId: z.string() }),
+	handler: async ({ userId, actorId, params }) => {
+		const transcription = await transcriptionsService.findByIdForOwner(
+			params.transcriptionId,
+			{ userId, actorId } as OwnerIdentity,
+		);
+
+		if (!transcription) throw new NotFoundError("Transcription not found");
+
+		if (!transcription.transcriptText) {
+			throw new NotFoundError("Transcript not yet available");
+		}
+
+		const safeFilename = sanitizeDownloadFilename(transcription.filename);
+
+		return new Response(transcription.transcriptText, {
+			headers: {
+				"Content-Type": "text/plain; charset=utf-8",
+				"Content-Disposition": `attachment; filename="${safeFilename}.txt"`,
+			},
+		});
+	},
+});
