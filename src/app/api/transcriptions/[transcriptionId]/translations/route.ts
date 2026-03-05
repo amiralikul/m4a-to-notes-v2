@@ -88,10 +88,24 @@ export const POST = route({
 			await translationsService.resetForRetry(existing.id);
 			translationId = existing.id;
 		} else {
-			translationId = await translationsService.create(
-				params.transcriptionId,
-				body.language,
-			);
+			try {
+				translationId = await translationsService.create(
+					params.transcriptionId,
+					body.language,
+				);
+			} catch {
+				// Concurrent request may have inserted between our check and insert.
+				// Re-fetch and return the existing translation.
+				const raced =
+					await translationsService.findByTranscriptionAndLanguage(
+						params.transcriptionId,
+						body.language,
+					);
+				if (raced) {
+					return { translation: raced };
+				}
+				throw new Error("Failed to create translation");
+			}
 		}
 
 		await workflowService.requestTranslation(
