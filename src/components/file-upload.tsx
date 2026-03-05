@@ -11,6 +11,7 @@ import {
 	Download,
 	FileAudio,
 	Loader2,
+	Play,
 	RotateCcw,
 	Trash2,
 	Upload,
@@ -31,6 +32,14 @@ import { AudioPlayer } from "@/components/audio-player";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 
 interface UploadedFile {
 	id: string;
@@ -170,6 +179,8 @@ export default function FileUpload({
 	const [historyActionError, setHistoryActionError] = useState<string | null>(
 		null,
 	);
+	const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+	const [dialogOpen, setDialogOpen] = useState(false);
 	const [enableDiarization, setEnableDiarization] = useState(false);
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const abortControllerRef = useRef<AbortController | null>(null);
@@ -223,13 +234,8 @@ export default function FileUpload({
 			return false;
 		}
 
-		if (file.size > AUDIO_LIMITS.MAX_FILE_SIZE && enableDiarization) {
-			alert("Speaker diarization is supported only for files up to 100MB.");
-			return false;
-		}
-
 		return true;
-	}, [enableDiarization]);
+	}, []);
 
 	const formatFileSize = (bytes: number) => {
 		if (bytes === 0) return "0 Bytes";
@@ -643,26 +649,46 @@ export default function FileUpload({
 			],
 		);
 
+	const pendingFile = pendingFiles[0] ?? null;
+
+	const startTranscription = useCallback(() => {
+		if (!pendingFile) return;
+
+		const file = pendingFile;
+		const fileId = Math.random().toString(36).substr(2, 9);
+		const uploadedFile: UploadedFile = {
+			file,
+			id: fileId,
+			status: "uploading",
+			progress: 0,
+		};
+
+		setUploadedFiles((prev) => [...prev, uploadedFile]);
+		processFileWithAPI(fileId, file);
+
+		setPendingFiles((prev) => {
+			const remaining = prev.slice(1);
+			if (remaining.length === 0) {
+				setDialogOpen(false);
+			} else {
+				setEnableDiarization(false);
+			}
+			return remaining;
+		});
+	}, [pendingFile, processFileWithAPI]);
+
 	const processFiles = useCallback(
 		(files: FileList) => {
-			const fileArray = Array.from(files);
+			const validFiles = Array.from(files).filter((file) =>
+				validateFile(file),
+			);
+			if (validFiles.length === 0) return;
 
-			for (const file of fileArray) {
-				if (validateFile(file)) {
-					const fileId = Math.random().toString(36).substr(2, 9);
-					const uploadedFile: UploadedFile = {
-						file,
-						id: fileId,
-						status: "uploading",
-						progress: 0,
-					};
-
-					setUploadedFiles((prev) => [...prev, uploadedFile]);
-					processFileWithAPI(fileId, file);
-				}
-			}
+			setPendingFiles(validFiles);
+			setEnableDiarization(false);
+			setDialogOpen(true);
 		},
-		[validateFile, processFileWithAPI],
+		[validateFile],
 	);
 
 	const handleDrop = useCallback(
@@ -856,27 +882,16 @@ export default function FileUpload({
 
 					<h3 className="text-2xl font-semibold mb-3 text-stone-900">
 						{isDragOver
-							? "Drop your audio files here"
-							: "Upload Audio Files"}
+							? "Drop your audio file here"
+							: "Upload Audio File"}
 					</h3>
 
 					<p className="text-stone-500 mb-8 max-w-lg leading-relaxed text-lg">
-						Drag and drop your audio files here, or click to browse
-						and select files from your device. Supported formats:
+						Drag and drop your audio file here, or click to browse
+						and select a file from your device. Supported formats:
 						{" "}
 						{SUPPORTED_AUDIO_FORMATS_TEXT}.
 					</p>
-
-					<label className="flex items-center gap-2 mb-6 cursor-pointer select-none text-sm text-stone-600 hover:text-stone-800 transition-colors">
-						<input
-							type="checkbox"
-							checked={enableDiarization}
-							onChange={(e) => setEnableDiarization(e.target.checked)}
-							className="h-4 w-4 rounded border-stone-300 text-amber-500 focus:ring-amber-500"
-						/>
-						<Users className="w-4 h-4" />
-						Identify Speakers
-					</label>
 
 					<Button
 						onClick={() => fileInputRef.current?.click()}
@@ -884,7 +899,7 @@ export default function FileUpload({
 						className="mb-8 h-12 px-8 bg-amber-500 hover:bg-amber-600 text-stone-950 font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all"
 					>
 						<Upload className="mr-3 h-5 w-5" />
-						Choose Files
+						Choose File
 					</Button>
 
 					<div className="flex flex-wrap justify-center gap-3 text-sm">
@@ -902,25 +917,98 @@ export default function FileUpload({
 							<CheckCircle className="w-3 h-3 mr-2" />
 							Max {formatFileSize(maxUploadSizeBytes)} per file
 						</Badge>
-						<Badge
-							variant="outline"
-							className="bg-white border-stone-200 text-stone-600 px-4 py-2"
-						>
-							<Upload className="w-3 h-3 mr-2" />
-							Multiple files supported
-						</Badge>
 					</div>
 
 					<input
 						ref={fileInputRef}
 						type="file"
-						accept={AUDIO_LIMITS.VALID_EXTENSIONS.join(",")}
 						multiple
+						accept={AUDIO_LIMITS.VALID_EXTENSIONS.join(",")}
 						onChange={handleFileSelect}
 						className="sr-only"
 					/>
 				</CardContent>
 			</Card>
+
+			{/* Upload Settings Dialog */}
+			<Dialog open={dialogOpen} onOpenChange={(open) => {
+				setDialogOpen(open);
+				if (!open) setPendingFiles([]);
+			}}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>
+							Start Transcription
+							{pendingFiles.length > 1 && (
+								<span className="text-sm font-normal text-stone-500 ml-2">
+									(1 of {pendingFiles.length})
+								</span>
+							)}
+						</DialogTitle>
+						<DialogDescription>
+							Configure settings for your transcription.
+						</DialogDescription>
+					</DialogHeader>
+
+					{pendingFile && (
+						<div className="space-y-4">
+							<div className="flex items-center gap-3 p-3 bg-stone-50 rounded-lg border border-stone-200">
+								<FileAudio className="h-5 w-5 text-amber-500 shrink-0" />
+								<div className="min-w-0 flex-1">
+									<p className="font-medium text-stone-900 truncate">
+										{pendingFile.name}
+									</p>
+									<p className="text-sm text-stone-500">
+										{formatFileSize(pendingFile.size)}
+									</p>
+								</div>
+							</div>
+
+							<label className="flex items-center gap-3 p-3 rounded-lg border border-stone-200 cursor-pointer select-none hover:bg-stone-50 transition-colors">
+								<input
+									type="checkbox"
+									checked={enableDiarization}
+									onChange={(e) => setEnableDiarization(e.target.checked)}
+									disabled={pendingFile.size > AUDIO_LIMITS.MAX_FILE_SIZE}
+									aria-describedby={pendingFile.size > AUDIO_LIMITS.MAX_FILE_SIZE ? "diarization-hint" : undefined}
+									className="h-4 w-4 rounded border-stone-300 text-amber-500 focus:ring-amber-500"
+								/>
+								<Users className="w-4 h-4 text-stone-600" />
+								<div>
+									<p className="text-sm font-medium text-stone-900">
+										Identify Speakers
+									</p>
+									{pendingFile.size > AUDIO_LIMITS.MAX_FILE_SIZE && (
+										<p id="diarization-hint" className="text-xs text-stone-500">
+											Not available for files over 100MB
+										</p>
+									)}
+								</div>
+							</label>
+						</div>
+					)}
+
+					<DialogFooter>
+						<Button
+							variant="outline"
+							onClick={() => {
+								setDialogOpen(false);
+								setPendingFiles([]);
+							}}
+						>
+							Cancel
+						</Button>
+						<Button
+							onClick={startTranscription}
+							disabled={!pendingFile}
+							className="bg-amber-500 hover:bg-amber-600 text-stone-950 font-semibold"
+						>
+							<Play className="w-4 h-4 mr-2" />
+							{pendingFiles.length > 1 ? "Start & Next" : "Start"}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 
 			{/* Uploaded Files */}
 			{uploadedFiles.length > 0 && (
