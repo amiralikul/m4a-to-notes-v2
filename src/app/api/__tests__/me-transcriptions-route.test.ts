@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { auth } from "@clerk/nextjs/server";
 import { resolveActorIdentity } from "@/lib/trial-identity";
-import { actorsService, transcriptionsService } from "@/services";
+import { actorsService, transcriptionsService, translationsService } from "@/services";
 import { GET as listTranscriptions } from "@/app/api/me/transcriptions/route";
 
 vi.mock("@clerk/nextjs/server", () => ({
@@ -23,6 +23,9 @@ vi.mock("@/services", () => ({
 		countByUserId: vi.fn(),
 		findByActorId: vi.fn(),
 		countByActorId: vi.fn(),
+	},
+	translationsService: {
+		countByTranscriptionIds: vi.fn().mockResolvedValue(new Map()),
 	},
 }));
 
