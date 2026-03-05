@@ -179,7 +179,7 @@ export default function FileUpload({
 	const [historyActionError, setHistoryActionError] = useState<string | null>(
 		null,
 	);
-	const [pendingFile, setPendingFile] = useState<File | null>(null);
+	const [pendingFiles, setPendingFiles] = useState<File[]>([]);
 	const [dialogOpen, setDialogOpen] = useState(false);
 	const [enableDiarization, setEnableDiarization] = useState(false);
 	const fileInputRef = useRef<HTMLInputElement>(null);
@@ -649,6 +649,8 @@ export default function FileUpload({
 			],
 		);
 
+	const pendingFile = pendingFiles[0] ?? null;
+
 	const startTranscription = useCallback(() => {
 		if (!pendingFile) return;
 
@@ -663,20 +665,28 @@ export default function FileUpload({
 
 		setUploadedFiles((prev) => [...prev, uploadedFile]);
 		processFileWithAPI(fileId, file);
-		setPendingFile(null);
-		setDialogOpen(false);
+
+		setPendingFiles((prev) => {
+			const remaining = prev.slice(1);
+			if (remaining.length === 0) {
+				setDialogOpen(false);
+			} else {
+				setEnableDiarization(false);
+			}
+			return remaining;
+		});
 	}, [pendingFile, processFileWithAPI]);
 
 	const processFiles = useCallback(
 		(files: FileList) => {
-			const file = files[0];
-			if (!file) return;
+			const validFiles = Array.from(files).filter((file) =>
+				validateFile(file),
+			);
+			if (validFiles.length === 0) return;
 
-			if (validateFile(file)) {
-				setPendingFile(file);
-				setEnableDiarization(false);
-				setDialogOpen(true);
-			}
+			setPendingFiles(validFiles);
+			setEnableDiarization(false);
+			setDialogOpen(true);
 		},
 		[validateFile],
 	);
@@ -912,6 +922,7 @@ export default function FileUpload({
 					<input
 						ref={fileInputRef}
 						type="file"
+						multiple
 						accept={AUDIO_LIMITS.VALID_EXTENSIONS.join(",")}
 						onChange={handleFileSelect}
 						className="sr-only"
@@ -922,11 +933,18 @@ export default function FileUpload({
 			{/* Upload Settings Dialog */}
 			<Dialog open={dialogOpen} onOpenChange={(open) => {
 				setDialogOpen(open);
-				if (!open) setPendingFile(null);
+				if (!open) setPendingFiles([]);
 			}}>
 				<DialogContent>
 					<DialogHeader>
-						<DialogTitle>Start Transcription</DialogTitle>
+						<DialogTitle>
+							Start Transcription
+							{pendingFiles.length > 1 && (
+								<span className="text-sm font-normal text-stone-500 ml-2">
+									(1 of {pendingFiles.length})
+								</span>
+							)}
+						</DialogTitle>
 						<DialogDescription>
 							Configure settings for your transcription.
 						</DialogDescription>
@@ -975,7 +993,7 @@ export default function FileUpload({
 							variant="outline"
 							onClick={() => {
 								setDialogOpen(false);
-								setPendingFile(null);
+								setPendingFiles([]);
 							}}
 						>
 							Cancel
@@ -986,7 +1004,7 @@ export default function FileUpload({
 							className="bg-amber-500 hover:bg-amber-600 text-stone-950 font-semibold"
 						>
 							<Play className="w-4 h-4 mr-2" />
-							Start
+							{pendingFiles.length > 1 ? "Start & Next" : "Start"}
 						</Button>
 					</DialogFooter>
 				</DialogContent>
