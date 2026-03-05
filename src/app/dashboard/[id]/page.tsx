@@ -7,6 +7,7 @@ import {
 	FileText,
 	Globe,
 	Loader2,
+	RefreshCw,
 	Trash2,
 	Users,
 } from "lucide-react";
@@ -261,9 +262,13 @@ export default function TranscriptionDetailPage() {
 		transcription.status === "completed" &&
 		transcription.summaryStatus === "completed";
 
-	const existingLanguages = new Set(translations.map((t) => t.language));
+	const nonFailedLanguages = new Set(
+		translations
+			.filter((t) => t.status !== "failed")
+			.map((t) => t.language),
+	);
 	const availableLanguages = Object.entries(SUPPORTED_LANGUAGES).filter(
-		([code]) => !existingLanguages.has(code),
+		([code]) => !nonFailedLanguages.has(code),
 	);
 
 	const displayData = viewingTranslation
@@ -563,6 +568,23 @@ export default function TranscriptionDetailPage() {
 													{viewingTranslation?.id === t.id
 														? "Show Original"
 														: "View"}
+												</Button>
+											)}
+											{t.status === "failed" && (
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={() =>
+														translateMutation.mutate(t.language)
+													}
+													disabled={translateMutation.isPending}
+												>
+													{translateMutation.isPending ? (
+														<Loader2 className="w-4 h-4 animate-spin mr-1" />
+													) : (
+														<RefreshCw className="w-4 h-4 mr-1" />
+													)}
+													Retry
 												</Button>
 											)}
 											{t.status === "processing" ||

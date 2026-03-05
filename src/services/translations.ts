@@ -170,6 +170,27 @@ export class TranslationsService {
 		}
 	}
 
+	async resetForRetry(translationId: string): Promise<void> {
+		try {
+			await this.db
+				.update(translations)
+				.set({
+					status: TranslationStatus.PENDING,
+					errorDetails: null,
+					updatedAt: new Date().toISOString(),
+				})
+				.where(eq(translations.id, translationId));
+
+			this.logger.info("Translation reset for retry", { translationId });
+		} catch (error) {
+			this.logger.error("Failed to reset translation for retry", {
+				translationId,
+				error: getErrorMessage(error),
+			});
+			throw error;
+		}
+	}
+
 	async markFailed(
 		translationId: string,
 		code: string,
