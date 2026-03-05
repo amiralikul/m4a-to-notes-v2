@@ -96,12 +96,15 @@ export const POST = route({
 						body.language,
 					);
 				if (existing) {
-					const shouldReturnExisting =
+					if (
 						existing.status === TranslationStatus.PROCESSING ||
-						existing.status === TranslationStatus.COMPLETED;
-
-					if (shouldReturnExisting) {
+						existing.status === TranslationStatus.COMPLETED
+					) {
 						return { translation: existing };
+					}
+
+					if (existing.status === TranslationStatus.FAILED) {
+						await translationsService.resetForRetry(existing.id);
 					}
 
 					translationId = existing.id;
