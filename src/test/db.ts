@@ -117,16 +117,6 @@ export function createTestDb() {
 		CREATE UNIQUE INDEX IF NOT EXISTS idx_actors_user_id ON actors(user_id);
 		CREATE INDEX IF NOT EXISTS idx_actors_last_seen_at ON actors(last_seen_at);
 
-		CREATE TABLE IF NOT EXISTS conversations (
-			chat_id TEXT PRIMARY KEY NOT NULL,
-			data TEXT NOT NULL,
-			created_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
-			updated_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
-			expires_at TEXT NOT NULL
-		);
-
-		CREATE INDEX IF NOT EXISTS idx_conversations_expires_at ON conversations(expires_at);
-
 		CREATE TABLE IF NOT EXISTS user_entitlements (
 			user_id TEXT PRIMARY KEY NOT NULL,
 			plan TEXT,

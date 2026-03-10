@@ -162,6 +162,13 @@
       "when": 1772814315915,
       "tag": "0022_add_content_type_column",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1773156322752,
+      "tag": "0023_drop_conversations_table",
+      "breakpoints": true
     }
   ]
 }

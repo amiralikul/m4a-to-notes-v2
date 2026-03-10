@@ -26,10 +26,6 @@ vi.mock("@/services", () => ({
 	},
 }));
 
-vi.mock("@/services/telegram", () => ({
-	sendTelegramMessage: vi.fn(),
-}));
-
 vi.mock("@/lib/logger", () => ({
 	logger: {
 		info: vi.fn(),
@@ -46,7 +42,6 @@ import {
 	assemblyAiService,
 } from "@/services";
 import { INNGEST_EVENTS } from "@/inngest/events";
-import { sendTelegramMessage } from "@/services/telegram";
 
 const mockSendEvent = vi.fn();
 
@@ -173,70 +168,6 @@ describe("process-transcription Inngest function", () => {
 			status: "skipped",
 			transcriptionId: "tx-3",
 		});
-	});
-
-	it("sends Telegram notification for telegram-source transcription", async () => {
-		const mockTranscription = {
-			id: "tx-4",
-			status: "pending",
-			audioKey: "https://blob.vercel/telegram.m4a",
-			filename: "voice.m4a",
-			source: "telegram",
-			userMetadata: { chatId: "12345" },
-		};
-
-		vi.mocked(transcriptionsService.findById).mockResolvedValue(
-			mockTranscription as unknown as Awaited<ReturnType<typeof transcriptionsService.findById>>,
-		);
-		vi.mocked(transcriptionAiService.transcribeAudioFromUrl).mockResolvedValue(
-			"Telegram transcript text",
-		);
-		vi.mocked(transcriptionsService.markStarted).mockResolvedValue({} as never);
-		vi.mocked(transcriptionsService.updateProgress).mockResolvedValue({} as never);
-		vi.mocked(transcriptionsService.markCompleted).mockResolvedValue({} as never);
-
-		process.env.TELEGRAM_BOT_TOKEN = "test-bot-token";
-
-		const result = await runProcessTranscription("tx-4");
-
-		expect(result).toEqual({
-			status: "completed",
-			transcriptionId: "tx-4",
-			transcriptionLength: 24,
-		});
-
-		expect(sendTelegramMessage).toHaveBeenCalledWith(
-			"12345",
-			"Telegram transcript text",
-			"test-bot-token",
-		);
-
-		delete process.env.TELEGRAM_BOT_TOKEN;
-	});
-
-	it("does NOT send Telegram notification for web-source transcription", async () => {
-		const mockTranscription = {
-			id: "tx-5",
-			status: "pending",
-			audioKey: "https://blob.vercel/web.m4a",
-			filename: "web.m4a",
-			source: "web",
-			userMetadata: { userId: "user_1" },
-		};
-
-		vi.mocked(transcriptionsService.findById).mockResolvedValue(
-			mockTranscription as unknown as Awaited<ReturnType<typeof transcriptionsService.findById>>,
-		);
-		vi.mocked(transcriptionAiService.transcribeAudioFromUrl).mockResolvedValue(
-			"Web transcript",
-		);
-		vi.mocked(transcriptionsService.markStarted).mockResolvedValue({} as never);
-		vi.mocked(transcriptionsService.updateProgress).mockResolvedValue({} as never);
-		vi.mocked(transcriptionsService.markCompleted).mockResolvedValue({} as never);
-
-		await runProcessTranscription("tx-5");
-
-		expect(sendTelegramMessage).not.toHaveBeenCalled();
 	});
 
 	it("does not delete audio blob after transcription (kept for dashboard)", async () => {

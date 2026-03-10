@@ -42,18 +42,6 @@ describe("TranscriptionsService", () => {
 			expect(transcription!.summaryStatus).toBeNull();
 		});
 
-		it("creates a telegram-source transcription", async () => {
-			const id = await service.create({
-				audioKey: "blob://telegram-audio.m4a",
-				filename: "voice.m4a",
-				source: "telegram",
-				userMetadata: { chatId: "12345" },
-			});
-
-			const transcription = await service.findById(id);
-			expect(transcription!.source).toBe("telegram");
-			expect(transcription!.userMetadata).toEqual({ chatId: "12345" });
-		});
 	});
 
 	describe("findById", () => {

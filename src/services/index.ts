@@ -2,7 +2,6 @@ import { db } from "@/db";
 import { logger } from "@/lib/logger";
 import { TranscriptionsService } from "./transcriptions";
 import { UsersService } from "./users";
-import { ConversationService } from "./conversation";
 import { StorageService } from "./storage";
 import { WorkflowService } from "./workflow";
 import { TrialUsageService } from "./trial-usage";
@@ -24,7 +23,6 @@ import { TranscriptionChunksService } from "./transcription-chunks";
 export const transcriptionsService = new TranscriptionsService(db, logger);
 export const transcriptionChunksService = new TranscriptionChunksService(db, logger);
 export const usersService = new UsersService(db, logger);
-export const conversationService = new ConversationService(db, logger);
 
 const transcriptionProvider = parseTranscriptionProvider(
 	process.env.TRANSCRIPTION_PROVIDER,
