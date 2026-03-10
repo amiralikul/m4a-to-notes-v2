@@ -168,26 +168,6 @@ export const actors = sqliteTable(
 	],
 );
 
-// Conversations table
-export const conversations = sqliteTable(
-	"conversations",
-	{
-		chatId: text("chat_id").primaryKey(),
-		data: text("data", { mode: "json" })
-			.$type<ConversationData>()
-			.notNull(),
-		createdAt: text("created_at")
-			.notNull()
-			.default(sql`(CURRENT_TIMESTAMP)`),
-		updatedAt: text("updated_at")
-			.notNull()
-			.default(sql`(CURRENT_TIMESTAMP)`)
-			.$onUpdate(() => sql`(CURRENT_TIMESTAMP)`),
-		expiresAt: text("expires_at").notNull(),
-	},
-	(table) => [index("idx_conversations_expires_at").on(table.expiresAt)],
-);
-
 // User entitlements table
 export const userEntitlements = sqliteTable("user_entitlements", {
 	userId: text("user_id").primaryKey(),
@@ -235,19 +215,6 @@ export const billingSubscriptions = sqliteTable(
 		index("idx_billing_subs_user_id").on(table.userId),
 	],
 );
-
-// Type definitions for conversation data
-export interface ConversationData {
-	messages: Array<{
-		id: string;
-		type: "transcription" | "user_message" | "bot_response";
-		content: string;
-		audioFileId?: string;
-		timestamp: string;
-	}>;
-	createdAt: string;
-	updatedAt: string;
-}
 
 export interface DiarizationSegment {
 	speaker: string;   // "A", "B", etc.
@@ -377,10 +344,6 @@ export type InsertTrialDailyUsage = typeof trialDailyUsage.$inferInsert;
 
 export type Actor = typeof actors.$inferSelect;
 export type InsertActor = typeof actors.$inferInsert;
-
-export type Conversation = typeof conversations.$inferSelect;
-export type InsertConversation = typeof conversations.$inferInsert;
-export type UpdateConversation = Partial<Omit<Conversation, "chatId">>;
 
 export type UserEntitlement = typeof userEntitlements.$inferSelect;
 export type InsertUserEntitlement = typeof userEntitlements.$inferInsert;

@@ -33,7 +33,6 @@ export type SummaryStatusType =
 
 export const TranscriptionSource = {
 	WEB: "web",
-	TELEGRAM: "telegram",
 } as const;
 
 export type TranscriptionSourceType =
