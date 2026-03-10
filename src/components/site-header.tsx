@@ -49,13 +49,15 @@ export function SiteHeader() {
 					</span>
 				</Link>
 
-					<nav className="hidden md:flex flex-1 items-center gap-8 justify-start ml-10">
-						{isAdmin && <Link
+				<nav className="hidden md:flex flex-1 items-center gap-8 justify-start ml-10">
+					{isAdmin && (
+						<Link
 							href="/job-match"
 							className="text-sm text-stone-500 hover:text-stone-900 transition-colors"
 						>
 							Job Match
-						</Link> }
+						</Link>
+					)}
 					<Link
 						href="/features"
 						className="text-sm text-stone-500 hover:text-stone-900 transition-colors"
@@ -82,13 +84,15 @@ export function SiteHeader() {
 					</Link>
 				</nav>
 
-					<div className="ml-auto flex items-center gap-4">
-						{isAdmin &&  <Link
+				<div className="ml-auto flex items-center gap-4">
+					{isAdmin && (
+						<Link
 							href="/job-match"
 							className="text-sm text-stone-500 hover:text-stone-900 transition-colors"
 						>
 							Job Match
-					</Link> }
+						</Link>
+					)}
 					<Link
 						href="/dashboard"
 						className="text-sm text-stone-500 hover:text-stone-900 transition-colors"

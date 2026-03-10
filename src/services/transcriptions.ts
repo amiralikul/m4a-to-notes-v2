@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, count, desc, eq, isNull } from "drizzle-orm";
 import type {
 	DiarizationSegment,
 	InsertTranscription,
@@ -7,7 +7,7 @@ import type {
 	UpdateTranscription,
 } from "@/db/schema";
 import { transcriptions } from "@/db/schema";
-import type { AppDatabase } from "@/db/types";
+import type { AppDatabase, ProductionDatabase } from "@/db/types";
 import { getErrorMessage } from "@/lib/errors";
 import type { Logger } from "@/lib/logger";
 import type { OwnerIdentity } from "@/lib/route";
@@ -389,11 +389,11 @@ export class TranscriptionsService {
 
 	async countByUserId(userId: string): Promise<number> {
 		try {
-			const result = await this.db
-				.select()
+			const result = await (this.db as ProductionDatabase)
+				.select({ count: count() })
 				.from(transcriptions)
 				.where(eq(transcriptions.userId, userId));
-			return result.length;
+			return result[0]?.count ?? 0;
 		} catch (error) {
 			this.logger.error("Failed to count transcriptions by userId", {
 				userId,
@@ -405,8 +405,8 @@ export class TranscriptionsService {
 
 	async countByActorId(actorId: string): Promise<number> {
 		try {
-			const result = await this.db
-				.select()
+			const result = await (this.db as ProductionDatabase)
+				.select({ count: count() })
 				.from(transcriptions)
 				.where(
 					and(
@@ -414,7 +414,7 @@ export class TranscriptionsService {
 						eq(transcriptions.ownerId, actorId),
 					),
 				);
-			return result.length;
+			return result[0]?.count ?? 0;
 		} catch (error) {
 			this.logger.error("Failed to count transcriptions by actorId", {
 				actorId,

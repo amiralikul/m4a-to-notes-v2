@@ -136,10 +136,6 @@ export default function CookiePolicyPage() {
 										subscription management
 									</li>
 									<li>
-										<strong>Better Auth:</strong> User authentication and account
-										management
-									</li>
-									<li>
 										<strong>Analytics Services:</strong> To understand usage
 										patterns and improve our service
 									</li>
@@ -215,7 +211,7 @@ export default function CookiePolicyPage() {
 									<p className="text-sm text-gray-500 text-center">
 										This Cookie Policy complements our Privacy Policy and
 										Terms of Service, working together with Lemon Squeezy payment
-										processing and Better Auth authentication services.
+										processing and our built-in authentication system.
 									</p>
 								</div>
 							</div>

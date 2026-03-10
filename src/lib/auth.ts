@@ -34,4 +34,4 @@ export const auth = betterAuth({
 		: {}),
 });
 
-export type AuthSession = typeof auth.$Infer.Session;
+export type BetterAuthSession = typeof auth.$Infer.Session;

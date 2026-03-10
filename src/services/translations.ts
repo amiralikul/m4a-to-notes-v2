@@ -1,11 +1,11 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, count, eq, inArray } from "drizzle-orm";
 import type {
 	InsertTranslation,
 	Translation,
 	TranscriptionSummaryData,
 } from "@/db/schema";
 import { translations } from "@/db/schema";
-import type { AppDatabase } from "@/db/types";
+import type { AppDatabase, ProductionDatabase } from "@/db/types";
 import { getErrorMessage } from "@/lib/errors";
 import type { Logger } from "@/lib/logger";
 
@@ -221,20 +221,18 @@ export class TranslationsService {
 		if (transcriptionIds.length === 0) return new Map();
 
 		try {
-			const rows = await this.db
-				.select()
+			const rows = await (this.db as ProductionDatabase)
+				.select({
+					transcriptionId: translations.transcriptionId,
+					count: count(),
+				})
 				.from(translations)
-				.where(inArray(translations.transcriptionId, transcriptionIds));
+				.where(inArray(translations.transcriptionId, transcriptionIds))
+				.groupBy(translations.transcriptionId);
 
-			const counts = new Map<string, number>();
-			for (const row of rows) {
-				counts.set(
-					row.transcriptionId,
-					(counts.get(row.transcriptionId) ?? 0) + 1,
-				);
-			}
-
-			return counts;
+			return new Map(
+				rows.map((row) => [row.transcriptionId, row.count]),
+			);
 		} catch (error) {
 			this.logger.error("Failed to count translations by transcription IDs", {
 				error: getErrorMessage(error),

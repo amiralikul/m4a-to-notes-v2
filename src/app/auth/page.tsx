@@ -38,22 +38,25 @@ export default function AuthPage() {
 		event.preventDefault();
 		setIsSigningIn(true);
 		setSignInError(null);
+		try {
+			const { error } = await authClient.signIn.email({
+				email: signInEmail,
+				password: signInPassword,
+				callbackURL: dashboardPath,
+			});
 
-		const { error } = await authClient.signIn.email({
-			email: signInEmail,
-			password: signInPassword,
-			callbackURL: dashboardPath,
-		});
+			if (error) {
+				setSignInError(error.message || "Could not sign in.");
+				return;
+			}
 
-		setIsSigningIn(false);
-
-		if (error) {
-			setSignInError(error.message || "Could not sign in.");
-			return;
+			router.push(dashboardPath);
+			router.refresh();
+		} catch {
+			setSignInError("Could not sign in. Check your connection and try again.");
+		} finally {
+			setIsSigningIn(false);
 		}
-
-		router.push(dashboardPath);
-		router.refresh();
 	};
 
 	const handleEmailSignUp: React.ComponentProps<"form">["onSubmit"] = async (
@@ -65,38 +68,48 @@ export default function AuthPage() {
 		event.preventDefault();
 		setIsSigningUp(true);
 		setSignUpError(null);
+		try {
+			const { error } = await authClient.signUp.email({
+				name: signUpName,
+				email: signUpEmail,
+				password: signUpPassword,
+				callbackURL: dashboardPath,
+			});
 
-		const { error } = await authClient.signUp.email({
-			name: signUpName,
-			email: signUpEmail,
-			password: signUpPassword,
-			callbackURL: dashboardPath,
-		});
+			if (error) {
+				setSignUpError(error.message || "Could not create your account.");
+				return;
+			}
 
-		setIsSigningUp(false);
-
-		if (error) {
-			setSignUpError(error.message || "Could not create your account.");
-			return;
+			router.push(dashboardPath);
+			router.refresh();
+		} catch {
+			setSignUpError(
+				"Could not create your account. Check your connection and try again.",
+			);
+		} finally {
+			setIsSigningUp(false);
 		}
-
-		router.push(dashboardPath);
-		router.refresh();
 	};
 
 	const handleGoogleSignIn = async () => {
 		setIsSocialLoading(true);
 		setSocialError(null);
+		try {
+			const { error } = await authClient.signIn.social({
+				provider: "google",
+				callbackURL: dashboardPath,
+			});
 
-		const { error } = await authClient.signIn.social({
-			provider: "google",
-			callbackURL: dashboardPath,
-		});
-
-		setIsSocialLoading(false);
-
-		if (error) {
-			setSocialError(error.message || "Could not start Google sign in.");
+			if (error) {
+				setSocialError(error.message || "Could not start Google sign in.");
+			}
+		} catch {
+			setSocialError(
+				"Could not start Google sign in. Check your connection and try again.",
+			);
+		} finally {
+			setIsSocialLoading(false);
 		}
 	};
 
