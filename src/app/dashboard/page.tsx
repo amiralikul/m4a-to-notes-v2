@@ -16,6 +16,9 @@ import {
 } from "lucide-react";
 import { AudioPlayer } from "@/components/audio-player";
 import { CopyButton } from "@/components/copy-button";
+import { SummaryRenderer, ContentTypeBadge } from "@/components/summary-renderer";
+import type { TranscriptionSummaryData } from "@/db/schema";
+import { isFlexibleSummary } from "@/db/schema";
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -48,23 +51,11 @@ interface TranscriptionItem {
 	translationCount: number;
 }
 
-interface SummaryActionItem {
-	task: string;
-	owner?: string;
-	dueDate?: string;
-}
-
-interface SummaryData {
-	summary: string;
-	keyPoints: string[];
-	actionItems: SummaryActionItem[];
-	keyTakeaways: string[];
-}
 
 interface SummaryPayload {
 	transcriptionId: string;
 	summaryStatus: "pending" | "processing" | "completed" | "failed";
-	summaryData: SummaryData | null;
+	summaryData: TranscriptionSummaryData | null;
 	summaryError?: {
 		code?: string;
 		message?: string;
@@ -504,56 +495,16 @@ function SummarySection({ transcription }: { transcription: TranscriptionItem })
 			{!isLoading && summary?.summaryData && (
 				<div className="space-y-3 text-sm">
 					<div className="flex items-center justify-between">
-						<p className="font-semibold text-stone-900">Summary</p>
+						<div className="flex items-center gap-2">
+							<p className="font-semibold text-stone-900">Summary</p>
+							{isFlexibleSummary(summary.summaryData) && (
+								<ContentTypeBadge contentType={summary.summaryData.contentType} />
+							)}
+						</div>
 						<CopyButton contentRef={summaryContentRef} />
 					</div>
 					<div ref={summaryContentRef}>
-					<div>
-						<p className="text-stone-600 mt-1">
-							{summary.summaryData.summary}
-						</p>
-					</div>
-
-					<div>
-						<p className="font-semibold text-stone-900">Key Points</p>
-						<ul className="list-disc pl-5 mt-1 text-stone-600 space-y-1">
-							{summary.summaryData.keyPoints.map((point, index) => (
-								<li key={`${id}-point-${index}`}>{point}</li>
-							))}
-						</ul>
-					</div>
-
-					<div>
-						<p className="font-semibold text-stone-900">Action Items</p>
-						{summary.summaryData.actionItems.length === 0 ? (
-							<p className="text-stone-500 mt-1">
-								No action items found.
-							</p>
-						) : (
-							<ul className="list-disc pl-5 mt-1 text-stone-600 space-y-1">
-								{summary.summaryData.actionItems.map((item, index) => (
-									<li key={`${id}-action-${index}`}>
-										{item.task}
-										{item.owner && ` (Owner: ${item.owner})`}
-										{item.dueDate && ` (Due: ${item.dueDate})`}
-									</li>
-								))}
-							</ul>
-						)}
-					</div>
-
-					<div>
-						<p className="font-semibold text-stone-900">
-							Key Takeaways
-						</p>
-						<ul className="list-disc pl-5 mt-1 text-stone-600 space-y-1">
-							{summary.summaryData.keyTakeaways.map(
-								(takeaway, index) => (
-									<li key={`${id}-takeaway-${index}`}>{takeaway}</li>
-								),
-							)}
-						</ul>
-					</div>
+						<SummaryRenderer data={summary.summaryData} idPrefix={id} />
 					</div>
 				</div>
 			)}

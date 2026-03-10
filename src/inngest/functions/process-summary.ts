@@ -10,6 +10,9 @@ import {
 	TranscriptionStatus,
 } from "@/services/transcriptions";
 import { getErrorMessage } from "@/lib/errors";
+import type { ContentType } from "@/lib/constants/content-types";
+import { ALL_CONTENT_TYPES } from "@/lib/constants/content-types";
+
 export const processSummary = inngest.createFunction(
 	{
 		id: "process-summary",
@@ -96,9 +99,15 @@ export const processSummary = inngest.createFunction(
 			};
 		}
 
+		const rawContentType = transcriptionResult.transcription.contentType;
+		const contentType = rawContentType && (ALL_CONTENT_TYPES as readonly string[]).includes(rawContentType)
+			? (rawContentType as ContentType)
+			: null;
+
 		const summary = await step.run("generate-summary", async () => {
 			return textAiService.generateSummary(
 				transcriptionResult.transcription.transcriptText as string,
+				contentType,
 			);
 		});
 
@@ -109,13 +118,18 @@ export const processSummary = inngest.createFunction(
 				textAiService.provider,
 				textAiService.model,
 			);
+
+			// Save auto-detected content type only if not already set by user and valid
+			if (!contentType && summary.contentType && (ALL_CONTENT_TYPES as readonly string[]).includes(summary.contentType)) {
+				await transcriptionsService.update(transcriptionId, { contentType: summary.contentType });
+			}
 		});
 
 		return {
 			status: "completed",
 			transcriptionId,
-			keyPoints: summary.keyPoints.length,
-			actionItems: summary.actionItems.length,
+			contentType: summary.contentType,
+			sections: summary.sections.length,
 		};
 	},
 );

@@ -4,23 +4,18 @@ import {
 	getErrorMessage,
 } from "@/lib/errors";
 import type { Logger } from "@/lib/logger";
+import type { FlexibleSummaryData, TranscriptionSummaryData } from "@/db/schema";
+import { isFlexibleSummary } from "@/db/schema";
+import type { ContentType } from "@/lib/constants/content-types";
+import { CONTENT_TYPE_TEMPLATES, ALL_CONTENT_TYPES } from "@/lib/constants/content-types";
+import { zodResponseFormat } from "openai/helpers/zod";
 import { createOpenAiClient } from "./providers/openai.client";
-import { summaryResultSchema } from "./schemas/summary.schema";
+import {
+	flexibleSummaryResultSchema,
+	parseSummaryResult,
+} from "./schemas/summary.schema";
 
 export type TextAiProvider = "openai";
-
-export interface SummaryActionItem {
-	task: string;
-	owner?: string;
-	dueDate?: string;
-}
-
-export interface SummaryResult {
-	summary: string;
-	keyPoints: string[];
-	actionItems: SummaryActionItem[];
-	keyTakeaways: string[];
-}
 
 export interface TextAiServiceConfig {
 	provider: TextAiProvider;
@@ -48,6 +43,82 @@ export function parseTextAiProvider(value: string | undefined): TextAiProvider {
 	);
 }
 
+function buildSectionsSpec(contentType: ContentType): string {
+	const template = CONTENT_TYPE_TEMPLATES[contentType];
+	return template.sections
+		.map((s) => {
+			if (s.type === "rich") {
+				return `  - key: "${s.key}", label: "${s.label}", items: array of {text: string, owner?: string, dueDate?: string}`;
+			}
+			return `  - key: "${s.key}", label: "${s.label}", items: array of strings`;
+		})
+		.join("\n");
+}
+
+function buildAutoDetectPrompt(): string {
+	const typeDescriptions = ALL_CONTENT_TYPES
+		.map((type) => {
+			const t = CONTENT_TYPE_TEMPLATES[type];
+			return `- "${type}": ${t.description}`;
+		})
+		.join("\n");
+
+	const sectionSpecs = ALL_CONTENT_TYPES
+		.map((type) => {
+			const t = CONTENT_TYPE_TEMPLATES[type];
+			const sections = t.sections
+				.map((s) => {
+					if (s.type === "rich") {
+						return `    - key: "${s.key}", label: "${s.label}", items: [{text, owner?, dueDate?}]`;
+					}
+					return `    - key: "${s.key}", label: "${s.label}", items: [strings]`;
+				})
+				.join("\n");
+			return `  "${type}":\n${sections}`;
+		})
+		.join("\n");
+
+	return `You analyze audio transcripts. First, classify the transcript as one of these content types:
+${typeDescriptions}
+
+Then generate a summary with sections appropriate for that content type.
+
+Section definitions per type:
+${sectionSpecs}
+
+If the transcript contains meaningful verbatim quotes, you may add an extra section with key "notableQuotes", label "Notable Quotes", items as strings (include speaker attribution if speakers are identified).
+
+Return valid JSON with this structure:
+{
+  "contentType": "<detected type>",
+  "summary": "<concise overview>",
+  "sections": [{ "key": "<section key>", "label": "<section label>", "items": [<strings or rich items>] }]
+}
+
+Keep content concise and factual.`;
+}
+
+function buildExplicitTypePrompt(contentType: ContentType): string {
+	const template = CONTENT_TYPE_TEMPLATES[contentType];
+	const sectionsSpec = buildSectionsSpec(contentType);
+
+	return `You analyze audio transcripts. This is a ${template.label.toLowerCase()} transcript.
+
+Generate a summary with these sections:
+${sectionsSpec}
+
+If the transcript contains meaningful verbatim quotes, you may add an extra section with key "notableQuotes", label "Notable Quotes", items as strings (include speaker attribution if speakers are identified).
+
+Return valid JSON with this structure:
+{
+  "contentType": "${contentType}",
+  "summary": "<concise overview>",
+  "sections": [{ "key": "<section key>", "label": "<section label>", "items": [<strings or rich items>] }]
+}
+
+Keep content concise and factual.`;
+}
+
 export class TextAiService {
 	private client: ReturnType<typeof createOpenAiClient> | null = null;
 	private readonly logger: Logger;
@@ -62,7 +133,10 @@ export class TextAiService {
 		this.logger = logger;
 	}
 
-	async generateSummary(transcriptText: string): Promise<SummaryResult> {
+	async generateSummary(
+		transcriptText: string,
+		contentType?: ContentType | null,
+	): Promise<FlexibleSummaryData> {
 		if (!transcriptText.trim()) {
 			throw new SummaryError("Cannot generate summary for empty transcript");
 		}
@@ -72,10 +146,15 @@ export class TextAiService {
 				? `${transcriptText.slice(0, MAX_TEXT_CHARS)}\n\n[Transcript truncated for summarization.]`
 				: transcriptText;
 
+		const systemPrompt = contentType
+			? buildExplicitTypePrompt(contentType)
+			: buildAutoDetectPrompt();
+
 		const startTime = Date.now();
 		this.logger.info("Starting summary generation", {
 			provider: this.provider,
 			model: this.model,
+			contentType: contentType || "auto-detect",
 			transcriptLength: transcriptText.length,
 			truncated: transcriptText.length > MAX_TEXT_CHARS,
 		});
@@ -83,17 +162,10 @@ export class TextAiService {
 		try {
 			const completion = await this.getClient().chat.completions.create({
 				model: this.model,
-				response_format: { type: "json_object" },
+				response_format: zodResponseFormat(flexibleSummaryResultSchema, "flexible_summary"),
 				messages: [
-					{
-						role: "system",
-						content:
-							"You summarize meeting transcripts. Return valid JSON with keys: summary (string), keyPoints (string[]), actionItems ({task:string, owner?:string, dueDate?:string}[]), keyTakeaways (string[]). Keep content concise and factual.",
-					},
-					{
-						role: "user",
-						content: `Summarize this transcript:\n\n${promptTranscript}`,
-					},
+					{ role: "system", content: systemPrompt },
+					{ role: "user", content: `Analyze this transcript:\n\n${promptTranscript}` },
 				],
 			});
 
@@ -111,16 +183,15 @@ export class TextAiService {
 				);
 			}
 
-			const result = summaryResultSchema.parse(parsed);
+			const result = flexibleSummaryResultSchema.parse(parsed);
 
 			this.logger.info("Summary generation completed", {
 				provider: this.provider,
 				model: this.model,
+				contentType: result.contentType,
 				duration: `${Date.now() - startTime}ms`,
 				summaryLength: result.summary.length,
-				keyPoints: result.keyPoints.length,
-				actionItems: result.actionItems.length,
-				keyTakeaways: result.keyTakeaways.length,
+				sections: result.sections.length,
 			});
 
 			return result;
@@ -201,14 +272,21 @@ export class TextAiService {
 	}
 
 	async translateSummary(
-		summary: SummaryResult,
+		summary: TranscriptionSummaryData,
 		targetLanguage: string,
-	): Promise<SummaryResult> {
+	): Promise<TranscriptionSummaryData> {
+		const isFlexible = isFlexibleSummary(summary);
+
+		const translationPrompt = isFlexible
+			? `You are a professional translator. Translate the following JSON summary to ${targetLanguage}. Preserve the exact JSON structure including "contentType", "summary", and "sections" array with each section's "key", "label", and "items". Translate the text values and labels, not the JSON keys or section keys. Return valid JSON.`
+			: `You are a professional translator. Translate the following JSON summary to ${targetLanguage}. Preserve the exact JSON structure with keys: summary (string), keyPoints (string[]), actionItems ({task:string, owner?:string, dueDate?:string}[]), keyTakeaways (string[]). Only translate the text values, not the JSON keys. Return valid JSON.`;
+
 		const startTime = Date.now();
 		this.logger.info("Starting summary translation", {
 			provider: this.provider,
 			model: this.model,
 			targetLanguage,
+			format: isFlexible ? "flexible" : "legacy",
 		});
 
 		try {
@@ -216,14 +294,8 @@ export class TextAiService {
 				model: this.model,
 				response_format: { type: "json_object" },
 				messages: [
-					{
-						role: "system",
-						content: `You are a professional translator. Translate the following JSON summary to ${targetLanguage}. Preserve the exact JSON structure with keys: summary (string), keyPoints (string[]), actionItems ({task:string, owner?:string, dueDate?:string}[]), keyTakeaways (string[]). Only translate the text values, not the JSON keys. Return valid JSON.`,
-					},
-					{
-						role: "user",
-						content: JSON.stringify(summary),
-					},
+					{ role: "system", content: translationPrompt },
+					{ role: "user", content: JSON.stringify(summary) },
 				],
 			});
 
@@ -241,7 +313,7 @@ export class TextAiService {
 				);
 			}
 
-			const result = summaryResultSchema.parse(parsed);
+			const result = parseSummaryResult(parsed);
 
 			this.logger.info("Summary translation completed", {
 				provider: this.provider,

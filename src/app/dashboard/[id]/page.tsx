@@ -12,6 +12,9 @@ import {
 	Users,
 } from "lucide-react";
 import { CopyButton } from "@/components/copy-button";
+import { SummaryRenderer, ContentTypeBadge } from "@/components/summary-renderer";
+import type { TranscriptionSummaryData } from "@/db/schema";
+import { isFlexibleSummary } from "@/db/schema";
 import { useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -53,23 +56,10 @@ interface TranscriptionDetail {
 	summaryError?: { code?: string; message?: string };
 }
 
-interface SummaryActionItem {
-	task: string;
-	owner?: string;
-	dueDate?: string;
-}
-
-interface SummaryData {
-	summary: string;
-	keyPoints: string[];
-	actionItems: SummaryActionItem[];
-	keyTakeaways: string[];
-}
-
 interface SummaryPayload {
 	transcriptionId: string;
 	summaryStatus: "pending" | "processing" | "completed" | "failed";
-	summaryData: SummaryData | null;
+	summaryData: TranscriptionSummaryData | null;
 }
 
 interface TranslationItem {
@@ -78,7 +68,7 @@ interface TranslationItem {
 	language: string;
 	status: "pending" | "processing" | "completed" | "failed";
 	translatedText: string | null;
-	translatedSummary: SummaryData | null;
+	translatedSummary: TranscriptionSummaryData | null;
 	errorDetails: { code?: string; message: string } | null;
 	createdAt: string;
 	completedAt: string | null;
@@ -405,74 +395,23 @@ export default function TranscriptionDetailPage() {
 				<Card>
 					<CardHeader className="flex flex-row items-center justify-between">
 						<CardTitle className="text-lg">
-							Summary
-							{viewingTranslation && (
-								<span className="text-sm font-normal text-stone-500 ml-2">
-									({displayData.label})
-								</span>
-							)}
+							<div className="flex items-center gap-2">
+								Summary
+								{isFlexibleSummary(displayData.summaryData) && (
+									<ContentTypeBadge contentType={displayData.summaryData.contentType} />
+								)}
+								{viewingTranslation && (
+									<span className="text-sm font-normal text-stone-500">
+										({displayData.label})
+									</span>
+								)}
+							</div>
 						</CardTitle>
 						<CopyButton contentRef={summaryRef} />
 					</CardHeader>
 					<CardContent>
-						<div ref={summaryRef} className="space-y-4">
-						<div>
-							<p className="font-semibold text-stone-900 text-sm">
-								Overview
-							</p>
-							<p className="text-stone-600 text-sm mt-1">
-								{displayData.summaryData.summary}
-							</p>
-						</div>
-
-						<div>
-							<p className="font-semibold text-stone-900 text-sm">
-								Key Points
-							</p>
-							<ul className="list-disc pl-5 mt-1 text-stone-600 text-sm space-y-1">
-								{displayData.summaryData.keyPoints.map(
-									(point, index) => (
-										<li key={`point-${index}`}>{point}</li>
-									),
-								)}
-							</ul>
-						</div>
-
-						<div>
-							<p className="font-semibold text-stone-900 text-sm">
-								Action Items
-							</p>
-							{displayData.summaryData.actionItems.length === 0 ? (
-								<p className="text-stone-500 text-sm mt-1">
-									No action items found.
-								</p>
-							) : (
-								<ul className="list-disc pl-5 mt-1 text-stone-600 text-sm space-y-1">
-									{displayData.summaryData.actionItems.map(
-										(item, index) => (
-											<li key={`action-${index}`}>
-												{item.task}
-												{item.owner && ` (Owner: ${item.owner})`}
-												{item.dueDate && ` (Due: ${item.dueDate})`}
-											</li>
-										),
-									)}
-								</ul>
-							)}
-						</div>
-
-						<div>
-							<p className="font-semibold text-stone-900 text-sm">
-								Key Takeaways
-							</p>
-							<ul className="list-disc pl-5 mt-1 text-stone-600 text-sm space-y-1">
-								{displayData.summaryData.keyTakeaways.map(
-									(takeaway, index) => (
-										<li key={`takeaway-${index}`}>{takeaway}</li>
-									),
-								)}
-							</ul>
-						</div>
+						<div ref={summaryRef}>
+							<SummaryRenderer data={displayData.summaryData} idPrefix="detail" />
 						</div>
 					</CardContent>
 				</Card>

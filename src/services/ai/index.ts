@@ -7,8 +7,6 @@ export {
 export {
 	parseTextAiProvider,
 	TextAiService,
-	type SummaryActionItem,
-	type SummaryResult,
 	type TextAiProvider,
 	type TextAiServiceConfig,
 } from "./text-ai.service";

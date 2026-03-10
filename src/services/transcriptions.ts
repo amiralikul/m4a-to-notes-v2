@@ -500,6 +500,7 @@ export class TranscriptionsService {
 			createdAt: transcription.createdAt,
 			completedAt: transcription.completedAt,
 			preview: transcription.preview,
+			contentType: transcription.contentType,
 			enableDiarization: transcription.enableDiarization,
 			diarizationData: transcription.diarizationData ?? null,
 			transcriptText: transcription.transcriptText,

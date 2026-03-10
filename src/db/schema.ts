@@ -68,6 +68,7 @@ export const transcriptions = sqliteTable(
 			code?: string;
 			message?: string;
 		}>(),
+		contentType: text("content_type"),
 		enableDiarization: integer("enable_diarization", { mode: "boolean" }).default(false).notNull(),
 		diarizationData: text("diarization_data", { mode: "json" }).$type<DiarizationSegment[] | null>(),
 		summaryProvider: text("summary_provider"),
@@ -261,11 +262,41 @@ export interface TranscriptionSummaryActionItem {
 	dueDate?: string;
 }
 
-export interface TranscriptionSummaryData {
+// Legacy format (pre-content-type summaries)
+export interface LegacySummaryData {
 	summary: string;
 	keyPoints: string[];
 	actionItems: TranscriptionSummaryActionItem[];
 	keyTakeaways: string[];
+}
+
+// Rich item for action-item-like sections (task/owner/dueDate)
+export interface SummaryRichItem {
+	text: string;
+	owner?: string | null;
+	dueDate?: string | null;
+}
+
+// A single section in a flexible summary
+export interface SummarySection {
+	key: string;
+	label: string;
+	items: string[] | SummaryRichItem[];
+}
+
+// Flexible format with content-type-specific sections
+export interface FlexibleSummaryData {
+	contentType: string;
+	summary: string;
+	sections: SummarySection[];
+}
+
+export type TranscriptionSummaryData = FlexibleSummaryData | LegacySummaryData;
+
+export function isFlexibleSummary(
+	data: TranscriptionSummaryData,
+): data is FlexibleSummaryData {
+	return "contentType" in data && "sections" in data;
 }
 
 export interface JobAnalysisOneWeekPlanDay {

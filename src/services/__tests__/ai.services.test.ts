@@ -210,16 +210,19 @@ describe("TextAiService", () => {
 		vi.clearAllMocks();
 	});
 
-	it("returns validated structured summary", async () => {
+	it("returns validated structured summary with flexible format", async () => {
 		mockSummaryCreate.mockResolvedValueOnce({
 			choices: [
 				{
 					message: {
 						content: JSON.stringify({
+							contentType: "meeting",
 							summary: "Sprint planning reviewed blockers.",
-							keyPoints: ["Blockers reviewed", "Timeline adjusted"],
-							actionItems: [{ task: "Update roadmap", owner: "Sam" }],
-							keyTakeaways: ["Team aligned on priorities"],
+							sections: [
+								{ key: "keyPoints", label: "Key Points", items: ["Blockers reviewed", "Timeline adjusted"] },
+								{ key: "actionItems", label: "Action Items", items: [{ text: "Update roadmap", owner: "Sam" }] },
+								{ key: "keyTakeaways", label: "Key Takeaways", items: ["Team aligned on priorities"] },
+							],
 						}),
 					},
 				},
@@ -230,8 +233,8 @@ describe("TextAiService", () => {
 		const result = await service.generateSummary("Transcript content");
 
 		expect(result.summary).toContain("Sprint planning");
-		expect(result.keyPoints).toHaveLength(2);
-		expect(result.actionItems[0]?.task).toBe("Update roadmap");
+		expect(result.contentType).toBe("meeting");
+		expect(result.sections).toHaveLength(3);
 		expect(mockConstructor).toHaveBeenCalledTimes(1);
 		expect(mockSummaryCreate).toHaveBeenCalled();
 	});
