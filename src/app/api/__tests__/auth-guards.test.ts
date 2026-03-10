@@ -1,9 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Mock Clerk auth
-vi.mock("@clerk/nextjs/server", () => ({
-	auth: vi.fn().mockResolvedValue({ userId: null }),
-	currentUser: vi.fn().mockResolvedValue(null),
+vi.mock("@/lib/auth-server", () => ({
+	getServerSession: vi.fn().mockResolvedValue(null),
 }));
 
 // Mock services to prevent real DB connections

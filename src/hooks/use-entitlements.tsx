@@ -1,7 +1,7 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
 import { useCallback, useEffect, useState } from "react";
+import { useAuth } from "@/hooks/use-auth";
 
 interface Entitlements {
 	userId: string;
@@ -22,7 +22,7 @@ interface Entitlements {
 type PlanType = Entitlements["plan"];
 
 export function useEntitlements() {
-	const { user, isLoaded } = useUser();
+	const { user, isLoaded } = useAuth();
 	const [entitlements, setEntitlements] = useState<Entitlements | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);

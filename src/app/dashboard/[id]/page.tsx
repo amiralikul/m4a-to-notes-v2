@@ -1,6 +1,5 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
 import {
 	ArrowLeft,
 	Download,
@@ -31,6 +30,7 @@ import {
 import { transcriptionKeys } from "@/lib/query-keys";
 import { SUPPORTED_LANGUAGES } from "@/lib/constants/languages";
 import type { LanguageCode } from "@/lib/constants/languages";
+import { useAuth } from "@/hooks/use-auth";
 
 interface DiarizationSegment {
 	speaker: string;
@@ -147,7 +147,7 @@ async function deleteTranslation(
 export default function TranscriptionDetailPage() {
 	const { id } = useParams<{ id: string }>();
 	const router = useRouter();
-	const { isLoaded, isSignedIn } = useUser();
+	const { isLoaded, isSignedIn } = useAuth();
 	const queryClient = useQueryClient();
 	const [selectedLanguage, setSelectedLanguage] = useState<string>("");
 	const transcriptRef = useRef<HTMLDivElement>(null);

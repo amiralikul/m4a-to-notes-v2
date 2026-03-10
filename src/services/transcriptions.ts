@@ -1,4 +1,4 @@
-import { and, count, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import type {
 	DiarizationSegment,
 	InsertTranscription,
@@ -7,6 +7,7 @@ import type {
 	UpdateTranscription,
 } from "@/db/schema";
 import { transcriptions } from "@/db/schema";
+import type { AppDatabase } from "@/db/types";
 import { getErrorMessage } from "@/lib/errors";
 import type { Logger } from "@/lib/logger";
 import type { OwnerIdentity } from "@/lib/route";
@@ -38,14 +39,9 @@ export const TranscriptionSource = {
 export type TranscriptionSourceType =
 	(typeof TranscriptionSource)[keyof typeof TranscriptionSource];
 
-type Database = Parameters<typeof eq>[0] extends never
-	? never
-	: // biome-ignore lint: needed for generic DB type
-		any;
-
 export class TranscriptionsService {
 	constructor(
-		private db: Database,
+		private db: AppDatabase,
 		private logger: Logger,
 	) {}
 
@@ -394,10 +390,10 @@ export class TranscriptionsService {
 	async countByUserId(userId: string): Promise<number> {
 		try {
 			const result = await this.db
-				.select({ count: count() })
+				.select()
 				.from(transcriptions)
 				.where(eq(transcriptions.userId, userId));
-			return result[0]?.count ?? 0;
+			return result.length;
 		} catch (error) {
 			this.logger.error("Failed to count transcriptions by userId", {
 				userId,
@@ -410,7 +406,7 @@ export class TranscriptionsService {
 	async countByActorId(actorId: string): Promise<number> {
 		try {
 			const result = await this.db
-				.select({ count: count() })
+				.select()
 				.from(transcriptions)
 				.where(
 					and(
@@ -418,7 +414,7 @@ export class TranscriptionsService {
 						eq(transcriptions.ownerId, actorId),
 					),
 				);
-			return result[0]?.count ?? 0;
+			return result.length;
 		} catch (error) {
 			this.logger.error("Failed to count transcriptions by actorId", {
 				actorId,

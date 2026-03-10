@@ -1,13 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { auth } from "@clerk/nextjs/server";
+import { getServerSession } from "@/lib/auth-server";
 import { TRIAL_ERROR_CODES } from "@/lib/trial-errors";
 import { getUtcDayKey, resolveActorIdentity } from "@/lib/trial-identity";
 import { actorsService, trialUsageService } from "@/services";
 import { GET as getTrialQuota } from "@/app/api/trial/quota/route";
 
-vi.mock("@clerk/nextjs/server", () => ({
-	auth: vi.fn().mockResolvedValue({ userId: null }),
-	currentUser: vi.fn().mockResolvedValue(null),
+vi.mock("@/lib/auth-server", () => ({
+	getServerSession: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("@/lib/trial-identity", () => ({
@@ -42,7 +41,7 @@ function makeRequest() {
 describe("Trial quota route", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		vi.mocked(auth).mockResolvedValue({ userId: null } as never);
+		vi.mocked(getServerSession).mockResolvedValue(null);
 		vi.mocked(resolveActorIdentity).mockResolvedValue({ actorId: "actor-1" });
 		vi.mocked(actorsService.ensureActor).mockResolvedValue(undefined);
 		vi.mocked(getUtcDayKey).mockReturnValue("2026-02-16");
@@ -74,7 +73,10 @@ describe("Trial quota route", () => {
 	});
 
 	it("returns unlimited response for signed-in user", async () => {
-		vi.mocked(auth).mockResolvedValue({ userId: "user_123" } as never);
+		vi.mocked(getServerSession).mockResolvedValue({
+			user: { id: "user_123", email: "user@test.com", name: "User" },
+			session: { id: "sess_1", userId: "user_123" },
+		} as never);
 
 		const response = await getTrialQuota(makeRequest());
 		const body = await response.json();

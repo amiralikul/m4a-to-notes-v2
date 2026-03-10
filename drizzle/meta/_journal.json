@@ -169,6 +169,20 @@
       "when": 1773156322752,
       "tag": "0023_drop_conversations_table",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1773171675323,
+      "tag": "0024_add_better_auth_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1773174644574,
+      "tag": "0025_rename_better_auth_tables_plural",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,5 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
 import {
 	ChevronDown,
 	ChevronUp,
@@ -30,6 +29,7 @@ import {
 	CardContent,
 } from "@/components/ui/card";
 import { transcriptionKeys } from "@/lib/query-keys";
+import { useAuth } from "@/hooks/use-auth";
 
 interface TranscriptionItem {
 	id: string;
@@ -131,7 +131,7 @@ async function deleteTranscriptionApi(id: string): Promise<void> {
 }
 
 export default function DashboardPage() {
-	const { isLoaded } = useUser();
+	const { isLoaded } = useAuth();
 	const queryClient = useQueryClient();
 	const [expandedSummaryIds, setExpandedSummaryIds] = useState<Set<string>>(
 		new Set(),

@@ -1,5 +1,4 @@
 "use client";
-import { useUser } from "@clerk/nextjs";
 import {
 	useMutation,
 	useQuery,
@@ -40,6 +39,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import { useAuth } from "@/hooks/use-auth";
 
 interface UploadedFile {
 	id: string;
@@ -166,7 +166,7 @@ async function deletePreviousTranscriptionApi(
 export default function FileUpload({
 	showHistory = true,
 }: FileUploadProps) {
-	const { isLoaded, isSignedIn } = useUser();
+	const { isLoaded, isSignedIn } = useAuth();
 	const queryClient = useQueryClient();
 	const recentTranscriptionsQueryKey = viewerTranscriptionKeys.list(
 		RECENT_TRANSCRIPTIONS_LIMIT,

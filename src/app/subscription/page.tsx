@@ -1,6 +1,5 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
 import {
 	AlertCircle,
 	ArrowRight,
@@ -28,9 +27,10 @@ import {
 } from "@/components/ui/card";
 import { useEntitlements } from "@/hooks/use-entitlements";
 import { PRICING_PLANS } from "@/lib/pricing";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function SubscriptionPage() {
-	const { user, isLoaded } = useUser();
+	const { user, isLoaded } = useAuth();
 	const {
 		entitlements,
 		loading,
@@ -39,7 +39,6 @@ export default function SubscriptionPage() {
 		canUpgradeTo,
 	} = useEntitlements();
 
-	console.log({user})
 	const [cancellationSuccess, setCancellationSuccess] = useState<string | null>(null);
 
 	const getPlanDetails = (planKey: string | undefined) => {
@@ -376,7 +375,7 @@ export default function SubscriptionPage() {
 							<div className="text-sm space-y-2">
 								<div className="flex justify-between">
 									<span className="text-gray-500">Billing email</span>
-									<span>{user.primaryEmailAddress?.emailAddress}</span>
+									<span>{user.email}</span>
 								</div>
 							</div>
 

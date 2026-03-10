@@ -1,10 +1,11 @@
-import { and, count, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type {
 	InsertTranslation,
 	Translation,
 	TranscriptionSummaryData,
 } from "@/db/schema";
 import { translations } from "@/db/schema";
+import type { AppDatabase } from "@/db/types";
 import { getErrorMessage } from "@/lib/errors";
 import type { Logger } from "@/lib/logger";
 
@@ -18,14 +19,9 @@ export const TranslationStatus = {
 export type TranslationStatusType =
 	(typeof TranslationStatus)[keyof typeof TranslationStatus];
 
-type Database = Parameters<typeof eq>[0] extends never
-	? never
-	: // biome-ignore lint: needed for generic DB type
-		any;
-
 export class TranslationsService {
 	constructor(
-		private db: Database,
+		private db: AppDatabase,
 		private logger: Logger,
 	) {}
 
@@ -226,20 +222,19 @@ export class TranslationsService {
 
 		try {
 			const rows = await this.db
-				.select({
-					transcriptionId: translations.transcriptionId,
-					count: count(),
-				})
+				.select()
 				.from(translations)
-				.where(inArray(translations.transcriptionId, transcriptionIds))
-				.groupBy(translations.transcriptionId);
+				.where(inArray(translations.transcriptionId, transcriptionIds));
 
-			return new Map(
-				rows.map((r: { transcriptionId: string; count: number }) => [
-					r.transcriptionId,
-					r.count,
-				]),
-			);
+			const counts = new Map<string, number>();
+			for (const row of rows) {
+				counts.set(
+					row.transcriptionId,
+					(counts.get(row.transcriptionId) ?? 0) + 1,
+				);
+			}
+
+			return counts;
 		} catch (error) {
 			this.logger.error("Failed to count translations by transcription IDs", {
 				error: getErrorMessage(error),
