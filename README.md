@@ -20,50 +20,6 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-## Job Analysis MVP (LinkedIn jobs + pasted JD)
-
-This repo now includes an async job-fit analysis flow:
-
-1. `POST /api/analyses` accepts `resumeText` and either:
-- `jobUrl` (LinkedIn jobs URL only), or
-- `jobDescription` (pasted text)
-2. Route stores analysis row and emits `jobs/analysis.requested`.
-3. Inngest function `process-job-analysis`:
-- Scrapes LinkedIn job text via Bright Data (for URL input),
-- Runs Anthropic compatibility analysis,
-- Saves final score + guidance.
-4. `GET /api/analyses/:analysisId` returns status/result.
-
-Required environment variables:
-
-```env
-ANTHROPIC_API_KEY=...
-ANTHROPIC_MODEL=claude-haiku-4-5
-BRIGHTDATA_API_KEY=...
-BRIGHTDATA_LINKEDIN_JOBS_DATASET_ID=gd_lpfll7v5hcqtkxl6l
-```
-
-Run migrations after pulling changes:
-
-```bash
-npm run db:migrate
-```
-
-### Example requests
-
-```bash
-curl -X POST http://localhost:3000/api/analyses \
-  -H "Content-Type: application/json" \
-  -d '{
-    "resumeText": "Senior frontend engineer with 6 years ...",
-    "jobUrl": "https://www.linkedin.com/jobs/view/4321442384/"
-  }'
-```
-
-```bash
-curl http://localhost:3000/api/analyses/<analysisId>
-```
-
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
