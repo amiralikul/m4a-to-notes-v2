@@ -28,7 +28,10 @@ export function SafeAuthButtons() {
 	if (isSignedIn) {
 		return (
 			<DropdownMenu>
-				<DropdownMenuTrigger className="cursor-pointer rounded-full">
+				<DropdownMenuTrigger
+					className="cursor-pointer rounded-full"
+					aria-label={`Open account menu for ${user?.name ?? "account"}`}
+				>
 					<Avatar>
 						<AvatarImage src={user?.image ?? undefined} />
 						<AvatarFallback>

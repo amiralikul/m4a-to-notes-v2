@@ -231,7 +231,7 @@ export class TranslationsService {
 				.groupBy(translations.transcriptionId);
 
 			return new Map(
-				rows.map((row) => [row.transcriptionId, row.count]),
+				rows.map((row) => [row.transcriptionId, Number(row.count ?? 0)]),
 			);
 		} catch (error) {
 			this.logger.error("Failed to count translations by transcription IDs", {

@@ -393,7 +393,7 @@ export class TranscriptionsService {
 				.select({ count: count() })
 				.from(transcriptions)
 				.where(eq(transcriptions.userId, userId));
-			return result[0]?.count ?? 0;
+			return Number(result[0]?.count ?? 0);
 		} catch (error) {
 			this.logger.error("Failed to count transcriptions by userId", {
 				userId,
@@ -414,7 +414,7 @@ export class TranscriptionsService {
 						eq(transcriptions.ownerId, actorId),
 					),
 				);
-			return result[0]?.count ?? 0;
+			return Number(result[0]?.count ?? 0);
 		} catch (error) {
 			this.logger.error("Failed to count transcriptions by actorId", {
 				actorId,
