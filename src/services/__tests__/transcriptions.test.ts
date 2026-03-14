@@ -1,8 +1,8 @@
 import { eq } from "drizzle-orm";
-import { describe, it, expect, beforeEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { translations } from "@/db/schema";
 import { TranscriptionChunksService } from "@/services/transcription-chunks";
-import { createTestDb } from "@/test/db";
+import { cleanupTestDb, createTestDb } from "@/test/db";
 import { createTestLogger } from "@/test/setup";
 import {
 	SummaryStatus,
@@ -11,15 +11,19 @@ import {
 } from "../transcriptions";
 
 describe("TranscriptionsService", () => {
-	let db: ReturnType<typeof createTestDb>;
+	let db: Awaited<ReturnType<typeof createTestDb>>;
 	let service: TranscriptionsService;
 	let chunksService: TranscriptionChunksService;
 
-	beforeEach(() => {
-		db = createTestDb();
+	beforeEach(async () => {
+		db = await createTestDb();
 		const logger = createTestLogger();
 		service = new TranscriptionsService(db, logger);
 		chunksService = new TranscriptionChunksService(db, logger);
+	});
+
+	afterEach(async () => {
+		await cleanupTestDb(db);
 	});
 
 	describe("create", () => {
