@@ -27,7 +27,7 @@ export default function TermsOfServicePage() {
 								Terms of Service
 							</h1>
 							<p className="mx-auto max-w-2xl text-lg md:text-xl text-gray-600 leading-relaxed">
-								Please read these terms carefully before using AudioScribe
+								Please read these terms carefully before using WavesToText
 							</p>
 						</div>
 					</div>
@@ -48,7 +48,7 @@ export default function TermsOfServicePage() {
 									1. Agreement to Terms
 								</h2>
 								<p className="text-gray-700 mb-6">
-									By accessing or using AudioScribe ("the Service"), you agree
+									By accessing or using WavesToText ("the Service"), you agree
 									to be bound by these Terms of Service ("Terms"). If you do not
 									agree to these Terms, you may not use the Service.
 								</p>
@@ -57,7 +57,7 @@ export default function TermsOfServicePage() {
 									2. Description of Service
 								</h2>
 								<p className="text-gray-700 mb-6">
-									AudioScribe is an AI-powered transcription service that
+									WavesToText is an AI-powered transcription service that
 									converts audio files (including FLAC, MP3, MP4, MPEG, MPGA, M4A, OGG, WAV, and WebM formats) into text. The
 									Service is provided through our website and may include
 									additional features such as file management, editing tools,
@@ -112,7 +112,7 @@ export default function TermsOfServicePage() {
 									6. Content and Privacy
 								</h2>
 								<p className="text-gray-700 mb-6">
-									You retain ownership of the content you upload to AudioScribe.
+									You retain ownership of the content you upload to WavesToText.
 									However, you grant us a limited license to process, store, and
 									transcribe your content to provide the Service. We automatically
 									delete uploaded files and transcriptions according to our
@@ -134,7 +134,7 @@ export default function TermsOfServicePage() {
 									8. Limitation of Liability
 								</h2>
 								<p className="text-gray-700 mb-6">
-									TO THE MAXIMUM EXTENT PERMITTED BY LAW, AUDIOSCRIBE SHALL NOT
+									TO THE MAXIMUM EXTENT PERMITTED BY LAW, WAVESTOTEXT SHALL NOT
 									BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL,
 									OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS OR REVENUES,
 									WHETHER INCURRED DIRECTLY OR INDIRECTLY, OR ANY LOSS OF DATA,
@@ -145,7 +145,7 @@ export default function TermsOfServicePage() {
 									9. Indemnification
 								</h2>
 								<p className="text-gray-700 mb-6">
-									You agree to indemnify and hold AudioScribe harmless from any
+									You agree to indemnify and hold WavesToText harmless from any
 									claims, damages, or expenses arising from your use of the
 									Service or violation of these Terms.
 								</p>
@@ -165,7 +165,7 @@ export default function TermsOfServicePage() {
 								</h2>
 								<p className="text-gray-700 mb-6">
 									These Terms shall be governed by and construed in accordance
-									with the laws of the jurisdiction in which AudioScribe
+									with the laws of the jurisdiction in which WavesToText
 									operates, without regard to its conflict of law provisions.
 								</p>
 

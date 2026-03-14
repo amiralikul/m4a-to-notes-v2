@@ -25,13 +25,16 @@ export const SiteFooter = () => {
 									strokeLinejoin="round"
 									className="text-amber-400"
 								>
-									<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-									<path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-									<line x1="12" x2="12" y1="19" y2="22" />
+									<path d="M2 12h2" />
+									<path d="M6 8v8" />
+									<path d="M10 4v16" />
+									<path d="M14 6v12" />
+									<path d="M18 8v8" />
+									<path d="M22 12h-2" />
 								</svg>
 							</div>
 							<span className="font-display text-xl italic text-stone-200">
-								AudioScribe
+								WavesToText
 							</span>
 						</Link>
 						<p className="text-stone-500 leading-relaxed max-w-sm">
@@ -96,7 +99,7 @@ export const SiteFooter = () => {
 
 				<div className="border-t border-stone-800/60 mt-12 pt-8 flex flex-col sm:flex-row justify-between items-center gap-4">
 					<p className="text-sm text-stone-600">
-						&copy; {new Date().getFullYear()} AudioScribe
+						&copy; {new Date().getFullYear()} WavesToText
 					</p>
 					<nav className="flex gap-6" aria-label="Legal links">
 						<Link

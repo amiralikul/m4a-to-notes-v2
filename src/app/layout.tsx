@@ -23,7 +23,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-	title: "AudioScribe - Audio to Text Transcription",
+	title: "WavesToText - Audio to Text Transcription",
 	description:
 		"Convert your audio files to accurate text transcriptions using AI-powered speech recognition.",
 };

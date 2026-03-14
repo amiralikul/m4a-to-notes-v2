@@ -54,7 +54,7 @@ export default function ContactPage() {
 								</span>
 							</h1>
 							<p className="mx-auto max-w-2xl text-lg md:text-xl text-gray-600 leading-relaxed">
-								Have questions about AudioScribe? Need help with your account?
+								Have questions about WavesToText? Need help with your account?
 								Want to explore enterprise solutions? We'd love to hear from
 								you.
 							</p>
@@ -112,11 +112,11 @@ export default function ContactPage() {
 								<Button
 									className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-xl"
 									onClick={() =>
-										(window.location.href = "mailto:support@audioscribe.com")
+										(window.location.href = "mailto:support@wavestotext.com")
 									}
 								>
 									<Mail className="mr-2 h-4 w-4" />
-									support@audioscribe.com
+									support@wavestotext.com
 								</Button>
 							</CardContent>
 						</Card>
@@ -420,7 +420,7 @@ export default function ContactPage() {
 							</h2>
 							<p className="mx-auto max-w-2xl text-lg text-blue-100 leading-relaxed">
 								Don't wait – start transcribing your audio files today with
-								AudioScribe's powerful AI technology.
+								WavesToText's powerful AI technology.
 							</p>
 						</div>
 
@@ -432,7 +432,7 @@ export default function ContactPage() {
 									className="h-14 px-8 rounded-xl bg-white text-blue-600 hover:bg-gray-50"
 								>
 									<Sparkles className="mr-2 h-5 w-5" />
-									Try AudioScribe Now
+									Try WavesToText Now
 								</Button>
 							</Link>
 							<Link href="/pricing">
