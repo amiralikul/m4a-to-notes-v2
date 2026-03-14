@@ -1,12 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { auth } from "@clerk/nextjs/server";
+import { getServerSession } from "@/lib/auth-server";
 import { resolveActorIdentity } from "@/lib/trial-identity";
 import { actorsService, transcriptionsService, translationsService } from "@/services";
 import { GET as listTranscriptions } from "@/app/api/me/transcriptions/route";
 
-vi.mock("@clerk/nextjs/server", () => ({
-	auth: vi.fn().mockResolvedValue({ userId: null }),
-	currentUser: vi.fn().mockResolvedValue(null),
+vi.mock("@/lib/auth-server", () => ({
+	getServerSession: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("@/lib/trial-identity", () => ({
@@ -45,7 +44,7 @@ describe("GET /api/me/transcriptions", () => {
 	});
 
 	it("returns anonymous user's transcriptions when signed out", async () => {
-		vi.mocked(auth).mockResolvedValue({ userId: null } as never);
+		vi.mocked(getServerSession).mockResolvedValue(null);
 		vi.mocked(transcriptionsService.findByActorId).mockResolvedValue([
 			{
 				id: "tr_1",
@@ -80,7 +79,10 @@ describe("GET /api/me/transcriptions", () => {
 	});
 
 	it("returns signed-in user's transcriptions when authenticated", async () => {
-		vi.mocked(auth).mockResolvedValue({ userId: "user_1" } as never);
+		vi.mocked(getServerSession).mockResolvedValue({
+			user: { id: "user_1", email: "user@test.com", name: "User" },
+			session: { id: "sess_1", userId: "user_1" },
+		} as never);
 		vi.mocked(transcriptionsService.findByUserId).mockResolvedValue([
 			{
 				id: "tr_1",
@@ -115,7 +117,10 @@ describe("GET /api/me/transcriptions", () => {
 	});
 
 	it("uses default limit when query parameter is invalid", async () => {
-		vi.mocked(auth).mockResolvedValue({ userId: "user_1" } as never);
+		vi.mocked(getServerSession).mockResolvedValue({
+			user: { id: "user_1", email: "user@test.com", name: "User" },
+			session: { id: "sess_1", userId: "user_1" },
+		} as never);
 
 		const response = await listTranscriptions(
 			new Request("http://localhost:3000/api/me/transcriptions?limit=-10"),

@@ -1,6 +1,5 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
 import { CheckCircle, Crown } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -8,6 +7,7 @@ import { useEntitlements } from "../hooks/use-entitlements";
 import { PRICING_PLANS } from "../lib/pricing";
 import { useLemonSqueezy } from "./lemonsqueezy-provider";
 import { Button } from "./ui/button";
+import { useAuth } from "@/hooks/use-auth";
 
 interface LemonSqueezyCheckoutProps {
 	variantId: string | null;
@@ -22,7 +22,7 @@ export function LemonSqueezyCheckout({
 	children,
 	planKey = null,
 }: LemonSqueezyCheckoutProps) {
-	const { user, isLoaded: isUserLoaded } = useUser();
+	const { user, isLoaded: isUserLoaded } = useAuth();
 	const { isLoading, error, openCheckout } = useLemonSqueezy();
 	const {
 		entitlements,

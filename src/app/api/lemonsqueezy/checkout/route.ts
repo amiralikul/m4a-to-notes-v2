@@ -1,4 +1,3 @@
-import { currentUser } from "@clerk/nextjs/server";
 import { z } from "zod";
 import { route } from "@/lib/route";
 import { ValidationError } from "@/lib/errors";
@@ -6,6 +5,7 @@ import { logger } from "@/lib/logger";
 import { usersService } from "@/services";
 import { findPlanKeyByVariantId } from "@/lib/pricing";
 import { PLAN_HIERARCHY } from "@/lib/constants/plans";
+import { getServerSession } from "@/lib/auth-server";
 
 export const POST = route({
 	auth: "required",
@@ -57,12 +57,12 @@ export const POST = route({
 			);
 		}
 
-		const user = await currentUser();
-		const userEmail = user?.primaryEmailAddress?.emailAddress;
+			const session = await getServerSession();
+			const userEmail = session?.user.email;
 
-		const checkoutData: Record<string, unknown> = {
-			custom: { clerkUserId: userId },
-		};
+			const checkoutData: Record<string, unknown> = {
+				custom: { userId },
+			};
 		if (userEmail) {
 			checkoutData.email = userEmail;
 		}

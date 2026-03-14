@@ -8,7 +8,7 @@ Audio transcription SaaS that converts audio files to text via Whisper, with a w
 |---|---|
 | Framework | Next.js 16 (App Router, Turbopack) |
 | Language | TypeScript (strict mode) |
-| Auth | Clerk |
+| Auth | Better Auth |
 | Payments | Paddle |
 | Database | Turso (managed SQLite) + Drizzle ORM |
 | Storage | Vercel Blob |
@@ -25,7 +25,7 @@ Audio transcription SaaS that converts audio files to text via Whisper, with a w
 ```
 src/
 ├── app/
-│   ├── layout.tsx                     # Root layout (Clerk, Paddle, SiteHeader)
+│   ├── layout.tsx                     # Root layout (auth UI, payments, SiteHeader)
 │   ├── page.tsx                       # Home — hero, file upload, pricing
 │   ├── pricing/page.tsx               # Plan comparison + FAQ
 │   ├── subscription/page.tsx          # Subscription management dashboard
@@ -40,7 +40,7 @@ src/
 │       ├── telegram/route.ts          # Grammy webhook
 │       ├── inngest/route.ts           # Inngest webhook (GET/POST/PUT)
 │       ├── webhook/paddle/route.ts    # Paddle subscription webhooks
-│       ├── webhook/clerk/route.ts     # Clerk user webhooks
+│       ├── auth/[...all]/route.ts     # Better Auth handler
 │       ├── paddle/cancel/route.ts     # Subscription cancellation
 │       ├── validate-purchase/route.ts
 │       └── health/route.ts
@@ -92,7 +92,7 @@ src/
 │   ├── utils.ts                       # cn() utility
 │   └── constants/
 │       └── plans.ts                   # Plan hierarchy + Paddle mappings
-├── proxy.ts                           # Clerk middleware config
+├── proxy.ts                           # Lightweight no-op Next proxy
 └── test/
     ├── setup.ts                       # Test logger
     └── db.ts                          # In-memory SQLite for tests
@@ -130,7 +130,7 @@ Four tables in Turso (SQLite):
 ┌─────────────────────────────────────────────┐
 │ userEntitlements                            │
 ├─────────────────────────────────────────────┤
-│ userId        TEXT PK (Clerk user ID)       │
+│ userId        TEXT PK (app auth user ID)    │
 │ plan          TEXT (free|pro|business)       │
 │ status        TEXT (none|active|trialing|   │
 │               past_due|canceled)            │
@@ -184,14 +184,14 @@ All services are singletons instantiated in `src/services/index.ts`:
 
 ```
                     ┌──────────────────────────┐
-                    │     Clerk Middleware      │
+                    │       Next Proxy          │
   All requests ────►│      (src/proxy.ts)      │
                     └────────────┬─────────────┘
                                  │
                     ┌────────────┴─────────────┐
                     │                          │
-              Clerk-protected           Excluded routes
-              (session parsed)          (no Clerk parsing)
+              App routes                Webhooks / public infra
+              (server auth checks)      (public endpoints)
                     │                          │
               /api/upload              /api/inngest  ── Inngest signing key
               /api/start-*             /api/webhook/* ── HMAC-SHA256 (Paddle)
@@ -201,7 +201,7 @@ All services are singletons instantiated in `src/services/index.ts`:
               All page routes
 ```
 
-Protected API routes use `auth()` from Clerk to extract `userId`.
+Protected API routes use Better Auth session resolution to extract `userId`.
 
 ---
 
@@ -442,8 +442,10 @@ Canceled or past_due users lose access to paid tiers.
 | `PADDLE_API_KEY` | PaddleSyncService | For payments |
 | `PADDLE_ENVIRONMENT` | Paddle SDK | For payments |
 | `PADDLE_NOTIFICATION_WEBHOOK_SECRET` | Webhook HMAC verification | For payments |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk client-side | Yes |
-| `CLERK_SECRET_KEY` | Clerk server-side | Yes |
+| `BETTER_AUTH_SECRET` | Better Auth session signing | Yes |
+| `BETTER_AUTH_URL` | Better Auth base URL | Yes |
+| `GOOGLE_CLIENT_ID` | Google OAuth | Optional |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth | Optional |
 | `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN` | Paddle.js SDK | For payments |
 | `NEXT_PUBLIC_PADDLE_ENV` | Paddle.js SDK | For payments |
 | `NEXT_PUBLIC_POSTHOG_KEY` | Analytics | Optional |

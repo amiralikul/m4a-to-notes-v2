@@ -5,6 +5,7 @@ import type {
 	TranscriptionSummaryData,
 } from "@/db/schema";
 import { translations } from "@/db/schema";
+import type { AppDatabase, ProductionDatabase } from "@/db/types";
 import { getErrorMessage } from "@/lib/errors";
 import type { Logger } from "@/lib/logger";
 
@@ -18,14 +19,9 @@ export const TranslationStatus = {
 export type TranslationStatusType =
 	(typeof TranslationStatus)[keyof typeof TranslationStatus];
 
-type Database = Parameters<typeof eq>[0] extends never
-	? never
-	: // biome-ignore lint: needed for generic DB type
-		any;
-
 export class TranslationsService {
 	constructor(
-		private db: Database,
+		private db: AppDatabase,
 		private logger: Logger,
 	) {}
 
@@ -225,7 +221,7 @@ export class TranslationsService {
 		if (transcriptionIds.length === 0) return new Map();
 
 		try {
-			const rows = await this.db
+			const rows = await (this.db as ProductionDatabase)
 				.select({
 					transcriptionId: translations.transcriptionId,
 					count: count(),
@@ -235,10 +231,7 @@ export class TranslationsService {
 				.groupBy(translations.transcriptionId);
 
 			return new Map(
-				rows.map((r: { transcriptionId: string; count: number }) => [
-					r.transcriptionId,
-					r.count,
-				]),
+				rows.map((row) => [row.transcriptionId, Number(row.count ?? 0)]),
 			);
 		} catch (error) {
 			this.logger.error("Failed to count translations by transcription IDs", {

@@ -68,45 +68,42 @@ export async function POST(request: Request) {
 			subscriptionId,
 		});
 
-		let clerkUserId = event.meta.custom_data?.clerkUserId;
+			let userId =
+				event.meta.custom_data?.userId ?? event.meta.custom_data?.clerkUserId;
 
 		const billingService = new BillingSubscriptionsService(db, logger);
 
-		if (!clerkUserId) {
-			clerkUserId =
-				(await billingService.getUserIdBySubscriptionId(
-					"lemonsqueezy",
-					subscriptionId,
-				)) ?? undefined;
-		}
+			if (!userId) {
+				userId =
+					(await billingService.getUserIdBySubscriptionId(
+						"lemonsqueezy",
+						subscriptionId,
+					)) ?? undefined;
+			}
 
-		if (!clerkUserId) {
-			logger.error("Cannot resolve user for subscription event", {
-				eventName,
-				subscriptionId,
+			if (!userId) {
+				logger.error("Cannot resolve user for subscription event", {
+					eventName,
+					subscriptionId,
 			});
 			return Response.json({ received: true });
 		}
 
 		// Upsert billing subscription mapping for future lookups
 		await billingService.upsert({
-			id: `ls_${subscriptionId}`,
-			provider: "lemonsqueezy",
-			subscriptionId,
-			customerId: String(event.data.attributes.customer_id),
-			userId: clerkUserId,
-			status: event.data.attributes.status,
-			currentPeriodEnd:
-				event.data.attributes.renews_at || event.data.attributes.ends_at,
+				id: `ls_${subscriptionId}`,
+				provider: "lemonsqueezy",
+				subscriptionId,
+				customerId: String(event.data.attributes.customer_id),
+				userId,
+				status: event.data.attributes.status,
+				currentPeriodEnd:
+					event.data.attributes.renews_at || event.data.attributes.ends_at,
 		});
 
-		if ((HANDLED_EVENTS as readonly string[]).includes(eventName)) {
-			const syncService = new LemonSqueezySyncService(db, logger);
-			await syncService.syncSubscription(
-				clerkUserId,
-				subscriptionId,
-				eventName,
-			);
+			if ((HANDLED_EVENTS as readonly string[]).includes(eventName)) {
+				const syncService = new LemonSqueezySyncService(db, logger);
+				await syncService.syncSubscription(userId, subscriptionId, eventName);
 
 			logger.info("Webhook processed with canonical sync", {
 				subscriptionId,
