@@ -63,7 +63,7 @@ export const jobFitAiService = new JobFitAiService(
 	{
 		apiKey: env.ANTHROPIC_API_KEY || "",
 		model: env.ANTHROPIC_MODEL,
-		maxRetries: env.ANTHROPIC_MAX_RETRIES || env.ANTHROPIC_MAX_ATTEMPTS || 2,
+		maxRetries: env.ANTHROPIC_MAX_RETRIES ?? env.ANTHROPIC_MAX_ATTEMPTS ?? 2,
 	},
 	logger,
 );
