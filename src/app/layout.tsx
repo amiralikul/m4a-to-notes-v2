@@ -26,6 +26,9 @@ export const metadata: Metadata = {
 	title: "WavesToText - Audio to Text Transcription",
 	description:
 		"Convert your audio files to accurate text transcriptions using AI-powered speech recognition.",
+	icons: {
+		icon: "/icon.svg",
+	},
 };
 
 export default function RootLayout({
