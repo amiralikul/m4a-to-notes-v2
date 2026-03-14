@@ -1,16 +1,21 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TRIAL_DAILY_LIMIT } from "@/lib/trial-identity";
-import { createTestDb } from "@/test/db";
+import { cleanupTestDb, createTestDb } from "@/test/db";
 import { createTestLogger } from "@/test/setup";
 import { TrialUsageService } from "../trial-usage";
 
 describe("TrialUsageService", () => {
 	let service: TrialUsageService;
+	let db: Awaited<ReturnType<typeof createTestDb>>;
 
-	beforeEach(() => {
-		const db = createTestDb();
+	beforeEach(async () => {
+		db = await createTestDb();
 		const logger = createTestLogger();
 		service = new TrialUsageService(db, logger);
+	});
+
+	afterEach(async () => {
+		await cleanupTestDb(db);
 	});
 
 	it("returns full daily quota for new anon id", async () => {

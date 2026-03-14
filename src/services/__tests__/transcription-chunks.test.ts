@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it } from "vitest";
-import { createTestDb } from "@/test/db";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { cleanupTestDb, createTestDb } from "@/test/db";
 import { createTestLogger } from "@/test/setup";
 import {
 	TranscriptionChunkStatus,
@@ -10,12 +10,17 @@ import { TranscriptionsService } from "../transcriptions";
 describe("TranscriptionChunksService", () => {
 	let transcriptionsService: TranscriptionsService;
 	let chunksService: TranscriptionChunksService;
+	let db: Awaited<ReturnType<typeof createTestDb>>;
 
-	beforeEach(() => {
-		const db = createTestDb();
+	beforeEach(async () => {
+		db = await createTestDb();
 		const logger = createTestLogger();
 		transcriptionsService = new TranscriptionsService(db, logger);
 		chunksService = new TranscriptionChunksService(db, logger);
+	});
+
+	afterEach(async () => {
+		await cleanupTestDb(db);
 	});
 
 	it("creates and lists chunks in chunkIndex order", async () => {

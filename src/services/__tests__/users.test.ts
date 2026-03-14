@@ -1,15 +1,20 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { createTestDb } from "@/test/db";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { cleanupTestDb, createTestDb } from "@/test/db";
 import { createTestLogger } from "@/test/setup";
 import { UsersService } from "../users";
 
 describe("UsersService", () => {
 	let service: UsersService;
+	let db: Awaited<ReturnType<typeof createTestDb>>;
 
-	beforeEach(() => {
-		const db = createTestDb();
+	beforeEach(async () => {
+		db = await createTestDb();
 		const logger = createTestLogger();
 		service = new UsersService(db, logger);
+	});
+
+	afterEach(async () => {
+		await cleanupTestDb(db);
 	});
 
 	describe("get", () => {
