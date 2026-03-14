@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ComponentProps } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
@@ -33,12 +33,9 @@ export function AuthPageClient({
 	const [isSigningUp, setIsSigningUp] = useState(false);
 	const [isSocialLoading, setIsSocialLoading] = useState(false);
 
-	const handleEmailSignIn: React.ComponentProps<"form">["onSubmit"] = async (
+	const handleEmailSignIn: ComponentProps<"form">["onSubmit"] = async (
 		event,
 	) => {
-		if (!event) {
-			return;
-		}
 		event.preventDefault();
 		setIsSigningIn(true);
 		setSignInError(null);
@@ -63,12 +60,9 @@ export function AuthPageClient({
 		}
 	};
 
-	const handleEmailSignUp: React.ComponentProps<"form">["onSubmit"] = async (
+	const handleEmailSignUp: ComponentProps<"form">["onSubmit"] = async (
 		event,
 	) => {
-		if (!event) {
-			return;
-		}
 		event.preventDefault();
 		setIsSigningUp(true);
 		setSignUpError(null);

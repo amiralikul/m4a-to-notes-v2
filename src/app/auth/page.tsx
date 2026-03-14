@@ -1,9 +1,18 @@
+import { Suspense } from "react";
 import { AuthPageClient } from "@/components/auth-page-client";
+
+function AuthPageFallback() {
+	return <div className="min-h-[calc(100vh-4rem)] px-4 py-12" />;
+}
 
 export default function AuthPage() {
 	const isGoogleAuthEnabled = Boolean(
 		process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET,
 	);
 
-	return <AuthPageClient isGoogleAuthEnabled={isGoogleAuthEnabled} />;
+	return (
+		<Suspense fallback={<AuthPageFallback />}>
+			<AuthPageClient isGoogleAuthEnabled={isGoogleAuthEnabled} />
+		</Suspense>
+	);
 }
