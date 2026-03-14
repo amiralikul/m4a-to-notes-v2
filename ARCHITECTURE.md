@@ -1,4 +1,4 @@
-# AudioScribe V2 — Architecture
+# WavesToText V2 — Architecture
 
 Audio transcription SaaS that converts audio files to text via Whisper, with a web app and Telegram bot.
 

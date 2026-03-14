@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Workspace Overview
 
-**AudioScribe** — an audio transcription SaaS that converts M4A files to text via OpenAI Whisper, with a web app and Telegram bot. This workspace contains three related projects:
+**WavesToText** — an audio transcription SaaS that converts M4A files to text via OpenAI Whisper, with a web app and Telegram bot. This workspace contains three related projects:
 
 | Directory | What | Stack |
 |---|---|---|

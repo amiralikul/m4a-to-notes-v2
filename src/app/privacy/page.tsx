@@ -48,7 +48,7 @@ export default function PrivacyPolicyPage() {
 									1. Introduction
 								</h2>
 								<p className="text-gray-700 mb-6">
-									AudioScribe ("we," "our," or "us") is committed to protecting
+									WavesToText ("we," "our," or "us") is committed to protecting
 									your privacy. This Privacy Policy explains how we collect,
 									use, disclose, and safeguard your information when you use our
 									transcription service. Please read this policy carefully.

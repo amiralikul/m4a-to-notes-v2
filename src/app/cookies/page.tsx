@@ -59,7 +59,7 @@ export default function CookiePolicyPage() {
 									2. How We Use Cookies
 								</h2>
 								<p className="text-gray-700 mb-6">
-									AudioScribe uses cookies and similar tracking technologies
+									WavesToText uses cookies and similar tracking technologies
 									for various purposes, including to enhance functionality,
 									analyze usage patterns, and provide personalized experiences.
 									We are committed to using these technologies responsibly and
@@ -184,7 +184,7 @@ export default function CookiePolicyPage() {
 									Please note that disabling certain cookies may affect the
 									functionality of our website. Essential cookies are required
 									for basic functionality, and disabling them may prevent you
-									from using certain features of AudioScribe.
+									from using certain features of WavesToText.
 								</p>
 
 								<h2 className="text-2xl font-bold text-gray-900 mb-4">

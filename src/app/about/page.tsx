@@ -51,7 +51,7 @@ export default function AboutPage() {
 								</span>
 							</h1>
 							<p className="mx-auto max-w-2xl text-lg md:text-xl text-gray-600 leading-relaxed">
-								AudioScribe was born from a simple belief: everyone deserves
+								WavesToText was born from a simple belief: everyone deserves
 								easy access to the information locked away in audio files. We're
 								making transcription faster, more accurate, and more accessible
 								than ever.
@@ -64,7 +64,7 @@ export default function AboutPage() {
 									size="lg"
 									className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white h-14 px-8 rounded-xl"
 								>
-									Try AudioScribe
+									Try WavesToText
 								</Button>
 							</Link>
 							<Link href="/contact">
@@ -142,7 +142,7 @@ export default function AboutPage() {
 											Privacy by Design
 										</h3>
 										<p className="text-gray-600 leading-relaxed">
-											Your data is yours. We built AudioScribe with privacy at
+											Your data is yours. We built WavesToText with privacy at
 											its core, ensuring your files are secure, encrypted, and
 											automatically deleted after processing.
 										</p>
@@ -158,7 +158,7 @@ export default function AboutPage() {
 									<CardHeader className="pb-4">
 										<CardTitle className="flex items-center text-lg font-semibold">
 											<FileAudio className="mr-3 h-6 w-6 text-blue-600" />
-											AudioScribe Impact
+											WavesToText Impact
 										</CardTitle>
 										<CardDescription className="text-gray-500">
 											Transforming workflows worldwide
@@ -347,7 +347,7 @@ export default function AboutPage() {
 										</Badge>
 									</div>
 									<p className="text-gray-600 leading-relaxed">
-										AudioScribe launched to an enthusiastic response from early
+										WavesToText launched to an enthusiastic response from early
 										users. Their feedback helped us refine our service and add
 										features that matter most to real-world workflows.
 									</p>
@@ -369,7 +369,7 @@ export default function AboutPage() {
 										</Badge>
 									</div>
 									<p className="text-gray-600 leading-relaxed">
-										Today, AudioScribe serves thousands of users worldwide,
+										Today, WavesToText serves thousands of users worldwide,
 										processing millions of minutes of audio monthly. We're just
 										getting started on our mission to make audio accessible to
 										everyone.
@@ -392,7 +392,7 @@ export default function AboutPage() {
 							Our Team
 						</Badge>
 						<h2 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-							The People Behind AudioScribe
+							The People Behind WavesToText
 						</h2>
 						<p className="max-w-2xl text-lg text-gray-600 leading-relaxed">
 							We're a passionate team of engineers, designers, and researchers
@@ -451,7 +451,7 @@ export default function AboutPage() {
 								Ready to Transform Your Audio?
 							</h2>
 							<p className="mx-auto max-w-2xl text-lg text-blue-100 leading-relaxed">
-								Join thousands of professionals who trust AudioScribe to convert
+								Join thousands of professionals who trust WavesToText to convert
 								their audio content into accessible, searchable text.
 							</p>
 						</div>
@@ -464,7 +464,7 @@ export default function AboutPage() {
 									className="h-14 px-8 rounded-xl bg-white text-blue-600 hover:bg-gray-50"
 								>
 									<Sparkles className="mr-2 h-5 w-5" />
-									Try AudioScribe Now
+									Try WavesToText Now
 								</Button>
 							</Link>
 							<Link href="/contact">

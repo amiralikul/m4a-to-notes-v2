@@ -106,7 +106,7 @@ export default function FeaturesPage() {
 						</h1>
 
 						<p className="max-w-2xl text-lg md:text-xl text-stone-500 leading-relaxed">
-							Discover the features that make AudioScribe the best
+							Discover the features that make WavesToText the best
 							choice for converting your audio files to accurate
 							text.
 						</p>
@@ -119,7 +119,7 @@ export default function FeaturesPage() {
 							>
 								<Link href="/dashboard">
 									<Upload className="mr-2 h-5 w-5" />
-									Try AudioScribe Now
+									Try WavesToText Now
 								</Link>
 							</Button>
 							<Button
@@ -247,7 +247,7 @@ export default function FeaturesPage() {
 							Simple Process
 						</p>
 						<h2 className="text-3xl sm:text-4xl md:text-5xl font-display italic text-stone-900">
-							How AudioScribe works
+							How WavesToText works
 						</h2>
 					</div>
 
@@ -284,7 +284,7 @@ export default function FeaturesPage() {
 							Ready to transform your audio?
 						</h2>
 						<p className="text-lg text-stone-400 leading-relaxed">
-							Join professionals who trust AudioScribe for
+							Join professionals who trust WavesToText for
 							accurate, fast transcriptions.
 						</p>
 						<div className="flex flex-col sm:flex-row gap-4 pt-4">
