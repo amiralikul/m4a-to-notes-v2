@@ -41,7 +41,7 @@ export function AuthPageClient({
 		setSignInError(null);
 		try {
 			const { error } = await authClient.signIn.email({
-				email: signInEmail,
+				email: signInEmail.trim(),
 				password: signInPassword,
 				callbackURL: dashboardPath,
 			});
@@ -69,7 +69,7 @@ export function AuthPageClient({
 		try {
 			const { error } = await authClient.signUp.email({
 				name: signUpName,
-				email: signUpEmail,
+				email: signUpEmail.trim(),
 				password: signUpPassword,
 				callbackURL: dashboardPath,
 			});
