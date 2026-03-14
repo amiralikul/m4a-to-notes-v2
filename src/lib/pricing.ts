@@ -1,3 +1,5 @@
+import { env } from "@/env";
+
 interface PricingPlan {
 	name: string;
 	monthlyPrice: number;
@@ -26,8 +28,10 @@ export const PRICING_PLANS: Record<string, PricingPlan> = {
 		name: "Unlimited",
 		monthlyPrice: 9.9,
 		yearlyPrice: 90,
-		monthlyVariantId: process.env.NEXT_PUBLIC_LEMONSQUEEZY_PRO_MONTHLY_VARIANT_ID || null,
-		yearlyVariantId: process.env.NEXT_PUBLIC_LEMONSQUEEZY_PRO_YEARLY_VARIANT_ID || null,
+		monthlyVariantId:
+			env.NEXT_PUBLIC_LEMONSQUEEZY_PRO_MONTHLY_VARIANT_ID || null,
+		yearlyVariantId:
+			env.NEXT_PUBLIC_LEMONSQUEEZY_PRO_YEARLY_VARIANT_ID || null,
 		features: [
 			"Unlimited transcriptions",
 			"AI-powered transcription",

@@ -6,6 +6,7 @@ import { usersService } from "@/services";
 import { findPlanKeyByVariantId } from "@/lib/pricing";
 import { PLAN_HIERARCHY } from "@/lib/constants/plans";
 import { getServerSession } from "@/lib/auth-server";
+import { env } from "@/env";
 
 export const POST = route({
 	auth: "required",
@@ -14,8 +15,8 @@ export const POST = route({
 		planKey: z.string().optional(),
 	}),
 	handler: async ({ userId, body }) => {
-		const apiKey = process.env.LEMONSQUEEZY_API_KEY;
-		const storeId = process.env.LEMONSQUEEZY_STORE_ID;
+		const apiKey = env.LEMONSQUEEZY_API_KEY;
+		const storeId = env.LEMONSQUEEZY_STORE_ID;
 
 		if (!apiKey || !storeId) {
 			throw new Error(
@@ -57,12 +58,12 @@ export const POST = route({
 			);
 		}
 
-			const session = await getServerSession();
-			const userEmail = session?.user.email;
+		const session = await getServerSession();
+		const userEmail = session?.user.email;
 
-			const checkoutData: Record<string, unknown> = {
-				custom: { userId },
-			};
+		const checkoutData: Record<string, unknown> = {
+			custom: { userId },
+		};
 		if (userEmail) {
 			checkoutData.email = userEmail;
 		}
@@ -84,10 +85,10 @@ export const POST = route({
 							checkout_options: {
 								embed: true,
 							},
-							...(process.env.NEXT_PUBLIC_APP_URL
+							...(env.NEXT_PUBLIC_APP_URL
 								? {
 										product_options: {
-											redirect_url: `${process.env.NEXT_PUBLIC_APP_URL}/checkout/success`,
+											redirect_url: `${env.NEXT_PUBLIC_APP_URL}/checkout/success`,
 										},
 									}
 								: {}),

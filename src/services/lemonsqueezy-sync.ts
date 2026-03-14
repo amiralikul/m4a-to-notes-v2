@@ -10,6 +10,7 @@ import type { AppDatabase } from "@/db/types";
 import { getErrorMessage } from "@/lib/errors";
 import type { Logger } from "@/lib/logger";
 import type { LemonSqueezySubscriptionAttributes } from "@/lib/types";
+import { env } from "@/env";
 import { UsersService } from "./users";
 
 interface EntitlementsMapping {
@@ -37,7 +38,7 @@ export class LemonSqueezySyncService {
 		database: AppDatabase,
 		logger: Logger,
 	) {
-		this.apiKey = process.env.LEMONSQUEEZY_API_KEY || "";
+		this.apiKey = env.LEMONSQUEEZY_API_KEY || "";
 		this.logger = logger;
 		this.users = new UsersService(database, logger);
 	}

@@ -19,29 +19,30 @@ import {
 import { TranslationsService } from "./translations";
 import { BillingSubscriptionsService } from "./billing-subscriptions";
 import { TranscriptionChunksService } from "./transcription-chunks";
+import { env } from "@/env";
 
 export const transcriptionsService = new TranscriptionsService(db, logger);
 export const transcriptionChunksService = new TranscriptionChunksService(db, logger);
 export const usersService = new UsersService(db, logger);
 
 const transcriptionProvider = parseTranscriptionProvider(
-	process.env.TRANSCRIPTION_PROVIDER,
+	env.TRANSCRIPTION_PROVIDER,
 );
-const textAiProvider = parseTextAiProvider(process.env.SUMMARY_PROVIDER);
+const textAiProvider = parseTextAiProvider(env.SUMMARY_PROVIDER);
 
 export const transcriptionAiService = new TranscriptionAiService(
 	{
 		provider: transcriptionProvider,
-		groqKey: process.env.GROQ_API_KEY || "",
-		openaiKey: process.env.OPENAI_API_KEY || "",
+		groqKey: env.GROQ_API_KEY || "",
+		openaiKey: env.OPENAI_API_KEY || "",
 	},
 	logger,
 );
 export const textAiService = new TextAiService(
 	{
 		provider: textAiProvider,
-		model: process.env.SUMMARY_MODEL,
-		openaiKey: process.env.OPENAI_API_KEY || "",
+		model: env.SUMMARY_MODEL,
+		openaiKey: env.OPENAI_API_KEY || "",
 	},
 	logger,
 );
@@ -53,28 +54,22 @@ export const actorsService = new ActorsService(db, logger);
 export const jobAnalysesService = new JobAnalysesService(db, logger);
 export const brightDataService = new BrightDataService(
 	{
-		apiKey: process.env.BRIGHTDATA_API_KEY || "",
-		datasetId:
-			process.env.BRIGHTDATA_LINKEDIN_JOBS_DATASET_ID || "gd_lpfll7v5hcqtkxl6l",
+		apiKey: env.BRIGHTDATA_API_KEY || "",
+		datasetId: env.BRIGHTDATA_LINKEDIN_JOBS_DATASET_ID,
 	},
 	logger,
 );
 export const jobFitAiService = new JobFitAiService(
 	{
-		apiKey: process.env.ANTHROPIC_API_KEY || "",
-		model: process.env.ANTHROPIC_MODEL || "claude-haiku-4-5",
-		maxRetries: Number.parseInt(
-			process.env.ANTHROPIC_MAX_RETRIES ||
-				process.env.ANTHROPIC_MAX_ATTEMPTS ||
-				"2",
-			10,
-		),
+		apiKey: env.ANTHROPIC_API_KEY || "",
+		model: env.ANTHROPIC_MODEL,
+		maxRetries: env.ANTHROPIC_MAX_RETRIES || env.ANTHROPIC_MAX_ATTEMPTS || 2,
 	},
 	logger,
 );
 export const translationsService = new TranslationsService(db, logger);
 export const assemblyAiService = new AssemblyAiService(
-	{ apiKey: process.env.ASSEMBLYAI_API_KEY || "" },
+	{ apiKey: env.ASSEMBLYAI_API_KEY || "" },
 	logger,
 );
 export const billingSubscriptionsService = new BillingSubscriptionsService(

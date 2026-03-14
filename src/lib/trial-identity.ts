@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
+import { env } from "@/env";
 
 export const TRIAL_ACTOR_COOKIE_NAME = "actor_id";
 export const TRIAL_DAILY_LIMIT = 3;
@@ -25,7 +26,7 @@ export interface ActorIdentity {
 }
 
 function getTrialCookieSecret(): string {
-	const secret = process.env.TRIAL_COOKIE_SECRET;
+	const secret = env.TRIAL_COOKIE_SECRET;
 	if (!secret) {
 		throw new Error("TRIAL_COOKIE_SECRET is not set");
 	}

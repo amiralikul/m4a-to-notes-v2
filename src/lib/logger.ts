@@ -56,6 +56,9 @@ export { Logger };
 export type { LogLevel, LogMeta };
 
 // Singleton export (#16)
-export const logger = new Logger(
-	(process.env.LOG_LEVEL as LogLevel) || "INFO",
-);
+const defaultLogLevel =
+	typeof window === "undefined"
+		? ((process.env.LOG_LEVEL as LogLevel | undefined) ?? "INFO")
+		: "INFO";
+
+export const logger = new Logger(defaultLogLevel);

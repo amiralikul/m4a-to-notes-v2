@@ -12,6 +12,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 type AuthTab = "signin" | "signup";
 
 const dashboardPath = "/dashboard";
+const emailVerificationSentPath = "/auth?check-email=1";
+const emailVerifiedPath = "/auth?verified=1";
 
 export function AuthPageClient({
 	isGoogleAuthEnabled,
@@ -20,7 +22,15 @@ export function AuthPageClient({
 }) {
 	const router = useRouter();
 	const searchParams = useSearchParams();
-	const tab: AuthTab = searchParams.get("tab") === "signup" ? "signup" : "signin";
+	const isEmailCheckState = searchParams.get("check-email") === "1";
+	const isEmailVerifiedState = searchParams.get("verified") === "1";
+	const verificationEmail = searchParams.get("email");
+	const tab: AuthTab =
+		searchParams.get("tab") === "signup" &&
+		!isEmailCheckState &&
+		!isEmailVerifiedState
+			? "signup"
+			: "signin";
 	const [signInEmail, setSignInEmail] = useState("");
 	const [signInPassword, setSignInPassword] = useState("");
 	const [signUpName, setSignUpName] = useState("");
@@ -71,7 +81,7 @@ export function AuthPageClient({
 				name: signUpName,
 				email: signUpEmail,
 				password: signUpPassword,
-				callbackURL: dashboardPath,
+				callbackURL: emailVerifiedPath,
 			});
 
 			if (error) {
@@ -79,7 +89,9 @@ export function AuthPageClient({
 				return;
 			}
 
-			router.push(dashboardPath);
+			router.push(
+				`${emailVerificationSentPath}&email=${encodeURIComponent(signUpEmail)}`,
+			);
 			router.refresh();
 		} catch {
 			setSignUpError(
@@ -122,6 +134,20 @@ export function AuthPageClient({
 						</CardDescription>
 					</CardHeader>
 					<CardContent>
+						{isEmailCheckState ? (
+							<div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+								We sent a verification link to{" "}
+								<span className="font-medium">
+									{verificationEmail || "your email address"}
+								</span>
+								. Open it to verify your account.
+							</div>
+						) : null}
+						{isEmailVerifiedState ? (
+							<div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+								Your email has been verified. You can continue to the dashboard.
+							</div>
+						) : null}
 						<Tabs
 							value={tab}
 							onValueChange={(value) => {

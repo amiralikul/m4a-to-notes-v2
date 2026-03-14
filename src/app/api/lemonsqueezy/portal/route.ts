@@ -3,6 +3,7 @@ import { route } from "@/lib/route";
 import { ForbiddenError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { billingSubscriptionsService } from "@/services";
+import { env } from "@/env";
 
 export const POST = route({
 	auth: "required",
@@ -16,7 +17,7 @@ export const POST = route({
 
 		if (!isOwner) throw new ForbiddenError();
 
-		const apiKey = process.env.LEMONSQUEEZY_API_KEY;
+		const apiKey = env.LEMONSQUEEZY_API_KEY;
 		if (!apiKey) {
 			throw new Error("LEMONSQUEEZY_API_KEY is required");
 		}
