@@ -6,6 +6,7 @@ import { getErrorMessage } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import type { LemonSqueezyWebhook } from "@/lib/types";
 import { WEBHOOK_EVENT_TYPES } from "@/lib/constants/plans";
+import { env } from "@/env";
 
 function verifySignature(
 	body: string,
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
 			hasSignature: !!signature,
 		});
 
-		const webhookSecret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET;
+		const webhookSecret = env.LEMONSQUEEZY_WEBHOOK_SECRET;
 		if (!webhookSecret) {
 			logger.error("LEMONSQUEEZY_WEBHOOK_SECRET not configured");
 			return Response.json(

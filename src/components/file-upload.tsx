@@ -21,6 +21,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { upload } from "@vercel/blob/client";
 import { logger } from "@/lib/logger";
+import { env } from "@/env";
 import { viewerTranscriptionKeys } from "@/lib/query-keys";
 import { TRIAL_ERROR_CODES } from "@/lib/trial-errors";
 import {
@@ -87,7 +88,7 @@ const MAX_CHUNKER_FILE_SIZE = 1024 * 1024 * 1024;
 const RECENT_TRANSCRIPTIONS_LIMIT = 10;
 const CHUNKER_CHUNK_SECONDS = 10 * 60; //FIXME
 const CHUNKER_OVERLAP_SECONDS = 10;
-const AUDIO_CHUNKER_URL = process.env.NEXT_PUBLIC_AUDIO_CHUNKER_URL;
+const AUDIO_CHUNKER_URL = env.NEXT_PUBLIC_AUDIO_CHUNKER_URL;
 
 function isDailyLimitErrorMessage(message: string): boolean {
 	const normalized = message.toLowerCase();

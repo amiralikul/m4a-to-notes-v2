@@ -10,10 +10,12 @@ import multer from "multer";
 import pino from "pino";
 import { z } from "zod";
 import { put } from "@vercel/blob";
+import { getChunkerEnv } from "./env";
 
 const execFileAsync = promisify(execFile);
+const env = getChunkerEnv();
 
-const logger = pino({ level: process.env.LOG_LEVEL || "info" });
+const logger = pino({ level: env.LOG_LEVEL });
 const app = express();
 
 const ONE_GB = 1024 * 1024 * 1024;
@@ -79,9 +81,7 @@ interface ChunkResponseBody {
 }
 
 function getBlobToken(): string {
-	const token =
-		process.env.BLOB_READ_WRITE_TOKEN ||
-		process.env.M4A_TO_NOTES_READ_WRITE_TOKEN;
+	const token = env.BLOB_READ_WRITE_TOKEN || env.M4A_TO_NOTES_READ_WRITE_TOKEN;
 
 	if (!token) {
 		throw new Error(
@@ -93,7 +93,7 @@ function getBlobToken(): string {
 }
 
 function parseAllowedOrigins(): string[] | null {
-	const raw = process.env.ALLOWED_ORIGINS;
+	const raw = env.ALLOWED_ORIGINS;
 	if (!raw) return null;
 
 	const values = raw
@@ -361,7 +361,7 @@ app.use(
 	},
 );
 
-const port = Number.parseInt(process.env.PORT || "8080", 10);
+const port = env.PORT;
 app.listen(port, () => {
 	logger.info({ port }, "Audio chunker service started");
 });
