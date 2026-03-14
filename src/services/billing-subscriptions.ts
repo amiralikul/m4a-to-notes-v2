@@ -1,15 +1,13 @@
 import { and, eq } from "drizzle-orm";
 import { billingSubscriptions } from "@/db/schema";
 import type { BillingSubscription, InsertBillingSubscription } from "@/db/schema";
+import type { AppDatabase } from "@/db/types";
 import { getErrorMessage } from "@/lib/errors";
 import type { Logger } from "@/lib/logger";
 
-// biome-ignore lint: needed for generic DB type
-type Database = any;
-
 export class BillingSubscriptionsService {
 	constructor(
-		private db: Database,
+		private db: AppDatabase,
 		private logger: Logger,
 	) {}
 
@@ -44,7 +42,7 @@ export class BillingSubscriptionsService {
 	): Promise<string | null> {
 		try {
 			const result = await this.db
-				.select({ userId: billingSubscriptions.userId })
+				.select()
 				.from(billingSubscriptions)
 				.where(
 					and(

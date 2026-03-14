@@ -1,8 +1,9 @@
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
+import type { AppDatabase } from "@/db/types";
 import * as schema from "@/db/schema";
 
-export function createTestDb() {
+export function createTestDb(): AppDatabase {
 	const sqlite = new Database(":memory:");
 	sqlite.pragma("foreign_keys = ON");
 

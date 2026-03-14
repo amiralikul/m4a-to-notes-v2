@@ -38,4 +38,5 @@
 - [ ] **Vocabulary & Prompt Customization** (Pro) — Whisper supports a `prompt` parameter for domain-specific terms. Let Pro users set custom vocabulary per-request.
 - [ ] **Team / Workspace Collaboration** — Shared workspace for multiple users. Requires `workspaces` table and invitation system. Good for B2B.
 - [ ] **Webhooks / API Access** (Developer Tier) — Public API for programmatic integration. Internal API already exists, needs auth tokens and docs.
-- [ ] **Email Notifications** — Notify users when transcription completes. Clerk has email addresses, use Resend or similar.
+- [ ] **Email Notifications** — Notify users when transcription completes. Auth users have email addresses, use Resend or similar.
+- [ ] **Harden Better Auth Email/Password Flows** — Add password reset, email verification, stricter password length rules, and absolute callback URLs. Consider requiring verified email before sign-in once outbound email is wired.

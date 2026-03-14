@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { auth } from "@clerk/nextjs/server";
+import { getServerSession } from "@/lib/auth-server";
 import { POST as createAnalysis } from "@/app/api/analyses/route";
 import { GET as getAnalysis } from "@/app/api/analyses/[analysisId]/route";
 import { JobSourceType } from "@/services/job-analyses";
@@ -9,8 +9,8 @@ import {
 	workflowService,
 } from "@/services";
 
-vi.mock("@clerk/nextjs/server", () => ({
-	auth: vi.fn(),
+vi.mock("@/lib/auth-server", () => ({
+	getServerSession: vi.fn(),
 }));
 
 vi.mock("@/services", () => ({
@@ -34,7 +34,10 @@ vi.mock("@/lib/logger", () => ({
 describe("Job analyses API", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		vi.mocked(auth).mockResolvedValue({ userId: "user_1" } as never);
+		vi.mocked(getServerSession).mockResolvedValue({
+			user: { id: "user_1", email: "user@test.com", name: "User" },
+			session: { id: "sess_1", userId: "user_1" },
+		} as never);
 		vi.mocked(brightDataService.isSupportedLinkedinJobUrl).mockReturnValue(true);
 		vi.mocked(jobAnalysesService.create).mockResolvedValue("analysis-1");
 		vi.mocked(jobAnalysesService.markFailed).mockResolvedValue({} as never);
@@ -64,7 +67,7 @@ describe("Job analyses API", () => {
 	});
 
 	it("returns 401 when unauthenticated", async () => {
-		vi.mocked(auth).mockResolvedValue({ userId: null } as never);
+		vi.mocked(getServerSession).mockResolvedValue(null);
 
 		const response = await createAnalysis(
 			new Request("http://localhost:3000/api/analyses", {

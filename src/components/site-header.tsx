@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { SafeAuthButtons } from "./safe-auth-buttons";
-import { useUser } from "@clerk/nextjs";
+import { useAuth } from "@/hooks/use-auth";
 
 export function SiteHeader() {
 	const [scrolled, setScrolled] = useState(false);
-	const { isSignedIn, user } = useUser();
+	const { isSignedIn } = useAuth();
 
 	useEffect(() => {
 		const onScroll = () => setScrolled(window.scrollY > 4);
@@ -49,12 +49,6 @@ export function SiteHeader() {
 				</Link>
 
 				<nav className="hidden md:flex flex-1 items-center gap-8 justify-start ml-10">
-					{ user?.id === "user_39ckoysfZ8KgkQnJXBUTnL8JnRN" && <Link
-						href="/job-match"
-						className="text-sm text-stone-500 hover:text-stone-900 transition-colors"
-					>
-						Job Match
-					</Link> }
 					<Link
 						href="/features"
 						className="text-sm text-stone-500 hover:text-stone-900 transition-colors"
@@ -82,12 +76,6 @@ export function SiteHeader() {
 				</nav>
 
 				<div className="ml-auto flex items-center gap-4">
-					{ user?.id === "user_39ckoysfZ8KgkQnJXBUTnL8JnRN" &&  <Link
-						href="/job-match"
-						className="text-sm text-stone-500 hover:text-stone-900 transition-colors"
-					>
-						Job Match
-					</Link> }
 					<Link
 						href="/dashboard"
 						className="text-sm text-stone-500 hover:text-stone-900 transition-colors"

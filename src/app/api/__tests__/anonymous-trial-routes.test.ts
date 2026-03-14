@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { auth } from "@clerk/nextjs/server";
 import { handleUpload } from "@vercel/blob/client";
 import { TRIAL_ERROR_CODES } from "@/lib/trial-errors";
+import { getServerSession } from "@/lib/auth-server";
 import { getUtcDayKey, resolveActorIdentity } from "@/lib/trial-identity";
 import {
 	actorsService,
@@ -15,9 +15,8 @@ import { GET as getTranscript } from "../../api/transcriptions/[transcriptionId]
 import { POST as startTranscription } from "../../api/start-transcription/route";
 import { POST as uploadRoute } from "../../api/upload/route";
 
-vi.mock("@clerk/nextjs/server", () => ({
-	auth: vi.fn().mockResolvedValue({ userId: null }),
-	currentUser: vi.fn().mockResolvedValue(null),
+vi.mock("@/lib/auth-server", () => ({
+	getServerSession: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("@vercel/blob/client", () => ({
@@ -60,7 +59,7 @@ vi.mock("@/lib/logger", () => ({
 describe("Anonymous trial routes", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		vi.mocked(auth).mockResolvedValue({ userId: null } as never);
+		vi.mocked(getServerSession).mockResolvedValue(null);
 		vi.mocked(resolveActorIdentity).mockResolvedValue({ actorId: "actor-1" });
 		vi.mocked(actorsService.ensureActor).mockResolvedValue(undefined);
 		vi.mocked(getUtcDayKey).mockReturnValue("2026-02-16");
