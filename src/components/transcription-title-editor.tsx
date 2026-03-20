@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, Pencil, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { getTranscriptionTitle } from "@/components/transcription-title-utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,13 +48,6 @@ export function TranscriptionTitleEditor({
 	const [draft, setDraft] = useState(resolvedTitle);
 	const [validationError, setValidationError] = useState<string | null>(null);
 
-	useEffect(() => {
-		if (!isEditing) {
-			setDraft(resolvedTitle);
-			setValidationError(null);
-		}
-	}, [isEditing, resolvedTitle]);
-
 	async function handleSave() {
 		const nextDisplayName = draft.trim();
 		const nextValidationError = validateDisplayNameDraft(draft);
@@ -93,7 +86,11 @@ export function TranscriptionTitleEditor({
 						variant="ghost"
 						size="icon"
 						className="h-8 w-8 shrink-0"
-						onClick={() => setIsEditing(true)}
+						onClick={() => {
+							setDraft(resolvedTitle);
+							setValidationError(null);
+							setIsEditing(true);
+						}}
 						aria-label={`Rename ${resolvedTitle}`}
 					>
 						<Pencil className="h-4 w-4" />
