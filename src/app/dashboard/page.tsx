@@ -16,6 +16,7 @@ import {
 import { AudioPlayer } from "@/components/audio-player";
 import { CopyButton } from "@/components/copy-button";
 import { SummaryRenderer, ContentTypeBadge } from "@/components/summary-renderer";
+import { TranscriptionTitleEditor } from "@/components/transcription-title-editor";
 import type { TranscriptionSummaryData } from "@/db/schema";
 import { isFlexibleSummary } from "@/db/schema";
 import { useRef, useState } from "react";
@@ -30,10 +31,12 @@ import {
 } from "@/components/ui/card";
 import { transcriptionKeys } from "@/lib/query-keys";
 import { useAuth } from "@/hooks/use-auth";
+import { useTranscriptionRename } from "@/hooks/use-transcription-rename";
 
 interface TranscriptionItem {
 	id: string;
 	filename: string;
+	displayName: string | null;
 	status: "pending" | "processing" | "completed" | "failed";
 	progress: number;
 	preview: string | null;
@@ -330,10 +333,8 @@ export default function DashboardPage() {
 							<CardContent className="py-4">
 								<div className="flex items-center justify-between gap-4">
 									<div className="min-w-0 flex-1">
-										<div className="flex items-center gap-3 mb-1 flex-wrap">
-											<span className="font-medium truncate text-stone-900">
-												{t.filename}
-											</span>
+										<div className="mb-1 flex flex-wrap items-start gap-3">
+											<TranscriptionListTitle transcription={t} />
 											<Badge className={statusConfig[t.status].className}>
 												{statusConfig[t.status].label}
 												{(t.status === "processing" ||
@@ -464,6 +465,26 @@ export default function DashboardPage() {
 				</div>
 			)}
 		</div>
+	);
+}
+
+function TranscriptionListTitle({
+	transcription,
+}: {
+	transcription: TranscriptionItem;
+}) {
+	const renameMutation = useTranscriptionRename(transcription.id);
+
+	return (
+		<TranscriptionTitleEditor
+			displayName={transcription.displayName}
+			filename={transcription.filename}
+			isPending={renameMutation.isPending}
+			errorMessage={renameMutation.errorMessage}
+			onSave={renameMutation.rename}
+			onCancel={renameMutation.clearError}
+			className="min-w-0 flex-1"
+		/>
 	);
 }
 
