@@ -56,8 +56,10 @@ Migration behavior:
 
 ## API Design
 
-Add an authenticated update endpoint for a specific transcription. The endpoint must:
+Add an owner-scoped update endpoint for a specific transcription. The endpoint must:
 
+- use the existing optional-auth owner resolution so signed-in and signed-out owners can rename their own transcriptions
+- align with the existing `/api/me/transcriptions/[transcriptionId]` mutation pattern unless implementation constraints in the codebase require an adjacent owner-scoped route
 - resolve the current owner identity using existing route helpers
 - load the transcription via owner-scoped lookup
 - reject updates for non-owned or missing records
@@ -66,7 +68,17 @@ Add an authenticated update endpoint for a specific transcription. The endpoint 
 - persist the new `displayName`
 - return the updated transcription payload including `displayName`
 
-The route should be separate from delete/status endpoints if that keeps responsibilities clearer in the current API layout.
+The route should preserve the current anonymous-owner flow instead of requiring a signed-in session.
+
+## Read Model Updates
+
+Every payload that powers a transcription title in the UI must expose `displayName` alongside `filename`, including:
+
+- `/api/me/transcriptions` for homepage history and dashboard list views
+- `/api/transcriptions/[transcriptionId]/detail` for the dashboard detail view
+- any local query/mutation response types that currently model transcription list or detail records
+
+This change is not complete if rename persists successfully but any list/detail surface continues to read only `filename`.
 
 ## UI Design
 
@@ -103,7 +115,12 @@ Use a consistent inline edit pattern:
 3. User enters a new title and submits.
 4. Client sends the trimmed title to the rename endpoint.
 5. Server validates ownership and input, persists `displayName`, and returns the updated record.
-6. Client updates or invalidates transcription queries so all visible surfaces reflect the new title.
+6. Client updates or invalidates all relevant transcription queries so all visible surfaces reflect the new title.
+
+Relevant cache families include:
+
+- dashboard/detail query keys under `transcriptionKeys.*`
+- homepage/viewer history query keys under `viewerTranscriptionKeys.*`
 
 ## Error Handling
 
@@ -119,6 +136,7 @@ Use a consistent inline edit pattern:
 - successful rename updates only `displayName`
 - rename keeps `filename` unchanged
 - owner-scoped access is enforced
+- signed-out owner flow remains supported
 - empty and whitespace-only input is rejected
 
 ### UI
@@ -126,6 +144,7 @@ Use a consistent inline edit pattern:
 - title rendering falls back to `filename` when `displayName` is null
 - title rendering prefers `displayName` when present
 - successful rename updates visible title in list/detail flows
+- rename invalidates or refreshes both dashboard and homepage history query families
 
 ## Risks
 
