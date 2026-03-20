@@ -26,7 +26,9 @@ const { mutationState, useMutationMock, useQueryClientMock } = vi.hoisted(() => 
 				};
 			},
 		),
-		useQueryClientMock: vi.fn(() => ({ marker: "query-client" })),
+		useQueryClientMock: vi.fn(() => ({
+			invalidateQueries: vi.fn().mockResolvedValue(undefined),
+		})),
 	};
 });
 
