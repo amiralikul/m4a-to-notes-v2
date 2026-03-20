@@ -499,6 +499,7 @@ export class TranscriptionsService {
 			status: transcription.status,
 			progress: transcription.progress,
 			filename: transcription.filename,
+			displayName: transcription.displayName,
 			createdAt: transcription.createdAt,
 			completedAt: transcription.completedAt,
 			preview: transcription.preview,
