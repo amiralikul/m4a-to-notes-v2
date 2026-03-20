@@ -120,6 +120,7 @@ export const transcriptions = sqliteTable(
 		progress: integer("progress").default(0).notNull(),
 		audioKey: text("audio_key").notNull(),
 		filename: text("filename").notNull(),
+		displayName: text("display_name"),
 		source: text("source", {
 			enum: ["web", "telegram"],
 		}).notNull(),

@@ -251,6 +251,13 @@ export class TranscriptionsService {
 		});
 	}
 
+	async updateDisplayName(
+		transcriptionId: string,
+		displayName: string | null,
+	): Promise<Transcription> {
+		return this.update(transcriptionId, { displayName });
+	}
+
 	async updateProgress(
 		transcriptionId: string,
 		progress: number,
