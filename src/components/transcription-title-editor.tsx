@@ -71,9 +71,9 @@ export function TranscriptionTitleEditor({
 
 	if (!isEditing) {
 		return (
-			<div className={cn("min-w-0", className)}>
+			<div className={cn("min-w-0 max-w-md", className)}>
 				<div className="flex items-start gap-2">
-					<div className="min-w-0 flex-1">
+					<div className="min-w-0">
 						<p className="font-medium text-stone-900 truncate">{resolvedTitle}</p>
 						{originalFilenameLabel ? (
 							<p className="text-xs text-stone-500 truncate">
@@ -85,7 +85,7 @@ export function TranscriptionTitleEditor({
 						type="button"
 						variant="ghost"
 						size="icon"
-						className="h-8 w-8 shrink-0"
+						className="h-6 w-6 shrink-0"
 						onClick={() => {
 							setDraft(resolvedTitle);
 							setValidationError(null);
@@ -104,7 +104,7 @@ export function TranscriptionTitleEditor({
 	}
 
 	return (
-		<div className={cn("space-y-2", className)}>
+		<div className={cn("space-y-2 max-w-md", className)}>
 			<div className="flex items-start gap-2">
 				<Input
 					value={draft}

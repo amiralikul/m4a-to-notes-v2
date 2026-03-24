@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
-import { DM_Sans, Instrument_Serif, Geist_Mono } from "next/font/google";
+import { DM_Sans, Instrument_Serif, Geist_Mono, Geist } from "next/font/google";
 import "./globals.css";
 import { LemonSqueezyProvider } from "@/components/lemonsqueezy-provider";
 import { QueryProvider } from "@/components/query-provider";
 import { SiteHeader } from "@/components/site-header";
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 const dmSans = DM_Sans({
 	subsets: ["latin"],
@@ -37,7 +40,7 @@ export default function RootLayout({
 	children: React.ReactNode;
 }>) {
 	return (
-		<html lang="en">
+		<html lang="en" className={cn("font-sans", geist.variable)}>
 			<body
 				className={`${dmSans.variable} ${instrumentSerif.variable} ${geistMono.variable} antialiased`}
 			>

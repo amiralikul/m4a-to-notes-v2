@@ -333,8 +333,10 @@ export default function DashboardPage() {
 							<CardContent className="py-4">
 								<div className="flex items-center justify-between gap-4">
 									<div className="min-w-0 flex-1">
-										<div className="mb-1 flex flex-wrap items-start gap-3">
+										<div className="mb-1">
 											<TranscriptionListTitle transcription={t} />
+										</div>
+										<div className="mb-1 flex flex-wrap items-center gap-2">
 											<Badge className={statusConfig[t.status].className}>
 												{statusConfig[t.status].label}
 												{(t.status === "processing" ||
