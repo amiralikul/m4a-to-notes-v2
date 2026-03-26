@@ -116,8 +116,13 @@ export class TranscriptionChatsService {
 	): Promise<ChatMessageRow> {
 		try {
 			const now = new Date().toISOString();
+			// Drizzle exposes different transaction callback types for sync test DBs and
+			// async production DBs. The runtime API is compatible, so normalize here.
+			const runTransaction = this.db.transaction as unknown as <T>(
+				callback: (tx: AppDatabase) => Promise<T>,
+			) => Promise<T>;
 
-			const insertedMessage = await this.db.transaction(async (tx) => {
+			const insertedMessage = await runTransaction(async (tx) => {
 				const messageId = crypto.randomUUID();
 
 				await tx.insert(chatMessages).values({

@@ -14,17 +14,23 @@ import {
 	parseTextAiProvider,
 	parseTranscriptionProvider,
 	TextAiService,
+	TranscriptionChatAiService,
 	TranscriptionAiService,
 } from "./ai";
 import { TranslationsService } from "./translations";
 import { BillingSubscriptionsService } from "./billing-subscriptions";
 import { TranscriptionChunksService } from "./transcription-chunks";
 import { TranscriptionChatsService } from "./transcription-chats";
+import { TranscriptionChatRetrievalService } from "./transcription-chat-retrieval";
 import { env } from "@/env";
 
 export const transcriptionsService = new TranscriptionsService(db, logger);
 export const transcriptionChunksService = new TranscriptionChunksService(db, logger);
 export const transcriptionChatsService = new TranscriptionChatsService(db, logger);
+export const transcriptionChatRetrievalService = new TranscriptionChatRetrievalService(
+	db,
+	logger,
+);
 export const usersService = new UsersService(db, logger);
 
 const transcriptionProvider = parseTranscriptionProvider(
@@ -76,5 +82,13 @@ export const assemblyAiService = new AssemblyAiService(
 );
 export const billingSubscriptionsService = new BillingSubscriptionsService(
 	db,
+	logger,
+);
+export const transcriptionChatAiService = new TranscriptionChatAiService(
+	{
+		apiKey: env.ANTHROPIC_API_KEY || "",
+		model: env.ANTHROPIC_MODEL,
+		maxRetries: env.ANTHROPIC_MAX_RETRIES ?? env.ANTHROPIC_MAX_ATTEMPTS ?? 2,
+	},
 	logger,
 );

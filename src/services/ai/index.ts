@@ -19,3 +19,7 @@ export {
 	type AssemblyAiServiceConfig,
 	type AssemblyAiResult,
 } from "./assemblyai.service";
+export {
+	TranscriptionChatAiService,
+	type TranscriptionChatAiServiceConfig,
+} from "./transcription-chat-ai.service";
