@@ -183,6 +183,13 @@
       "when": 1773174644574,
       "tag": "0025_rename_better_auth_tables_plural",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1774531008757,
+      "tag": "0026_add_transcription_chat_tables",
+      "breakpoints": true
     }
   ]
 }

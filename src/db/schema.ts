@@ -1,6 +1,20 @@
 import { sql } from "drizzle-orm";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
+export type TranscriptionChatMessagePart =
+	{
+		type: string;
+		text?: string;
+		[key: string]: unknown;
+	};
+
+export type TranscriptionChatQuotedChunk = {
+	chunkId: string;
+	startMs: number;
+	endMs: number;
+	text: string;
+};
+
 export const users = sqliteTable(
 	"users",
 	{
@@ -201,6 +215,62 @@ export const transcriptionChunks = sqliteTable(
 		uniqueIndex("idx_transcription_chunks_transcription_chunk").on(
 			table.transcriptionId,
 			table.chunkIndex,
+		),
+	],
+);
+
+export const transcriptionChats = sqliteTable(
+	"transcription_chats",
+	{
+		id: text("id").primaryKey(),
+		transcriptionId: text("transcription_id")
+			.notNull()
+			.references(() => transcriptions.id, { onDelete: "cascade" }),
+		userId: text("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		createdAt: text("created_at")
+			.notNull()
+			.default(sql`(CURRENT_TIMESTAMP)`),
+		updatedAt: text("updated_at")
+			.notNull()
+			.default(sql`(CURRENT_TIMESTAMP)`)
+			.$onUpdate(() => sql`(CURRENT_TIMESTAMP)`),
+	},
+	(table) => [
+		uniqueIndex("transcription_chats_transcription_user_unique").on(
+			table.transcriptionId,
+			table.userId,
+		),
+		index("transcription_chats_user_id_idx").on(table.userId),
+		index("transcription_chats_updated_at_idx").on(table.updatedAt),
+	],
+);
+
+export const chatMessages = sqliteTable(
+	"chat_messages",
+	{
+		id: text("id").primaryKey(),
+		chatId: text("chat_id")
+			.notNull()
+			.references(() => transcriptionChats.id, { onDelete: "cascade" }),
+		role: text("role", {
+			enum: ["user", "assistant"],
+		}).notNull(),
+		parts: text("parts", { mode: "json" })
+			.$type<TranscriptionChatMessagePart[]>()
+			.notNull(),
+		quotedChunks: text("quoted_chunks", { mode: "json" })
+			.$type<TranscriptionChatQuotedChunk[] | null>(),
+		createdAt: text("created_at")
+			.notNull()
+			.default(sql`(CURRENT_TIMESTAMP)`),
+	},
+	(table) => [
+		index("chat_messages_chat_id_idx").on(table.chatId),
+		index("chat_messages_chat_id_created_at_idx").on(
+			table.chatId,
+			table.createdAt,
 		),
 	],
 );
