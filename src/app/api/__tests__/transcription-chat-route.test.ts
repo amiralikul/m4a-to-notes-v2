@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
 	listMessages: vi.fn(),
 	appendUserMessage: vi.fn(),
 	appendAssistantMessage: vi.fn(),
+	deleteLatestAssistantMessage: vi.fn(),
 	findRelevantChunks: vi.fn(),
 	streamResponse: vi.fn(),
 	toUIMessageStreamResponse: vi.fn(),
@@ -38,6 +39,7 @@ vi.mock("@/services", () => ({
 		listMessages: mocks.listMessages,
 		appendUserMessage: mocks.appendUserMessage,
 		appendAssistantMessage: mocks.appendAssistantMessage,
+		deleteLatestAssistantMessage: mocks.deleteLatestAssistantMessage,
 	},
 	transcriptionChatRetrievalService: {
 		findRelevantChunks: mocks.findRelevantChunks,
@@ -79,8 +81,27 @@ async function loadRouteModule() {
 }
 
 describe("transcription chat route", () => {
+	let finishPromise: Promise<unknown> | null;
+	let streamFinishEvent: {
+		isAborted: boolean;
+		responseMessage: {
+			id: string;
+			role: "assistant";
+			parts: Array<{ type: string; text?: string; state?: string }>;
+		};
+	} | null;
+
 	beforeEach(() => {
 		vi.clearAllMocks();
+		finishPromise = null;
+		streamFinishEvent = {
+			isAborted: false,
+			responseMessage: {
+				id: "msg_streamed_assistant_1",
+				role: "assistant",
+				parts: [{ type: "text", text: "The budget was approved at 01:01-01:15." }],
+			},
+		};
 
 		mocks.getServerSession.mockResolvedValue({
 			user: { id: "user_123", email: "user@example.com", name: "User" },
@@ -115,6 +136,10 @@ describe("transcription chat route", () => {
 			id: "msg_saved_assistant_1",
 			role: "assistant",
 		});
+		mocks.deleteLatestAssistantMessage.mockResolvedValue({
+			id: "msg_existing_1",
+			role: "assistant",
+		});
 		mocks.findRelevantChunks.mockResolvedValue([
 			{
 				id: "chunk_1",
@@ -125,7 +150,12 @@ describe("transcription chat route", () => {
 				score: 4,
 			},
 		]);
-		mocks.toUIMessageStreamResponse.mockImplementation(() => {
+		mocks.toUIMessageStreamResponse.mockImplementation((options?: {
+			onFinish?: (event: typeof streamFinishEvent extends null ? never : NonNullable<typeof streamFinishEvent>) => Promise<unknown> | unknown;
+		}) => {
+			finishPromise = streamFinishEvent && options?.onFinish
+				? Promise.resolve(options.onFinish(streamFinishEvent))
+				: Promise.resolve();
 			return new Response("stream", { status: 200 });
 		});
 		mocks.streamResponse.mockResolvedValue({
@@ -218,6 +248,7 @@ describe("transcription chat route", () => {
 			}),
 			{ params: Promise.resolve({ transcriptionId: "tr_123" }) },
 		);
+		await finishPromise;
 
 		expect(response.status).toBe(200);
 		expect(transcriptionChatsService.appendUserMessage).toHaveBeenCalledWith(
@@ -237,6 +268,72 @@ describe("transcription chat route", () => {
 		expect(transcriptionChatRetrievalService.findRelevantChunks).toHaveBeenCalledWith(
 			"tr_123",
 			"What did they decide about the budget? Include timestamps.",
+		);
+		expect(transcriptionChatsService.appendAssistantMessage).toHaveBeenCalledWith(
+			"chat_123",
+			[{ type: "text", text: "The budget was approved at 01:01-01:15." }],
+			[
+				{
+					chunkId: "chunk_1",
+					startMs: 61_000,
+					endMs: 75_000,
+					text: "Budget approved at the end of the meeting.",
+				},
+			],
+		);
+	});
+
+	it("does not persist an assistant message when the stream is aborted", async () => {
+		streamFinishEvent = {
+			isAborted: true,
+			responseMessage: {
+				id: "msg_streamed_assistant_1",
+				role: "assistant",
+				parts: [{ type: "text", text: "This should not be saved." }],
+			},
+		};
+		const { POST } = await loadRouteModule();
+
+		const response = await POST(
+			new Request("http://localhost:3000/api/transcriptions/tr_123/chat", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(createChatPayload()),
+			}),
+			{ params: Promise.resolve({ transcriptionId: "tr_123" }) },
+		);
+		await finishPromise;
+
+		expect(response.status).toBe(200);
+		expect(transcriptionChatsService.appendAssistantMessage).not.toHaveBeenCalled();
+		expect(transcriptionChatsService.deleteLatestAssistantMessage).not.toHaveBeenCalled();
+	});
+
+	it("regenerates without persisting a duplicate user message", async () => {
+		const { POST } = await loadRouteModule();
+
+		const response = await POST(
+			new Request("http://localhost:3000/api/transcriptions/tr_123/chat", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					...createChatPayload(),
+					trigger: "regenerate-message",
+				}),
+			}),
+			{ params: Promise.resolve({ transcriptionId: "tr_123" }) },
+		);
+		await finishPromise;
+
+		expect(response.status).toBe(200);
+		expect(transcriptionChatsService.appendUserMessage).not.toHaveBeenCalled();
+		expect(transcriptionChatsService.deleteLatestAssistantMessage).toHaveBeenCalledWith(
+			"chat_123",
+		);
+		expect(
+			vi.mocked(transcriptionChatsService.deleteLatestAssistantMessage).mock.invocationCallOrder[0],
+		).toBeLessThan(
+			vi.mocked(transcriptionChatsService.appendAssistantMessage).mock.invocationCallOrder[0],
 		);
 	});
 

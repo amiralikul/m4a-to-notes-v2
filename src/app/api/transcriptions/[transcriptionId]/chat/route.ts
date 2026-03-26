@@ -79,9 +79,13 @@ export const POST = route({
 			);
 		}
 
-		await transcriptionChatsService.appendUserMessage(chat.id, [
-			{ type: "text", text: latestUserText },
-		]);
+		const isRegeneration = body.trigger === "regenerate-message";
+
+		if (!isRegeneration) {
+			await transcriptionChatsService.appendUserMessage(chat.id, [
+				{ type: "text", text: latestUserText },
+			]);
+		}
 
 		const retrievedChunks =
 			await transcriptionChatRetrievalService.findRelevantChunks(
@@ -113,6 +117,10 @@ export const POST = route({
 				}
 
 				try {
+					if (isRegeneration) {
+						await transcriptionChatsService.deleteLatestAssistantMessage(chat.id);
+					}
+
 					await transcriptionChatsService.appendAssistantMessage(
 						chat.id,
 						assistantParts,

@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import {
 	chatMessages,
 	transcriptionChats,
@@ -106,6 +106,46 @@ export class TranscriptionChatsService {
 		quotedChunks?: TranscriptionChatQuotedChunk[],
 	): Promise<ChatMessageRow> {
 		return this.appendMessage(chatId, "assistant", parts, quotedChunks ?? null);
+	}
+
+	async deleteLatestAssistantMessage(chatId: string): Promise<ChatMessageRow | null> {
+		try {
+			const now = new Date().toISOString();
+			const runTransaction = this.db.transaction as unknown as <T>(
+				callback: (tx: AppDatabase) => Promise<T>,
+			) => Promise<T>;
+
+			return await runTransaction(async (tx) => {
+				const rows = await tx
+					.select()
+					.from(chatMessages)
+					.where(eq(chatMessages.chatId, chatId))
+					.orderBy(desc(chatMessages.createdAt), desc(chatMessages.id))
+					.limit(1);
+
+				const latestMessage = rows[0];
+				if (!latestMessage || latestMessage.role !== "assistant") {
+					return null;
+				}
+
+				await tx
+					.delete(chatMessages)
+					.where(eq(chatMessages.id, latestMessage.id));
+
+				await tx
+					.update(transcriptionChats)
+					.set({ updatedAt: now })
+					.where(eq(transcriptionChats.id, chatId));
+
+				return latestMessage;
+			});
+		} catch (error) {
+			this.logger.error("Failed to delete latest assistant transcription chat message", {
+				chatId,
+				error: getErrorMessage(error),
+			});
+			throw error;
+		}
 	}
 
 	private async appendMessage(
