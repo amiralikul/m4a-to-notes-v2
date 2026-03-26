@@ -118,19 +118,28 @@ export const POST = route({
 
 				try {
 					if (isRegeneration) {
-						await transcriptionChatsService.deleteLatestAssistantMessage(chat.id);
+						await transcriptionChatsService.replaceLatestAssistantMessage(
+							chat.id,
+							assistantParts,
+							retrievedChunks.map((chunk) => ({
+								chunkId: chunk.id,
+								startMs: chunk.startMs,
+								endMs: chunk.endMs,
+								text: chunk.text,
+							})),
+						);
+					} else {
+						await transcriptionChatsService.appendAssistantMessage(
+							chat.id,
+							assistantParts,
+							retrievedChunks.map((chunk) => ({
+								chunkId: chunk.id,
+								startMs: chunk.startMs,
+								endMs: chunk.endMs,
+								text: chunk.text,
+							})),
+						);
 					}
-
-					await transcriptionChatsService.appendAssistantMessage(
-						chat.id,
-						assistantParts,
-						retrievedChunks.map((chunk) => ({
-							chunkId: chunk.id,
-							startMs: chunk.startMs,
-							endMs: chunk.endMs,
-							text: chunk.text,
-						})),
-					);
 				} catch (error) {
 					logger.error("Failed to persist assistant chat message", {
 						transcriptionId: params.transcriptionId,

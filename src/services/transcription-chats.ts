@@ -11,6 +11,9 @@ import type { Logger } from "@/lib/logger";
 
 type TranscriptionChatRow = typeof transcriptionChats.$inferSelect;
 type ChatMessageRow = typeof chatMessages.$inferSelect;
+type TransactionRunner = <T>(
+	callback: (tx: AppDatabase) => Promise<T>,
+) => Promise<T>;
 
 export class TranscriptionChatsService {
 	constructor(
@@ -108,39 +111,65 @@ export class TranscriptionChatsService {
 		return this.appendMessage(chatId, "assistant", parts, quotedChunks ?? null);
 	}
 
-	async deleteLatestAssistantMessage(chatId: string): Promise<ChatMessageRow | null> {
+	async replaceLatestAssistantMessage(
+		chatId: string,
+		parts: TranscriptionChatMessagePart[],
+		quotedChunks?: TranscriptionChatQuotedChunk[],
+	): Promise<ChatMessageRow> {
 		try {
 			const now = new Date().toISOString();
-			const runTransaction = this.db.transaction as unknown as <T>(
-				callback: (tx: AppDatabase) => Promise<T>,
-			) => Promise<T>;
+			const runTransaction = this.getTransactionRunner();
 
 			return await runTransaction(async (tx) => {
-				const rows = await tx
+				const latestAssistantRows = await tx
 					.select()
 					.from(chatMessages)
-					.where(eq(chatMessages.chatId, chatId))
+					.where(
+						and(
+							eq(chatMessages.chatId, chatId),
+							eq(chatMessages.role, "assistant"),
+						),
+					)
 					.orderBy(desc(chatMessages.createdAt), desc(chatMessages.id))
 					.limit(1);
 
-				const latestMessage = rows[0];
-				if (!latestMessage || latestMessage.role !== "assistant") {
-					return null;
-				}
+				const latestAssistantMessage = latestAssistantRows[0] ?? null;
+				const replacementMessageId = crypto.randomUUID();
 
-				await tx
-					.delete(chatMessages)
-					.where(eq(chatMessages.id, latestMessage.id));
+				await tx.insert(chatMessages).values({
+					id: replacementMessageId,
+					chatId,
+					role: "assistant",
+					parts,
+					quotedChunks: quotedChunks ?? null,
+					createdAt: now,
+				});
+
+				if (latestAssistantMessage) {
+					await tx
+						.delete(chatMessages)
+						.where(eq(chatMessages.id, latestAssistantMessage.id));
+				}
 
 				await tx
 					.update(transcriptionChats)
 					.set({ updatedAt: now })
 					.where(eq(transcriptionChats.id, chatId));
 
-				return latestMessage;
+				const insertedRows = await tx
+					.select()
+					.from(chatMessages)
+					.where(eq(chatMessages.id, replacementMessageId))
+					.limit(1);
+
+				if (!insertedRows[0]) {
+					throw new Error("Failed to replace transcription chat assistant message");
+				}
+
+				return insertedRows[0];
 			});
 		} catch (error) {
-			this.logger.error("Failed to delete latest assistant transcription chat message", {
+			this.logger.error("Failed to replace latest assistant transcription chat message", {
 				chatId,
 				error: getErrorMessage(error),
 			});
@@ -156,11 +185,7 @@ export class TranscriptionChatsService {
 	): Promise<ChatMessageRow> {
 		try {
 			const now = new Date().toISOString();
-			// Drizzle exposes different transaction callback types for sync test DBs and
-			// async production DBs. The runtime API is compatible, so normalize here.
-			const runTransaction = this.db.transaction as unknown as <T>(
-				callback: (tx: AppDatabase) => Promise<T>,
-			) => Promise<T>;
+			const runTransaction = this.getTransactionRunner();
 
 			const insertedMessage = await runTransaction(async (tx) => {
 				const messageId = crypto.randomUUID();
@@ -201,5 +226,9 @@ export class TranscriptionChatsService {
 			});
 			throw error;
 		}
+	}
+
+	private getTransactionRunner(): TransactionRunner {
+		return this.db.transaction.bind(this.db) as unknown as TransactionRunner;
 	}
 }

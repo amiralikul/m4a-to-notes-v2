@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
 	listMessages: vi.fn(),
 	appendUserMessage: vi.fn(),
 	appendAssistantMessage: vi.fn(),
-	deleteLatestAssistantMessage: vi.fn(),
+	replaceLatestAssistantMessage: vi.fn(),
 	findRelevantChunks: vi.fn(),
 	streamResponse: vi.fn(),
 	toUIMessageStreamResponse: vi.fn(),
@@ -39,7 +39,7 @@ vi.mock("@/services", () => ({
 		listMessages: mocks.listMessages,
 		appendUserMessage: mocks.appendUserMessage,
 		appendAssistantMessage: mocks.appendAssistantMessage,
-		deleteLatestAssistantMessage: mocks.deleteLatestAssistantMessage,
+		replaceLatestAssistantMessage: mocks.replaceLatestAssistantMessage,
 	},
 	transcriptionChatRetrievalService: {
 		findRelevantChunks: mocks.findRelevantChunks,
@@ -136,7 +136,7 @@ describe("transcription chat route", () => {
 			id: "msg_saved_assistant_1",
 			role: "assistant",
 		});
-		mocks.deleteLatestAssistantMessage.mockResolvedValue({
+		mocks.replaceLatestAssistantMessage.mockResolvedValue({
 			id: "msg_existing_1",
 			role: "assistant",
 		});
@@ -306,7 +306,7 @@ describe("transcription chat route", () => {
 
 		expect(response.status).toBe(200);
 		expect(transcriptionChatsService.appendAssistantMessage).not.toHaveBeenCalled();
-		expect(transcriptionChatsService.deleteLatestAssistantMessage).not.toHaveBeenCalled();
+		expect(transcriptionChatsService.replaceLatestAssistantMessage).not.toHaveBeenCalled();
 	});
 
 	it("regenerates without persisting a duplicate user message", async () => {
@@ -327,13 +327,53 @@ describe("transcription chat route", () => {
 
 		expect(response.status).toBe(200);
 		expect(transcriptionChatsService.appendUserMessage).not.toHaveBeenCalled();
-		expect(transcriptionChatsService.deleteLatestAssistantMessage).toHaveBeenCalledWith(
+		expect(transcriptionChatsService.replaceLatestAssistantMessage).toHaveBeenCalledWith(
 			"chat_123",
+			[{ type: "text", text: "The budget was approved at 01:01-01:15." }],
+			[
+				{
+					chunkId: "chunk_1",
+					startMs: 61_000,
+					endMs: 75_000,
+					text: "Budget approved at the end of the meeting.",
+				},
+			],
 		);
-		expect(
-			vi.mocked(transcriptionChatsService.deleteLatestAssistantMessage).mock.invocationCallOrder[0],
-		).toBeLessThan(
-			vi.mocked(transcriptionChatsService.appendAssistantMessage).mock.invocationCallOrder[0],
+		expect(transcriptionChatsService.appendAssistantMessage).not.toHaveBeenCalled();
+	});
+
+	it("logs regenerate replacement failures without losing history in the route", async () => {
+		mocks.replaceLatestAssistantMessage.mockRejectedValueOnce(
+			new Error("replacement failed"),
+		);
+		const { POST } = await loadRouteModule();
+
+		const response = await POST(
+			new Request("http://localhost:3000/api/transcriptions/tr_123/chat", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					...createChatPayload(),
+					trigger: "regenerate-message",
+				}),
+			}),
+			{ params: Promise.resolve({ transcriptionId: "tr_123" }) },
+		);
+		await finishPromise;
+
+		expect(response.status).toBe(200);
+		expect(transcriptionChatsService.replaceLatestAssistantMessage).toHaveBeenCalledOnce();
+		expect(transcriptionChatsService.appendAssistantMessage).not.toHaveBeenCalled();
+		expect(mocks.logger.error).toHaveBeenCalledWith(
+			"Failed to persist assistant chat message",
+			expect.objectContaining({
+				transcriptionId: "tr_123",
+				chatId: "chat_123",
+				userId: "user_123",
+				requestId: "req_123",
+				responseMessageId: "msg_streamed_assistant_1",
+				error: "replacement failed",
+			}),
 		);
 	});
 

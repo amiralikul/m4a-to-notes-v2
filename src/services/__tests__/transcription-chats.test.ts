@@ -1,5 +1,5 @@
 import { asc, eq } from "drizzle-orm";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { chatMessages } from "@/db/schema";
 import {
 	transcriptionChats,
@@ -182,6 +182,69 @@ describe("TranscriptionChatsService", () => {
 		expect(otherMessages).toHaveLength(0);
 		expect(userMessages[0].parts).toEqual([
 			{ type: "text", text: "User one question" },
+		]);
+	});
+
+	it("replaces the latest assistant message atomically and keeps the original on insert failure", async () => {
+		const { transcriptionId, userId } = await seedTranscriptionAndUsers();
+		const chat = await service.getOrCreateForTranscriptionAndUser(
+			transcriptionId,
+			userId,
+		);
+
+		await service.appendUserMessage(chat.id, [
+			{ type: "text", text: "What changed?" },
+		]);
+		const originalAssistant = await service.appendAssistantMessage(chat.id, [
+			{ type: "text", text: "Original answer." },
+		]);
+
+		const replacedAssistant = await service.replaceLatestAssistantMessage(
+			chat.id,
+			[{ type: "text", text: "Replacement answer." }],
+			[
+				{
+					chunkId: "chunk-1",
+					startMs: 1000,
+					endMs: 2000,
+					text: "Replacement answer.",
+				},
+			],
+		);
+
+		const rowsAfterReplace = await service.listMessages(chat.id);
+		expect(replacedAssistant?.id).not.toBe(originalAssistant.id);
+		expect(rowsAfterReplace).toHaveLength(2);
+		expect(rowsAfterReplace[1].id).toBe(replacedAssistant?.id);
+		expect(rowsAfterReplace[1].parts).toEqual([
+			{ type: "text", text: "Replacement answer." },
+		]);
+		expect(rowsAfterReplace[1].quotedChunks).toEqual([
+			{
+				chunkId: "chunk-1",
+				startMs: 1000,
+				endMs: 2000,
+				text: "Replacement answer.",
+			},
+		]);
+
+		const randomUuidSpy = vi
+			.spyOn(crypto, "randomUUID")
+			.mockReturnValue(replacedAssistant.id);
+
+		await expect(
+			service.replaceLatestAssistantMessage(chat.id, [
+				{ type: "text", text: "Broken replacement" },
+			]),
+		).rejects.toThrow();
+
+		randomUuidSpy.mockRestore();
+
+		const rowsAfterFailedReplace = await service.listMessages(chat.id);
+		expect(rowsAfterFailedReplace).toHaveLength(2);
+		expect(rowsAfterFailedReplace[1].id).toBe(replacedAssistant?.id);
+		expect(rowsAfterFailedReplace[1].parts).toEqual([
+			{ type: "text", text: "Replacement answer." },
 		]);
 	});
 });
