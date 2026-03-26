@@ -26,7 +26,7 @@ export interface ActorIdentity {
 }
 
 function getTrialCookieSecret(): string {
-	const secret = env.TRIAL_COOKIE_SECRET;
+	const secret = process.env.TRIAL_COOKIE_SECRET || env.TRIAL_COOKIE_SECRET;
 	if (!secret) {
 		throw new Error("TRIAL_COOKIE_SECRET is not set");
 	}
