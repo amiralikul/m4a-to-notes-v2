@@ -19,10 +19,12 @@ import {
 import { TranslationsService } from "./translations";
 import { BillingSubscriptionsService } from "./billing-subscriptions";
 import { TranscriptionChunksService } from "./transcription-chunks";
+import { TranscriptionChatsService } from "./transcription-chats";
 import { env } from "@/env";
 
 export const transcriptionsService = new TranscriptionsService(db, logger);
 export const transcriptionChunksService = new TranscriptionChunksService(db, logger);
+export const transcriptionChatsService = new TranscriptionChatsService(db, logger);
 export const usersService = new UsersService(db, logger);
 
 const transcriptionProvider = parseTranscriptionProvider(

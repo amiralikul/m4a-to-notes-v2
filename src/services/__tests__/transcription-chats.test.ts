@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { chatMessages } from "@/db/schema";
 import {
 	transcriptionChats,
 	transcriptions,
@@ -23,28 +24,30 @@ describe("TranscriptionChatsService", () => {
 		await cleanupTestDb(db);
 	});
 
-	it("reuses one chat row for the same transcription and user", async () => {
+	async function seedTranscriptionAndUsers() {
 		const now = new Date();
 		const transcriptionId = crypto.randomUUID();
 		const userId = crypto.randomUUID();
 		const otherUserId = crypto.randomUUID();
 
-		await db.insert(users).values({
-			id: userId,
-			name: "Test User",
-			email: "user@example.com",
-			emailVerified: false,
-			createdAt: now,
-			updatedAt: now,
-		});
-		await db.insert(users).values({
-			id: otherUserId,
-			name: "Other User",
-			email: "other@example.com",
-			emailVerified: false,
-			createdAt: now,
-			updatedAt: now,
-		});
+		await db.insert(users).values([
+			{
+				id: userId,
+				name: "Test User",
+				email: "user@example.com",
+				emailVerified: false,
+				createdAt: now,
+				updatedAt: now,
+			},
+			{
+				id: otherUserId,
+				name: "Other User",
+				email: "other@example.com",
+				emailVerified: false,
+				createdAt: now,
+				updatedAt: now,
+			},
+		]);
 		await db.insert(transcriptions).values({
 			id: transcriptionId,
 			status: "completed",
@@ -55,6 +58,13 @@ describe("TranscriptionChatsService", () => {
 			createdAt: now.toISOString(),
 			updatedAt: now.toISOString(),
 		});
+
+		return { transcriptionId, userId, otherUserId };
+	}
+
+	it("reuses one chat row for the same transcription and user", async () => {
+		const { transcriptionId, userId, otherUserId } =
+			await seedTranscriptionAndUsers();
 
 		const firstChat = await service.getOrCreateForTranscriptionAndUser(
 			transcriptionId,
@@ -79,9 +89,98 @@ describe("TranscriptionChatsService", () => {
 			.from(transcriptionChats)
 			.where(eq(transcriptionChats.transcriptionId, transcriptionId));
 		expect(chatRows).toHaveLength(2);
-		expect(chatRows.map((row) => row.userId).sort()).toEqual([
-			otherUserId,
+		expect(chatRows.map((row) => row.userId).sort()).toEqual(
+			[userId, otherUserId].sort(),
+		);
+	});
+
+	it("appends user and assistant messages and lists them in chronological order", async () => {
+		const { transcriptionId, userId } = await seedTranscriptionAndUsers();
+		const chat = await service.getOrCreateForTranscriptionAndUser(
+			transcriptionId,
 			userId,
+		);
+
+		const userMessage = await service.appendUserMessage(chat.id, [
+			{ type: "text", text: "What does the transcript say?" },
+		]);
+		await new Promise((resolve) => setTimeout(resolve, 5));
+		const assistantMessage = await service.appendAssistantMessage(
+			chat.id,
+			[
+				{ type: "text", text: "It summarizes the recording." },
+			],
+			[
+				{
+					chunkId: "chunk-1",
+					startMs: 1200,
+					endMs: 3400,
+					text: "It summarizes the recording.",
+				},
+			],
+		);
+
+		const storedRows = await db
+			.select()
+			.from(chatMessages)
+			.where(eq(chatMessages.chatId, chat.id));
+
+		expect(storedRows).toHaveLength(2);
+		expect(storedRows[0].role).toBe("user");
+		expect(storedRows[0].parts).toEqual([
+			{ type: "text", text: "What does the transcript say?" },
+		]);
+		expect(storedRows[0].quotedChunks).toBeNull();
+		expect(storedRows[1].role).toBe("assistant");
+		expect(storedRows[1].parts).toEqual([
+			{ type: "text", text: "It summarizes the recording." },
+		]);
+		expect(storedRows[1].quotedChunks).toEqual([
+			{
+				chunkId: "chunk-1",
+				startMs: 1200,
+				endMs: 3400,
+				text: "It summarizes the recording.",
+			},
+		]);
+
+		const listedMessages = await service.listMessages(chat.id);
+		expect(listedMessages).toHaveLength(2);
+		expect(listedMessages.map((message) => message.id)).toEqual([
+			userMessage.id,
+			assistantMessage.id,
+		]);
+		expect(listedMessages.map((message) => message.role)).toEqual([
+			"user",
+			"assistant",
+		]);
+	});
+
+	it("keeps chats and messages isolated across users", async () => {
+		const { transcriptionId, userId, otherUserId } =
+			await seedTranscriptionAndUsers();
+
+		const userChat = await service.getOrCreateForTranscriptionAndUser(
+			transcriptionId,
+			userId,
+		);
+		const otherChat = await service.getOrCreateForTranscriptionAndUser(
+			transcriptionId,
+			otherUserId,
+		);
+
+		await service.appendUserMessage(userChat.id, [
+			{ type: "text", text: "User one question" },
+		]);
+
+		const userMessages = await service.listMessages(userChat.id);
+		const otherMessages = await service.listMessages(otherChat.id);
+
+		expect(userChat.id).not.toBe(otherChat.id);
+		expect(userMessages).toHaveLength(1);
+		expect(otherMessages).toHaveLength(0);
+		expect(userMessages[0].parts).toEqual([
+			{ type: "text", text: "User one question" },
 		]);
 	});
 });
