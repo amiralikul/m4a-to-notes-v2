@@ -2,7 +2,6 @@
 
 import {
 	ArrowLeft,
-	Download,
 	FileText,
 	Globe,
 	Loader2,
@@ -12,6 +11,7 @@ import {
 } from "lucide-react";
 import { CopyButton } from "@/components/copy-button";
 import { SummaryRenderer, ContentTypeBadge } from "@/components/summary-renderer";
+import { TranscriptionChat } from "@/components/transcription-chat";
 import type { TranscriptionSummaryData } from "@/db/schema";
 import { isFlexibleSummary } from "@/db/schema";
 import { useRef, useState } from "react";
@@ -415,6 +415,10 @@ export default function TranscriptionDetailPage() {
 						</div>
 					</CardContent>
 				</Card>
+			)}
+
+			{isSignedIn && transcription.status === "completed" && (
+				<TranscriptionChat transcriptionId={id} />
 			)}
 
 			{/* Translation Panel */}
