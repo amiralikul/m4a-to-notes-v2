@@ -38,12 +38,22 @@ export class TranscriptionChatRetrievalService {
 				.orderBy(asc(transcriptionChunks.chunkIndex));
 
 			const scoredChunks = chunks
-				.filter((chunk) => typeof chunk.transcriptText === "string" && chunk.transcriptText.trim().length > 0)
+				.filter(
+					(chunk) =>
+						typeof chunk.transcriptText === "string" &&
+						chunk.transcriptText.trim().length > 0,
+				)
 				.map((chunk) => {
 					const normalizedText = normalizeText(chunk.transcriptText ?? "");
-					const chunkTokens = new Set(tokenize(normalizedText));
-					const overlapCount = countQueryTokenOverlap(queryTokens, chunkTokens);
-					const exactPhraseBonus = normalizedText.includes(normalizedQuery)
+					const chunkTokens = tokenize(normalizedText);
+					const overlapCount = countQueryTokenOverlap(
+						queryTokens,
+						new Set(chunkTokens),
+					);
+					const exactPhraseBonus = hasContiguousPhraseMatch(
+						queryTokens,
+						chunkTokens,
+					)
 						? 1
 						: 0;
 
@@ -85,11 +95,15 @@ export class TranscriptionChatRetrievalService {
 }
 
 function normalizeText(value: string): string {
-	return value.toLowerCase().replace(/\s+/g, " ").trim();
+	return value
+		.toLowerCase()
+		.replace(/[^\p{L}\p{N}]+/gu, " ")
+		.replace(/\s+/g, " ")
+		.trim();
 }
 
 function tokenize(value: string): string[] {
-	return value.match(/[a-z0-9]+/g) ?? [];
+	return value.match(/[\p{L}\p{N}]+/gu) ?? [];
 }
 
 function countQueryTokenOverlap(
@@ -103,4 +117,30 @@ function countQueryTokenOverlap(
 		}
 	}
 	return count;
+}
+
+function hasContiguousPhraseMatch(
+	queryTokens: string[],
+	chunkTokens: string[],
+): boolean {
+	if (queryTokens.length === 0 || queryTokens.length > chunkTokens.length) {
+		return false;
+	}
+
+	for (let index = 0; index <= chunkTokens.length - queryTokens.length; index++) {
+		let matches = true;
+
+		for (let offset = 0; offset < queryTokens.length; offset++) {
+			if (chunkTokens[index + offset] !== queryTokens[offset]) {
+				matches = false;
+				break;
+			}
+		}
+
+		if (matches) {
+			return true;
+		}
+	}
+
+	return false;
 }

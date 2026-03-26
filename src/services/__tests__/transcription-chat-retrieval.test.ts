@@ -80,6 +80,53 @@ describe("TranscriptionChatRetrievalService", () => {
 		expect(results[0].score).toBeGreaterThan(results[1].score);
 	});
 
+	it("tokenizes Hebrew query and transcript text", async () => {
+		const transcriptionId = await seedChunks([
+			"דיברנו על פגישה-מחר בבוקר",
+			"פגישה כללית אחרת",
+			null,
+		]);
+
+		const results = await retrievalService.findRelevantChunks(
+			transcriptionId,
+			"פגישה מחר",
+			2,
+		);
+
+		expect(results).toHaveLength(2);
+		expect(results[0]).toMatchObject({
+			chunkIndex: 0,
+			text: "דיברנו על פגישה-מחר בבוקר",
+		});
+		expect(results[0].score).toBeGreaterThan(results[1].score);
+		expect(results[1].text).toBe("פגישה כללית אחרת");
+	});
+
+	it("boosts a normalized phrase only at token boundaries", async () => {
+		const transcriptionId = await seedChunks([
+			"release-plan approved",
+			"therelease plan approved",
+			"unrelated follow up",
+		]);
+
+		const results = await retrievalService.findRelevantChunks(
+			transcriptionId,
+			"release plan",
+			2,
+		);
+
+		expect(results).toHaveLength(2);
+		expect(results[0]).toMatchObject({
+			chunkIndex: 0,
+			text: "release-plan approved",
+		});
+		expect(results[0].score).toBeGreaterThan(results[1].score);
+		expect(results[1]).toMatchObject({
+			chunkIndex: 1,
+			text: "therelease plan approved",
+		});
+	});
+
 	it("ignores chunks without transcript text", async () => {
 		const transcriptionId = await seedChunks([
 			null,
