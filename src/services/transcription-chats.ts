@@ -116,28 +116,38 @@ export class TranscriptionChatsService {
 	): Promise<ChatMessageRow> {
 		try {
 			const now = new Date().toISOString();
-			const messageId = crypto.randomUUID();
 
-			await this.db.insert(chatMessages).values({
-				id: messageId,
-				chatId,
-				role,
-				parts,
-				quotedChunks,
-				createdAt: now,
+			const insertedMessage = await this.db.transaction(async (tx) => {
+				const messageId = crypto.randomUUID();
+
+				await tx.insert(chatMessages).values({
+					id: messageId,
+					chatId,
+					role,
+					parts,
+					quotedChunks,
+					createdAt: now,
+				});
+
+				await tx
+					.update(transcriptionChats)
+					.set({ updatedAt: now })
+					.where(eq(transcriptionChats.id, chatId));
+
+				const rows = await tx
+					.select()
+					.from(chatMessages)
+					.where(eq(chatMessages.id, messageId))
+					.limit(1);
+
+				if (!rows[0]) {
+					throw new Error("Failed to create transcription chat message");
+				}
+
+				return rows[0];
 			});
 
-			const insertedMessage = await this.db
-				.select()
-				.from(chatMessages)
-				.where(eq(chatMessages.id, messageId))
-				.limit(1);
-
-			if (!insertedMessage[0]) {
-				throw new Error("Failed to create transcription chat message");
-			}
-
-			return insertedMessage[0];
+			return insertedMessage;
 		} catch (error) {
 			this.logger.error("Failed to append transcription chat message", {
 				chatId,

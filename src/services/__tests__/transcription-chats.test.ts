@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { chatMessages } from "@/db/schema";
 import {
@@ -123,7 +123,8 @@ describe("TranscriptionChatsService", () => {
 		const storedRows = await db
 			.select()
 			.from(chatMessages)
-			.where(eq(chatMessages.chatId, chat.id));
+			.where(eq(chatMessages.chatId, chat.id))
+			.orderBy(asc(chatMessages.createdAt), asc(chatMessages.id));
 
 		expect(storedRows).toHaveLength(2);
 		expect(storedRows[0].role).toBe("user");
