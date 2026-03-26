@@ -2,13 +2,11 @@ import { sql } from "drizzle-orm";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export type TranscriptionChatMessagePart =
-	| {
-			type: "text";
-			text: string;
-	  }
-	| {
-			type: "step-start";
-	  };
+	{
+		type: string;
+		text?: string;
+		[key: string]: unknown;
+	};
 
 export type TranscriptionChatQuotedChunk = {
 	chunkId: string;
