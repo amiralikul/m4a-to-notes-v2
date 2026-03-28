@@ -155,6 +155,25 @@ export const POST = route({
 	},
 });
 
+export const DELETE = route({
+	auth: "required",
+	params: chatParamsSchema,
+	handler: async ({ userId, params }) => {
+		await requireCompletedTranscription(params.transcriptionId, userId);
+
+		const chat = await transcriptionChatsService.getOrCreateForTranscriptionAndUser(
+			params.transcriptionId,
+			userId,
+		);
+
+		await transcriptionChatsService.clearMessages(chat.id);
+
+		return {
+			success: true,
+		};
+	},
+});
+
 async function requireCompletedTranscription(
 	transcriptionId: string,
 	userId: string,

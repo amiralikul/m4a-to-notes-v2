@@ -247,4 +247,34 @@ describe("TranscriptionChatsService", () => {
 			{ type: "text", text: "Replacement answer." },
 		]);
 	});
+
+	it("clears all persisted messages while keeping the chat row", async () => {
+		const { transcriptionId, userId } = await seedTranscriptionAndUsers();
+		const chat = await service.getOrCreateForTranscriptionAndUser(
+			transcriptionId,
+			userId,
+		);
+
+		await service.appendUserMessage(chat.id, [
+			{ type: "text", text: "First question" },
+		]);
+		await service.appendAssistantMessage(chat.id, [
+			{ type: "text", text: "First answer" },
+		]);
+
+		await service.clearMessages(chat.id);
+
+		const messageRows = await db
+			.select()
+			.from(chatMessages)
+			.where(eq(chatMessages.chatId, chat.id));
+		const chatRows = await db
+			.select()
+			.from(transcriptionChats)
+			.where(eq(transcriptionChats.id, chat.id));
+
+		expect(messageRows).toHaveLength(0);
+		expect(chatRows).toHaveLength(1);
+		expect(await service.listMessages(chat.id)).toEqual([]);
+	});
 });

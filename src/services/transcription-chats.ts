@@ -177,6 +177,27 @@ export class TranscriptionChatsService {
 		}
 	}
 
+	async clearMessages(chatId: string): Promise<void> {
+		try {
+			const now = new Date().toISOString();
+			const runTransaction = this.getTransactionRunner();
+
+			await runTransaction(async (tx) => {
+				await tx.delete(chatMessages).where(eq(chatMessages.chatId, chatId));
+				await tx
+					.update(transcriptionChats)
+					.set({ updatedAt: now })
+					.where(eq(transcriptionChats.id, chatId));
+			});
+		} catch (error) {
+			this.logger.error("Failed to clear transcription chat messages", {
+				chatId,
+				error: getErrorMessage(error),
+			});
+			throw error;
+		}
+	}
+
 	private async appendMessage(
 		chatId: string,
 		role: "user" | "assistant",

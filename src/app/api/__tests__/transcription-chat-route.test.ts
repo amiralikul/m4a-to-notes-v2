@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
 	appendUserMessage: vi.fn(),
 	appendAssistantMessage: vi.fn(),
 	replaceLatestAssistantMessage: vi.fn(),
+	clearMessages: vi.fn(),
 	findRelevantChunks: vi.fn(),
 	streamResponse: vi.fn(),
 	toUIMessageStreamResponse: vi.fn(),
@@ -40,6 +41,7 @@ vi.mock("@/services", () => ({
 		appendUserMessage: mocks.appendUserMessage,
 		appendAssistantMessage: mocks.appendAssistantMessage,
 		replaceLatestAssistantMessage: mocks.replaceLatestAssistantMessage,
+		clearMessages: mocks.clearMessages,
 	},
 	transcriptionChatRetrievalService: {
 		findRelevantChunks: mocks.findRelevantChunks,
@@ -140,6 +142,7 @@ describe("transcription chat route", () => {
 			id: "msg_existing_1",
 			role: "assistant",
 		});
+		mocks.clearMessages.mockResolvedValue(undefined);
 		mocks.findRelevantChunks.mockResolvedValue([
 			{
 				id: "chunk_1",
@@ -398,6 +401,27 @@ describe("transcription chat route", () => {
 		expect(response.status).toBe(400);
 		expect(body.error).toBe("Message payload must include a user text message");
 		expect(transcriptionChatsService.appendUserMessage).not.toHaveBeenCalled();
+		expect(transcriptionChatAiService.streamResponse).not.toHaveBeenCalled();
+	});
+
+	it("clears persisted messages on DELETE", async () => {
+		const { DELETE } = await loadRouteModule();
+
+		const response = await DELETE(
+			new Request("http://localhost:3000/api/transcriptions/tr_123/chat", {
+				method: "DELETE",
+			}),
+			{ params: Promise.resolve({ transcriptionId: "tr_123" }) },
+		);
+		const body = await response.json();
+
+		expect(response.status).toBe(200);
+		expect(transcriptionChatsService.getOrCreateForTranscriptionAndUser).toHaveBeenCalledWith(
+			"tr_123",
+			"user_123",
+		);
+		expect(transcriptionChatsService.clearMessages).toHaveBeenCalledWith("chat_123");
+		expect(body).toEqual({ success: true });
 		expect(transcriptionChatAiService.streamResponse).not.toHaveBeenCalled();
 	});
 });

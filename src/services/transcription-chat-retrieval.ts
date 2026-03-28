@@ -1,5 +1,5 @@
 import { asc, eq } from "drizzle-orm";
-import { transcriptionChunks } from "@/db/schema";
+import { transcriptionChunks, transcriptions } from "@/db/schema";
 import type { AppDatabase } from "@/db/types";
 import { getErrorMessage } from "@/lib/errors";
 import type { Logger } from "@/lib/logger";
@@ -67,7 +67,39 @@ export class TranscriptionChatRetrievalService {
 					};
 				});
 
-			if (scoredChunks.length === 0) return [];
+			if (scoredChunks.length === 0) {
+				const transcriptionRows = await this.db
+					.select()
+					.from(transcriptions)
+					.where(eq(transcriptions.id, transcriptionId))
+					.limit(1);
+
+				const transcription = transcriptionRows[0];
+				if (!transcription?.transcriptText?.trim()) {
+					return [];
+				}
+
+				const normalizedText = normalizeText(transcription.transcriptText);
+				const transcriptTokens = tokenize(normalizedText);
+				const score =
+					countQueryTokenOverlap(queryTokens, new Set(transcriptTokens)) +
+					(hasContiguousPhraseMatch(queryTokens, transcriptTokens) ? 1 : 0);
+
+				if (score <= 0) {
+					return [];
+				}
+
+				return [
+					{
+						id: transcription.id,
+						text: transcription.transcriptText,
+						startMs: 0,
+						endMs: 0,
+						chunkIndex: 0,
+						score,
+					},
+				];
+			}
 
 			return scoredChunks
 				.sort((left, right) => {

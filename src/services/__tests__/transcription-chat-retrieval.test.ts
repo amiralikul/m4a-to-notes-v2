@@ -159,6 +159,34 @@ describe("TranscriptionChatRetrievalService", () => {
 		).resolves.toEqual([]);
 	});
 
+	it("falls back to transcriptText when no chunk transcripts are available", async () => {
+		const transcriptionId = await transcriptionsService.create({
+			audioKey: "https://blob.example/audio.m4a",
+			filename: "audio.m4a",
+		});
+
+		await transcriptionsService.markCompleted(
+			transcriptionId,
+			"פגישה מחר בבוקר על התקציב",
+			"פגישה מחר בבוקר על התקציב. הוחלט לאשר את התקציב ולהמשיך לשלב הבא.",
+		);
+
+		const results = await retrievalService.findRelevantChunks(
+			transcriptionId,
+			"מה אמרו על התקציב",
+			3,
+		);
+
+		expect(results).toHaveLength(1);
+		expect(results[0]).toMatchObject({
+			chunkIndex: 0,
+			startMs: 0,
+			endMs: 0,
+			text: "פגישה מחר בבוקר על התקציב. הוחלט לאשר את התקציב ולהמשיך לשלב הבא.",
+		});
+		expect(results[0].score).toBeGreaterThan(0);
+	});
+
 	it("returns at most the requested number of chunks with deterministic tie breaking", async () => {
 		const transcriptionId = await seedChunks([
 			"alpha beta gamma",

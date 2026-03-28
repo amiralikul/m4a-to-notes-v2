@@ -4,9 +4,12 @@ import { useChat } from "@ai-sdk/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import {
+	Maximize2,
+	Minimize2,
 	Loader2,
 	MessageSquare,
 	RefreshCw,
+	RotateCcw,
 	SendHorizontal,
 	Sparkles,
 	Square,
@@ -89,6 +92,9 @@ export function TranscriptionChat({
 	const queryClient = useQueryClient();
 	const bottomRef = useRef<HTMLDivElement>(null);
 	const [input, setInput] = useState("");
+	const [isClearing, setIsClearing] = useState(false);
+	const [clearErrorMessage, setClearErrorMessage] = useState<string | null>(null);
+	const [isFullscreen, setIsFullscreen] = useState(false);
 
 	const {
 		data: chatHistory,
@@ -138,6 +144,28 @@ export function TranscriptionChat({
 		});
 	}, [messages, status]);
 
+	useEffect(() => {
+		if (!isFullscreen) {
+			return;
+		}
+
+		const previousOverflow = document.body.style.overflow;
+		document.body.style.overflow = "hidden";
+
+		const handleEscape = (event: KeyboardEvent) => {
+			if (event.key === "Escape") {
+				setIsFullscreen(false);
+			}
+		};
+
+		window.addEventListener("keydown", handleEscape);
+
+		return () => {
+			document.body.style.overflow = previousOverflow;
+			window.removeEventListener("keydown", handleEscape);
+		};
+	}, [isFullscreen]);
+
 	const isSubmitting = status === "submitted" || status === "streaming";
 	const hasMessages = messages.length > 0;
 
@@ -159,19 +187,99 @@ export function TranscriptionChat({
 		await sendMessage({ text: prompt });
 	};
 
+	const handleClearChat = async () => {
+		if (isSubmitting || isClearing) {
+			return;
+		}
+
+		setClearErrorMessage(null);
+		setIsClearing(true);
+
+		try {
+			const response = await fetch(`/api/transcriptions/${transcriptionId}/chat`, {
+				method: "DELETE",
+			});
+
+			if (!response.ok) {
+				throw new Error("Failed to clear chat history");
+			}
+
+			setMessages([]);
+			setInput("");
+			clearError();
+			await queryClient.invalidateQueries({
+				queryKey: transcriptionKeys.chat(transcriptionId),
+			});
+		} catch (error) {
+			setClearErrorMessage(
+				error instanceof Error
+					? error.message
+					: "Something went wrong while clearing the chat.",
+			);
+		} finally {
+			setIsClearing(false);
+		}
+	};
+
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle className="flex items-center gap-2 text-lg">
-					<MessageSquare className="h-5 w-5" />
-					Ask About This Transcript
-				</CardTitle>
-				<CardDescription>
-					Ask follow-ups, pull out action items, or turn the transcript into
-					something more useful.
-				</CardDescription>
+		<>
+			{isFullscreen && (
+				<div className="fixed inset-0 z-40 bg-stone-950/30 backdrop-blur-[2px]" />
+			)}
+			<Card
+				className={cn(
+					isFullscreen &&
+						"fixed inset-4 z-50 flex h-[calc(100vh-2rem)] flex-col overflow-hidden border-stone-300 shadow-2xl",
+				)}
+			>
+				<CardHeader className="gap-4 sm:flex-row sm:items-start sm:justify-between">
+				<div className="space-y-1.5">
+					<CardTitle className="flex items-center gap-2 text-lg">
+						<MessageSquare className="h-5 w-5" />
+						Ask About This Transcript
+					</CardTitle>
+					<CardDescription>
+						Ask follow-ups, pull out action items, or turn the transcript into
+						something more useful.
+					</CardDescription>
+				</div>
+				<div className="flex items-center gap-2 self-start sm:self-auto">
+					<Button
+						type="button"
+						variant="outline"
+						size="icon"
+						onClick={() => setIsFullscreen((current) => !current)}
+						aria-label={isFullscreen ? "Exit full screen chat" : "Open full screen chat"}
+						title={isFullscreen ? "Exit full screen" : "Full screen"}
+					>
+						{isFullscreen ? (
+							<Minimize2 className="h-4 w-4" />
+						) : (
+							<Maximize2 className="h-4 w-4" />
+						)}
+					</Button>
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						onClick={() => void handleClearChat()}
+						disabled={loadingHistory || isSubmitting || isClearing || !hasMessages}
+					>
+						{isClearing ? (
+							<Loader2 className="h-4 w-4 animate-spin" />
+						) : (
+							<RotateCcw className="h-4 w-4" />
+						)}
+						Clear chat
+					</Button>
+				</div>
 			</CardHeader>
-			<CardContent className="space-y-4">
+			<CardContent
+				className={cn(
+					"space-y-4",
+					isFullscreen && "flex min-h-0 flex-1 flex-col",
+				)}
+			>
 				<div className="flex flex-wrap gap-2">
 					{STARTER_PROMPTS.map((prompt) => (
 						<Button
@@ -189,7 +297,12 @@ export function TranscriptionChat({
 					))}
 				</div>
 
-				<ScrollArea className="h-[420px] rounded-xl border border-stone-200 bg-stone-50/50">
+				<ScrollArea
+					className={cn(
+						"rounded-xl border border-stone-200 bg-stone-50/50",
+						isFullscreen ? "min-h-0 flex-1" : "h-[420px]",
+					)}
+				>
 					<div className="space-y-4 p-4">
 						{loadingHistory ? (
 							<div className="flex min-h-48 items-center justify-center text-sm text-stone-500">
@@ -297,8 +410,15 @@ export function TranscriptionChat({
 					</Alert>
 				)}
 
+				{clearErrorMessage && (
+					<Alert variant="destructive">
+						<AlertTitle>Unable to clear chat</AlertTitle>
+						<AlertDescription>{clearErrorMessage}</AlertDescription>
+					</Alert>
+				)}
+
 				<form
-					className="space-y-3"
+					className={cn("space-y-3", isFullscreen && "mt-auto")}
 					onSubmit={(event) => {
 						event.preventDefault();
 						void handleSubmit();
@@ -348,5 +468,6 @@ export function TranscriptionChat({
 				</form>
 			</CardContent>
 		</Card>
+		</>
 	);
 }
