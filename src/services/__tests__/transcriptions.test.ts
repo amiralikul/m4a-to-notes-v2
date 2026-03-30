@@ -86,6 +86,23 @@ describe("TranscriptionsService", () => {
 			expect(saved!.displayName).toBe("Team Sync");
 			expect(saved!.filename).toBe("meeting.m4a");
 		});
+
+		it("normalizes displayName before persisting", async () => {
+			const id = await service.create({
+				audioKey: "blob://meeting.m4a",
+				filename: "meeting.m4a",
+			});
+
+			const trimmed = await service.updateDisplayName(id, "  Team Sync  ");
+			expect(trimmed.displayName).toBe("Team Sync");
+
+			const cleared = await service.updateDisplayName(id, "   ");
+			expect(cleared.displayName).toBeNull();
+
+			const saved = await service.findById(id);
+			expect(saved).not.toBeNull();
+			expect(saved!.displayName).toBeNull();
+		});
 	});
 
 	describe("status transitions", () => {

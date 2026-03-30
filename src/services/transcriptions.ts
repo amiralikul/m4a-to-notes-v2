@@ -255,7 +255,11 @@ export class TranscriptionsService {
 		transcriptionId: string,
 		displayName: string | null,
 	): Promise<Transcription> {
-		return this.update(transcriptionId, { displayName });
+		const normalizedDisplayName = displayName?.trim() || null;
+
+		return this.update(transcriptionId, {
+			displayName: normalizedDisplayName,
+		});
 	}
 
 	async updateProgress(
