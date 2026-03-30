@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack --port 3434",
+    "dev": "next dev --turbopack",
+    "dev2": "next dev --turbopack --port 3434",
     "build": "npm run db:migrate && next build",
     "start": "next start",
     "type-check": "tsc --noEmit",
