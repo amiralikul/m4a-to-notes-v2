@@ -25,7 +25,7 @@ const chatMessagePartSchema = z
 const chatMessageSchema = z
 	.object({
 		id: z.string(),
-		role: z.enum(["system", "user", "assistant"]),
+		role: z.enum(["user", "assistant"]),
 		parts: z.array(chatMessagePartSchema),
 	})
 	.passthrough();
@@ -84,7 +84,7 @@ export const POST = route({
 		if (!isRegeneration) {
 			await transcriptionChatsService.appendUserMessage(chat.id, [
 				{ type: "text", text: latestUserText },
-			]);
+			], body.messageId);
 		}
 
 		const retrievedChunks =
@@ -95,7 +95,6 @@ export const POST = route({
 
 		const result = await transcriptionChatAiService.streamResponse({
 			messages: body.messages as UIMessage[],
-			latestUserText,
 			retrievedChunks,
 			abortSignal: request.signal,
 			requestId: body.id,
@@ -127,6 +126,7 @@ export const POST = route({
 								endMs: chunk.endMs,
 								text: chunk.text,
 							})),
+							responseMessage.id,
 						);
 					} else {
 						await transcriptionChatsService.appendAssistantMessage(
@@ -138,6 +138,7 @@ export const POST = route({
 								endMs: chunk.endMs,
 								text: chunk.text,
 							})),
+							responseMessage.id,
 						);
 					}
 				} catch (error) {

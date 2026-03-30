@@ -57,15 +57,15 @@ Current external references, verified on 2026-03-26:
 
 Repository context:
 
-- Anthropic provider factory already exists in [src/services/ai/providers/anthropic.client.ts](/Users/amir/projects/personal/m4a-to-notes-v2/src/services/ai/providers/anthropic.client.ts)
-- the transcription detail surface already exists in [src/app/dashboard/[id]/page.tsx](/Users/amir/projects/personal/m4a-to-notes-v2/src/app/dashboard/[id]/page.tsx)
-- transcript chunks with timestamps already exist in [src/db/schema.ts](/Users/amir/projects/personal/m4a-to-notes-v2/src/db/schema.ts)
+- Anthropic provider factory already exists in [src/services/ai/providers/anthropic.client.ts](../../../src/services/ai/providers/anthropic.client.ts)
+- the transcription detail surface already exists in [src/app/dashboard/[id]/page.tsx](../../../src/app/dashboard/[id]/page.tsx)
+- transcript chunks with timestamps already exist in [src/db/schema.ts](../../../src/db/schema.ts)
 
 ## UX Design
 
 ### Entry Point
 
-Add a chat card to the transcription detail page below the transcript and summary sections in [src/app/dashboard/[id]/page.tsx](/Users/amir/projects/personal/m4a-to-notes-v2/src/app/dashboard/[id]/page.tsx).
+Add a chat card to the transcription detail page below the transcript and summary sections in [src/app/dashboard/[id]/page.tsx](../../../src/app/dashboard/[id]/page.tsx).
 
 ### Behavior
 
@@ -203,7 +203,7 @@ Add a dedicated chat-generation service that:
 - streams the response
 - returns the final assistant message for persistence
 
-This logic should not reuse the legacy OpenAI-only helper in [src/services/chat.ts](/Users/amir/projects/personal/m4a-to-notes-v2/src/services/chat.ts), which is scoped to a different flow and API shape.
+This logic should not reuse the legacy OpenAI-only helper in [src/services/chat.ts](../../../src/services/chat.ts), which is scoped to a different flow and API shape.
 
 ## Prompting Rules
 

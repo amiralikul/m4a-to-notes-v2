@@ -32,7 +32,6 @@ export class TranscriptionChatAiService {
 
 	async streamResponse(input: {
 		messages: UIMessage[];
-		latestUserText: string;
 		retrievedChunks: TranscriptionChatRetrievedChunk[];
 		abortSignal?: AbortSignal;
 		requestId?: string;
@@ -43,7 +42,11 @@ export class TranscriptionChatAiService {
 		}
 
 		const modelMessages = await convertToModelMessages(
-			input.messages.map(({ id: _id, ...message }) => message),
+			input.messages.map((message) => {
+				return Object.fromEntries(
+					Object.entries(message).filter(([key]) => key !== "id"),
+				) as Omit<typeof message, "id">;
+			}),
 		);
 		const startedAt = Date.now();
 
@@ -51,10 +54,7 @@ export class TranscriptionChatAiService {
 			return streamText({
 				model: this.anthropicClient(this.model),
 				messages: modelMessages,
-				system: buildTranscriptChatSystemPrompt(
-					input.latestUserText,
-					input.retrievedChunks,
-				),
+				system: buildTranscriptChatSystemPrompt(input.retrievedChunks),
 				temperature: 0.2,
 				maxRetries: this.maxRetries,
 				abortSignal: input.abortSignal,
@@ -92,7 +92,6 @@ export class TranscriptionChatAiService {
 }
 
 function buildTranscriptChatSystemPrompt(
-	latestUserText: string,
 	retrievedChunks: TranscriptionChatRetrievedChunk[],
 ): string {
 	const transcriptContext =
@@ -111,8 +110,6 @@ function buildTranscriptChatSystemPrompt(
 		"Never fabricate transcript quotes or timestamps. If the transcript does not support the answer, say that clearly.",
 		"You may use general knowledge only as supplemental context, and you must label it as supplemental when you do.",
 		"Prefer concise, direct answers grounded in the transcript context.",
-		"",
-		`Latest user question: ${latestUserText}`,
 		"",
 		"Transcript context:",
 		transcriptContext,

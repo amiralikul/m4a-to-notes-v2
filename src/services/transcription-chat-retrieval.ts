@@ -4,6 +4,8 @@ import type { AppDatabase } from "@/db/types";
 import { getErrorMessage } from "@/lib/errors";
 import type { Logger } from "@/lib/logger";
 
+const MAX_FALLBACK_TRANSCRIPT_CHARS = 4_000;
+
 export type TranscriptionChatRetrievedChunk = {
 	id: string;
 	text: string;
@@ -65,7 +67,8 @@ export class TranscriptionChatRetrievalService {
 						chunkIndex: chunk.chunkIndex,
 						score: overlapCount + exactPhraseBonus,
 					};
-				});
+				})
+				.filter((chunk) => chunk.score > 0);
 
 			if (scoredChunks.length === 0) {
 				const transcriptionRows = await this.db
@@ -92,7 +95,10 @@ export class TranscriptionChatRetrievalService {
 				return [
 					{
 						id: transcription.id,
-						text: transcription.transcriptText,
+						text: createFallbackTranscriptExcerpt(
+							transcription.transcriptText,
+							queryTokens,
+						),
 						startMs: 0,
 						endMs: 0,
 						chunkIndex: 0,
@@ -117,7 +123,8 @@ export class TranscriptionChatRetrievalService {
 		} catch (error) {
 			this.logger.error("Failed to retrieve transcription chat chunks", {
 				transcriptionId,
-				latestUserQuery,
+				queryLength: latestUserQuery.length,
+				queryTokenCount: tokenize(normalizeText(latestUserQuery)).length,
 				limit,
 				error: getErrorMessage(error),
 			});
@@ -175,4 +182,41 @@ function hasContiguousPhraseMatch(
 	}
 
 	return false;
+}
+
+function createFallbackTranscriptExcerpt(
+	transcriptText: string,
+	queryTokens: string[],
+): string {
+	if (transcriptText.length <= MAX_FALLBACK_TRANSCRIPT_CHARS) {
+		return transcriptText;
+	}
+
+	const excerptBodyLength = MAX_FALLBACK_TRANSCRIPT_CHARS - 6;
+	const anchorIndex = findTranscriptAnchorIndex(transcriptText, queryTokens);
+	let start = Math.max(0, anchorIndex - Math.floor(excerptBodyLength / 2));
+	let end = Math.min(transcriptText.length, start + excerptBodyLength);
+	start = Math.max(0, end - excerptBodyLength);
+	end = Math.min(transcriptText.length, start + excerptBodyLength);
+
+	const prefix = start > 0 ? "..." : "";
+	const suffix = end < transcriptText.length ? "..." : "";
+
+	return `${prefix}${transcriptText.slice(start, end).trim()}${suffix}`;
+}
+
+function findTranscriptAnchorIndex(
+	transcriptText: string,
+	queryTokens: string[],
+): number {
+	const normalizedTranscriptText = transcriptText.toLowerCase();
+
+	for (const token of queryTokens) {
+		const tokenIndex = normalizedTranscriptText.indexOf(token.toLowerCase());
+		if (tokenIndex >= 0) {
+			return tokenIndex;
+		}
+	}
+
+	return 0;
 }

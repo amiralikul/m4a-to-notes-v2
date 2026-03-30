@@ -99,28 +99,53 @@ export class TranscriptionChatsService {
 	async appendUserMessage(
 		chatId: string,
 		parts: TranscriptionChatMessagePart[],
+		messageId?: string,
 	): Promise<ChatMessageRow> {
-		return this.appendMessage(chatId, "user", parts);
+		return this.appendMessage(chatId, "user", parts, null, messageId);
 	}
 
 	async appendAssistantMessage(
 		chatId: string,
 		parts: TranscriptionChatMessagePart[],
 		quotedChunks?: TranscriptionChatQuotedChunk[],
+		messageId?: string,
 	): Promise<ChatMessageRow> {
-		return this.appendMessage(chatId, "assistant", parts, quotedChunks ?? null);
+		return this.appendMessage(
+			chatId,
+			"assistant",
+			parts,
+			quotedChunks ?? null,
+			messageId,
+		);
 	}
 
 	async replaceLatestAssistantMessage(
 		chatId: string,
 		parts: TranscriptionChatMessagePart[],
 		quotedChunks?: TranscriptionChatQuotedChunk[],
+		messageId?: string,
 	): Promise<ChatMessageRow> {
 		try {
 			const now = new Date().toISOString();
 			const runTransaction = this.getTransactionRunner();
 
 			return await runTransaction(async (tx) => {
+				const replacementMessageId = messageId ?? crypto.randomUUID();
+
+				if (messageId) {
+					const existingMessage = await this.findMessageById(
+						tx,
+						replacementMessageId,
+					);
+					if (existingMessage) {
+						this.assertMessageIdentity(existingMessage, {
+							chatId,
+							role: "assistant",
+						});
+						return existingMessage;
+					}
+				}
+
 				const latestAssistantRows = await tx
 					.select()
 					.from(chatMessages)
@@ -134,9 +159,8 @@ export class TranscriptionChatsService {
 					.limit(1);
 
 				const latestAssistantMessage = latestAssistantRows[0] ?? null;
-				const replacementMessageId = crypto.randomUUID();
 
-				await tx.insert(chatMessages).values({
+				await this.insertMessage(tx, {
 					id: replacementMessageId,
 					chatId,
 					role: "assistant",
@@ -145,7 +169,10 @@ export class TranscriptionChatsService {
 					createdAt: now,
 				});
 
-				if (latestAssistantMessage) {
+				if (
+					latestAssistantMessage &&
+					latestAssistantMessage.id !== replacementMessageId
+				) {
 					await tx
 						.delete(chatMessages)
 						.where(eq(chatMessages.id, latestAssistantMessage.id));
@@ -156,17 +183,21 @@ export class TranscriptionChatsService {
 					.set({ updatedAt: now })
 					.where(eq(transcriptionChats.id, chatId));
 
-				const insertedRows = await tx
-					.select()
-					.from(chatMessages)
-					.where(eq(chatMessages.id, replacementMessageId))
-					.limit(1);
+				const insertedMessage = await this.findMessageById(
+					tx,
+					replacementMessageId,
+				);
 
-				if (!insertedRows[0]) {
+				if (!insertedMessage) {
 					throw new Error("Failed to replace transcription chat assistant message");
 				}
 
-				return insertedRows[0];
+				this.assertMessageIdentity(insertedMessage, {
+					chatId,
+					role: "assistant",
+				});
+
+				return insertedMessage;
 			});
 		} catch (error) {
 			this.logger.error("Failed to replace latest assistant transcription chat message", {
@@ -203,16 +234,25 @@ export class TranscriptionChatsService {
 		role: "user" | "assistant",
 		parts: TranscriptionChatMessagePart[],
 		quotedChunks: TranscriptionChatQuotedChunk[] | null = null,
+		messageId?: string,
 	): Promise<ChatMessageRow> {
 		try {
 			const now = new Date().toISOString();
 			const runTransaction = this.getTransactionRunner();
 
 			const insertedMessage = await runTransaction(async (tx) => {
-				const messageId = crypto.randomUUID();
+				const persistedMessageId = messageId ?? crypto.randomUUID();
 
-				await tx.insert(chatMessages).values({
-					id: messageId,
+				if (messageId) {
+					const existingMessage = await this.findMessageById(tx, persistedMessageId);
+					if (existingMessage) {
+						this.assertMessageIdentity(existingMessage, { chatId, role });
+						return existingMessage;
+					}
+				}
+
+				await this.insertMessage(tx, {
+					id: persistedMessageId,
 					chatId,
 					role,
 					parts,
@@ -225,17 +265,15 @@ export class TranscriptionChatsService {
 					.set({ updatedAt: now })
 					.where(eq(transcriptionChats.id, chatId));
 
-				const rows = await tx
-					.select()
-					.from(chatMessages)
-					.where(eq(chatMessages.id, messageId))
-					.limit(1);
+				const insertedRow = await this.findMessageById(tx, persistedMessageId);
 
-				if (!rows[0]) {
+				if (!insertedRow) {
 					throw new Error("Failed to create transcription chat message");
 				}
 
-				return rows[0];
+				this.assertMessageIdentity(insertedRow, { chatId, role });
+
+				return insertedRow;
 			});
 
 			return insertedMessage;
@@ -251,5 +289,37 @@ export class TranscriptionChatsService {
 
 	private getTransactionRunner(): TransactionRunner {
 		return this.db.transaction.bind(this.db) as unknown as TransactionRunner;
+	}
+
+	private async insertMessage(
+		tx: AppDatabase,
+		message: typeof chatMessages.$inferInsert,
+	): Promise<void> {
+		await tx.insert(chatMessages).values(message).onConflictDoNothing();
+	}
+
+	private async findMessageById(
+		tx: AppDatabase,
+		messageId: string,
+	): Promise<ChatMessageRow | null> {
+		const rows = await tx
+			.select()
+			.from(chatMessages)
+			.where(eq(chatMessages.id, messageId))
+			.limit(1);
+
+		return rows[0] ?? null;
+	}
+
+	private assertMessageIdentity(
+		message: ChatMessageRow,
+		expected: { chatId: string; role: "user" | "assistant" },
+	): void {
+		if (
+			message.chatId !== expected.chatId ||
+			message.role !== expected.role
+		) {
+			throw new Error("Chat message ID already exists for a different message");
+		}
 	}
 }

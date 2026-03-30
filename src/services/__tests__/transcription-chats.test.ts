@@ -157,6 +157,81 @@ describe("TranscriptionChatsService", () => {
 		]);
 	});
 
+	it("reuses caller-provided message ids for appends and retries", async () => {
+		const { transcriptionId, userId } = await seedTranscriptionAndUsers();
+		const chat = await service.getOrCreateForTranscriptionAndUser(
+			transcriptionId,
+			userId,
+		);
+
+		const userMessage = await (service as never as {
+			appendUserMessage: (
+				chatId: string,
+				parts: Array<{ type: string; text: string }>,
+				messageId: string,
+			) => Promise<{ id: string }>;
+		}).appendUserMessage(
+			chat.id,
+			[{ type: "text", text: "What does the transcript say?" }],
+			"msg_user_known",
+		);
+		const retriedUserMessage = await (service as never as {
+			appendUserMessage: (
+				chatId: string,
+				parts: Array<{ type: string; text: string }>,
+				messageId: string,
+			) => Promise<{ id: string; parts: Array<{ type: string; text: string }> }>;
+		}).appendUserMessage(
+			chat.id,
+			[{ type: "text", text: "This retry should not create a duplicate." }],
+			"msg_user_known",
+		);
+		const assistantMessage = await (service as never as {
+			appendAssistantMessage: (
+				chatId: string,
+				parts: Array<{ type: string; text: string }>,
+				quotedChunks: null,
+				messageId: string,
+			) => Promise<{ id: string }>;
+		}).appendAssistantMessage(
+			chat.id,
+			[{ type: "text", text: "It summarizes the recording." }],
+			null,
+			"msg_assistant_known",
+		);
+		const retriedAssistantMessage = await (service as never as {
+			appendAssistantMessage: (
+				chatId: string,
+				parts: Array<{ type: string; text: string }>,
+				quotedChunks: null,
+				messageId: string,
+			) => Promise<{ id: string; parts: Array<{ type: string; text: string }> }>;
+		}).appendAssistantMessage(
+			chat.id,
+			[{ type: "text", text: "This retry should also reuse the same row." }],
+			null,
+			"msg_assistant_known",
+		);
+
+		const listedMessages = await service.listMessages(chat.id);
+
+		expect(userMessage.id).toBe("msg_user_known");
+		expect(retriedUserMessage.id).toBe("msg_user_known");
+		expect(retriedUserMessage.parts).toEqual([
+			{ type: "text", text: "What does the transcript say?" },
+		]);
+		expect(assistantMessage.id).toBe("msg_assistant_known");
+		expect(retriedAssistantMessage.id).toBe("msg_assistant_known");
+		expect(retriedAssistantMessage.parts).toEqual([
+			{ type: "text", text: "It summarizes the recording." },
+		]);
+		expect(listedMessages).toHaveLength(2);
+		expect(listedMessages.map((message) => message.id)).toEqual([
+			"msg_user_known",
+			"msg_assistant_known",
+		]);
+	});
+
 	it("keeps chats and messages isolated across users", async () => {
 		const { transcriptionId, userId, otherUserId } =
 			await seedTranscriptionAndUsers();
@@ -186,10 +261,15 @@ describe("TranscriptionChatsService", () => {
 	});
 
 	it("replaces the latest assistant message atomically and keeps the original on insert failure", async () => {
-		const { transcriptionId, userId } = await seedTranscriptionAndUsers();
+		const { transcriptionId, userId, otherUserId } =
+			await seedTranscriptionAndUsers();
 		const chat = await service.getOrCreateForTranscriptionAndUser(
 			transcriptionId,
 			userId,
+		);
+		const otherChat = await service.getOrCreateForTranscriptionAndUser(
+			transcriptionId,
+			otherUserId,
 		);
 
 		await service.appendUserMessage(chat.id, [
@@ -210,9 +290,11 @@ describe("TranscriptionChatsService", () => {
 					text: "Replacement answer.",
 				},
 			],
+			"msg_assistant_replacement",
 		);
 
 		const rowsAfterReplace = await service.listMessages(chat.id);
+		expect(replacedAssistant?.id).toBe("msg_assistant_replacement");
 		expect(replacedAssistant?.id).not.toBe(originalAssistant.id);
 		expect(rowsAfterReplace).toHaveLength(2);
 		expect(rowsAfterReplace[1].id).toBe(replacedAssistant?.id);
@@ -228,17 +310,23 @@ describe("TranscriptionChatsService", () => {
 			},
 		]);
 
+		const conflictingAssistant = await service.appendAssistantMessage(otherChat.id, [
+			{ type: "text", text: "Other chat answer." },
+		]);
+
 		const randomUuidSpy = vi
 			.spyOn(crypto, "randomUUID")
-			.mockReturnValue(replacedAssistant.id);
+			.mockReturnValue(conflictingAssistant.id);
 
-		await expect(
-			service.replaceLatestAssistantMessage(chat.id, [
-				{ type: "text", text: "Broken replacement" },
-			]),
-		).rejects.toThrow();
-
-		randomUuidSpy.mockRestore();
+		try {
+			await expect(
+				service.replaceLatestAssistantMessage(chat.id, [
+					{ type: "text", text: "Broken replacement" },
+				]),
+			).rejects.toThrow();
+		} finally {
+			randomUuidSpy.mockRestore();
+		}
 
 		const rowsAfterFailedReplace = await service.listMessages(chat.id);
 		expect(rowsAfterFailedReplace).toHaveLength(2);
