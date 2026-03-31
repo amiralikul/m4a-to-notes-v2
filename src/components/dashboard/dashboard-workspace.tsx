@@ -325,52 +325,64 @@ export function DashboardWorkspace() {
 	);
 
 	const requestTranslationMutation = useMutation({
-		mutationFn: (language: string) => requestTranslation(selectedId!, language),
-		onSuccess: async () => {
-			if (!selectedId) return;
-			setWorkspaceState((current) => ({
-				...(current.selectedId === selectedId
+		mutationFn: ({
+			transcriptionId,
+			language,
+		}: {
+			transcriptionId: string;
+			language: string;
+		}) => requestTranslation(transcriptionId, language),
+		onSuccess: async (_data, variables) => {
+			if (selectedId === variables.transcriptionId) {
+				setWorkspaceState((current) => ({
+					...(current.selectedId === variables.transcriptionId
 					? current
 					: {
-							selectedId,
+							selectedId: variables.transcriptionId,
 							activeTab: "summary" as WorkspaceTab,
 							selectedLanguage: "",
 							viewingTranslationId: null,
 						}),
-				selectedId,
-				selectedLanguage: "",
-			}));
+					selectedId: variables.transcriptionId,
+					selectedLanguage: "",
+				}));
+			}
 			await queryClient.invalidateQueries({
-				queryKey: transcriptionKeys.translations(selectedId),
+				queryKey: transcriptionKeys.translations(variables.transcriptionId),
 			});
 		},
 	});
 
 	const deleteTranslationMutation = useMutation({
-		mutationFn: (language: string) => deleteTranslation(selectedId!, language),
-		onSuccess: async (_data, language) => {
-			const deletedTranslation = translations.find(
-				(translation) => translation.language === language,
-			);
-
-			if (deletedTranslation?.id === resolvedViewingTranslationId) {
+		mutationFn: ({
+			transcriptionId,
+			language,
+		}: {
+			transcriptionId: string;
+			language: string;
+			translationId: string | null;
+		}) => deleteTranslation(transcriptionId, language),
+		onSuccess: async (_data, variables) => {
+			if (
+				selectedId === variables.transcriptionId &&
+				variables.translationId === resolvedViewingTranslationId
+			) {
 				setWorkspaceState((current) => ({
-					...(current.selectedId === selectedId
+					...(current.selectedId === variables.transcriptionId
 						? current
 						: {
-								selectedId,
+								selectedId: variables.transcriptionId,
 								activeTab: "summary" as WorkspaceTab,
 								selectedLanguage: "",
 								viewingTranslationId: null,
 							}),
-					selectedId,
+					selectedId: variables.transcriptionId,
 					viewingTranslationId: null,
 				}));
 			}
 
-			if (!selectedId) return;
 			await queryClient.invalidateQueries({
-				queryKey: transcriptionKeys.translations(selectedId),
+				queryKey: transcriptionKeys.translations(variables.transcriptionId),
 			});
 		},
 	});
@@ -523,7 +535,10 @@ export function DashboardWorkspace() {
 							}))
 						}
 						onRequestTranslation={(language) =>
-							void requestTranslationMutation.mutate(language)
+							void requestTranslationMutation.mutate({
+								transcriptionId: detail.transcriptionId,
+								language,
+							})
 						}
 						onToggleViewingTranslation={(translationId) =>
 							setWorkspaceState((current) => {
@@ -550,7 +565,14 @@ export function DashboardWorkspace() {
 							})
 						}
 						onDeleteTranslation={(language) =>
-							void deleteTranslationMutation.mutate(language)
+							void deleteTranslationMutation.mutate({
+								transcriptionId: detail.transcriptionId,
+								language,
+								translationId:
+									translations.find(
+										(translation) => translation.language === language,
+									)?.id ?? null,
+							})
 						}
 					/>
 				) : (
