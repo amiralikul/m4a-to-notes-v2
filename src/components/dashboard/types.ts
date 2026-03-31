@@ -20,6 +20,7 @@ export interface DashboardTranscriptionItem {
 
 export interface DashboardSelectionState<TItem extends DashboardTranscriptionItem> {
 	selectedId: string | null;
+	normalizedId: string | null;
 	selectedItem: TItem | null;
 	shouldReplaceUrl: boolean;
 }
@@ -27,11 +28,18 @@ export interface DashboardSelectionState<TItem extends DashboardTranscriptionIte
 export interface DashboardSelectionRollback<TItem extends DashboardTranscriptionItem> {
 	items: readonly TItem[];
 	selectedId: string | null;
+	normalizedId: string | null;
+	selectedItem: TItem | null;
+}
+
+export interface DashboardSelectionSnapshot<TItem extends DashboardTranscriptionItem>
+	extends DashboardSelectionState<TItem> {
+	items: readonly TItem[];
 }
 
 export interface DashboardDeleteSelectionTransition<
 	TItem extends DashboardTranscriptionItem,
-> extends DashboardSelectionState<TItem> {
-	items: readonly TItem[];
+> {
+	next: DashboardSelectionSnapshot<TItem>;
 	rollback: DashboardSelectionRollback<TItem>;
 }
