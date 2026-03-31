@@ -1,8 +1,17 @@
+import type { TranscriptionSummaryData } from "@/db/schema";
+
 export type DashboardTranscriptionStatus =
 	| "pending"
 	| "processing"
 	| "completed"
 	| "failed";
+
+export type WorkspaceTab = "summary" | "transcript" | "chat";
+
+export interface DashboardStatusMessage {
+	code?: string;
+	message?: string;
+}
 
 export interface DashboardTranscriptionItem {
 	id: string;
@@ -17,6 +26,48 @@ export interface DashboardTranscriptionItem {
 	enableDiarization: boolean;
 	translationCount: number;
 }
+
+export interface DashboardDiarizationSegment {
+	speaker: string;
+	text: string;
+	start: number;
+	end: number;
+}
+
+export interface DashboardTranscriptionDetail extends DashboardTranscriptionItem {
+	transcriptionId: string;
+	transcriptText: string | null;
+	diarizationData: DashboardDiarizationSegment[] | null;
+	error?: DashboardStatusMessage | null;
+	summaryError?: DashboardStatusMessage | null;
+}
+
+export interface DashboardSummaryPayload {
+	transcriptionId: string;
+	summaryStatus: DashboardTranscriptionStatus;
+	summaryData: TranscriptionSummaryData | null;
+	summaryError?: DashboardStatusMessage | null;
+	summaryUpdatedAt?: string | null;
+	summaryProvider?: string | null;
+	summaryModel?: string | null;
+}
+
+export interface DashboardTranslationItem {
+	id: string;
+	transcriptionId: string;
+	language: string;
+	status: DashboardTranscriptionStatus;
+	translatedText: string | null;
+	translatedSummary: TranscriptionSummaryData | null;
+	errorDetails: DashboardStatusMessage | null;
+	createdAt: string;
+	completedAt: string | null;
+}
+
+export type DashboardLanguageOption = readonly [
+	code: string,
+	label: string,
+];
 
 export interface DashboardSelectionState<TItem extends DashboardTranscriptionItem> {
 	selectedId: string | null;
