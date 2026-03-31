@@ -33,10 +33,12 @@ export interface TranscriptionSidebarProps {
 	onRetry?: () => void;
 }
 
-function formatDate(value: string) {
-	return new Date(value).toLocaleDateString(undefined, {
+function formatDateTime(value: string) {
+	return new Date(value).toLocaleString(undefined, {
 		month: "short",
 		day: "numeric",
+		hour: "2-digit",
+		minute: "2-digit",
 	});
 }
 
@@ -160,14 +162,15 @@ export function TranscriptionSidebar({
 													{item.filename}
 												</p>
 											</div>
-											<p
+											<time
+												dateTime={item.createdAt}
 												className={cn(
 													"text-xs",
 													isSelected ? "text-stone-300" : "text-stone-500",
 												)}
 											>
-												{formatDate(item.createdAt)}
-											</p>
+												{formatDateTime(item.createdAt)}
+											</time>
 										</div>
 
 										<div className="flex flex-wrap items-center gap-2">

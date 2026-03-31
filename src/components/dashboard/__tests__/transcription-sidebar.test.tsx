@@ -31,6 +31,8 @@ describe("TranscriptionSidebar", () => {
 		expect(html).toContain("Meeting.m4a");
 		expect(html).toContain("Completed");
 		expect(html).toContain("Kickoff notes and next steps.");
+		expect(html).toContain('aria-pressed="true"');
+		expect(html).toContain('dateTime="2026-03-31T10:00:00.000Z"');
 	});
 
 	it("renders a retry state when the list query fails", () => {
