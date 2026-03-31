@@ -38,7 +38,7 @@ describe("resolveDashboardSelection", () => {
 		expect(result.shouldReplaceUrl).toBe(false);
 	});
 
-	it("selects the first item and canonicalizes the URL when no item query param is present", () => {
+	it("selects the first item without canonicalizing the URL when no item query param is present", () => {
 		const items = [
 			item({ id: "item-a", filename: "File A.m4a" }),
 			item({ id: "item-b", filename: "File B.m4a", createdAt: "2026-03-31T09:00:00.000Z" }),
@@ -49,7 +49,7 @@ describe("resolveDashboardSelection", () => {
 		expect(result.selectedId).toBe("item-a");
 		expect(result.normalizedId).toBe("item-a");
 		expect(result.selectedItem?.id).toBe("item-a");
-		expect(result.shouldReplaceUrl).toBe(true);
+		expect(result.shouldReplaceUrl).toBe(false);
 	});
 
 	it("falls back to the first item and marks the URL for replacement when the requested item is invalid", () => {
