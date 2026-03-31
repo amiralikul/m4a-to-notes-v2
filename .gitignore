@@ -49,6 +49,7 @@ next-env.d.ts
 
 # local agent / MCP config
 /.codex/
+/.superpowers/
 /.gemini/
 /.mcp.json
 /opencode.json
