@@ -59,7 +59,8 @@ The canonical dashboard route becomes:
 
 - if `item` exists and resolves to a transcription in the loaded list, that transcription is selected
 - if `item` is missing, select the most recent transcription when one exists
-- if `item` is invalid or no longer available, fall back to the most recent available transcription and normalize the URL
+- "most recent" means the first transcription in the dashboard list ordered by `createdAt` descending
+- if `item` is invalid or no longer available, fall back to the most recent available transcription and normalize the URL with replace-style navigation rather than pushing a new history entry
 - if the user has no transcriptions, the right pane renders the empty state
 
 ### Legacy Route Compatibility
