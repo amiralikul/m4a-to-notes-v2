@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { SummaryRenderer, ContentTypeBadge } from "@/components/summary-renderer";
+import { SUPPORTED_LANGUAGES } from "@/lib/constants/languages";
+import type { LanguageCode } from "@/lib/constants/languages";
 import type {
 	DashboardLanguageOption,
 	DashboardStatusMessage,
@@ -86,6 +88,15 @@ export function TranscriptionSummaryPanel({
 	onDeleteTranslation,
 }: TranscriptionSummaryPanelProps) {
 	const status = getSummaryStatusConfig(summaryStatus);
+	const viewingTranslation =
+		translations.find((translation) => translation.id === viewingTranslationId) ??
+		null;
+	const displayedSummaryData =
+		viewingTranslation?.translatedSummary ?? summaryData;
+	const viewingTranslationLabel = viewingTranslation
+		? SUPPORTED_LANGUAGES[viewingTranslation.language as LanguageCode] ??
+			viewingTranslation.language
+		: null;
 
 	return (
 		<div className="flex flex-col gap-4">
@@ -94,19 +105,27 @@ export function TranscriptionSummaryPanel({
 					<CardTitle className="flex flex-wrap items-center gap-2 text-base font-semibold text-stone-900">
 						<span>Summary</span>
 						<Badge className={status.className}>{status.label}</Badge>
-						{summaryData && isFlexibleSummary(summaryData) ? (
-							<ContentTypeBadge contentType={summaryData.contentType} />
+						{displayedSummaryData && isFlexibleSummary(displayedSummaryData) ? (
+							<ContentTypeBadge contentType={displayedSummaryData.contentType} />
+						) : null}
+						{viewingTranslationLabel ? (
+							<span className="text-sm font-normal text-stone-500">
+								({viewingTranslationLabel})
+							</span>
 						) : null}
 					</CardTitle>
 				</CardHeader>
 				<CardContent className="flex flex-col gap-4 pt-4">
 					<SummaryStateMessage
-						summaryData={summaryData}
+						summaryData={displayedSummaryData}
 						summaryStatus={summaryStatus}
 						summaryError={summaryError}
 					/>
-					{summaryData ? (
-						<SummaryRenderer data={summaryData} idPrefix="dashboard-summary" />
+					{displayedSummaryData ? (
+						<SummaryRenderer
+							data={displayedSummaryData}
+							idPrefix="dashboard-summary"
+						/>
 					) : null}
 				</CardContent>
 			</Card>

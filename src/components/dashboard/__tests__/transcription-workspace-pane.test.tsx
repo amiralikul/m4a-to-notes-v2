@@ -86,7 +86,7 @@ describe("TranscriptionWorkspacePane", () => {
 					["de", "German"],
 				]}
 				selectedLanguage="fr"
-				viewingTranslationId="translation_es"
+				viewingTranslationId={null}
 				onTabChange={() => {}}
 				onSelectedLanguageChange={() => {}}
 				onRequestTranslation={() => {}}
@@ -177,5 +177,21 @@ describe("TranscriptionWorkspacePane", () => {
 		expect(html).toContain("Translations");
 		expect(html).toContain("Spanish");
 		expect(html).toContain("View");
+	});
+
+	it("renders the translated summary when a translation is being viewed", () => {
+		const html = renderToStaticMarkup(
+			<TranscriptionWorkspacePane
+				activeTab="summary"
+				onTabChange={() => {}}
+				transcription={completedTranscription}
+				summary={completedSummary}
+				translations={[completedTranslation]}
+				viewingTranslationId="translation_es"
+			/>,
+		);
+
+		expect(html).toContain("Resumen de la revisión semanal del producto.");
+		expect(html).toContain("Show Original");
 	});
 });
