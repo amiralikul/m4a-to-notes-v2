@@ -145,6 +145,9 @@ export function TranscriptionWorkspacePane({
 	onDeleteTranslation,
 }: TranscriptionWorkspacePaneProps) {
 	const resolvedAudioSrc = audioSrc ?? transcription.audioKey;
+	const viewingTranslation =
+		translations.find((translation) => translation.id === viewingTranslationId) ??
+		null;
 
 	return (
 		<Card className="overflow-hidden border-stone-200 shadow-sm">
@@ -186,7 +189,10 @@ export function TranscriptionWorkspacePane({
 					</TabsContent>
 
 					<TabsContent value="transcript" className="mt-0 outline-none">
-						<TranscriptionTranscriptPanel transcription={transcription} />
+						<TranscriptionTranscriptPanel
+							transcription={transcription}
+							viewingTranslation={viewingTranslation}
+						/>
 					</TabsContent>
 
 					<TabsContent value="chat" className="mt-0 outline-none">

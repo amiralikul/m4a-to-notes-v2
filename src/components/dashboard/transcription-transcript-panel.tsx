@@ -2,10 +2,16 @@
 
 import { AlertCircle, FileText, Users } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import type { DashboardTranscriptionDetail } from "@/components/dashboard/types";
+import { SUPPORTED_LANGUAGES } from "@/lib/constants/languages";
+import type { LanguageCode } from "@/lib/constants/languages";
+import type {
+	DashboardTranscriptionDetail,
+	DashboardTranslationItem,
+} from "@/components/dashboard/types";
 
 interface TranscriptionTranscriptPanelProps {
 	transcription: DashboardTranscriptionDetail;
+	viewingTranslation?: DashboardTranslationItem | null;
 }
 
 function formatTimestamp(ms: number): string {
@@ -17,11 +23,18 @@ function formatTimestamp(ms: number): string {
 
 export function TranscriptionTranscriptPanel({
 	transcription,
+	viewingTranslation = null,
 }: TranscriptionTranscriptPanelProps) {
 	const hasDiarization =
 		!!transcription.diarizationData && transcription.diarizationData.length > 0;
-	const transcriptText = transcription.transcriptText ?? transcription.preview;
+	const translatedText = viewingTranslation?.translatedText ?? null;
+	const transcriptText =
+		translatedText ?? transcription.transcriptText ?? transcription.preview;
 	const hasTranscriptContent = !!transcriptText || hasDiarization;
+	const viewingTranslationLabel = viewingTranslation
+		? SUPPORTED_LANGUAGES[viewingTranslation.language as LanguageCode] ??
+			viewingTranslation.language
+		: null;
 
 	return (
 		<div className="flex flex-col gap-4">
@@ -46,7 +59,18 @@ export function TranscriptionTranscriptPanel({
 					) : null}
 
 					{hasTranscriptContent ? (
-						hasDiarization ? (
+						translatedText ? (
+							<>
+								<p className="whitespace-pre-wrap text-sm leading-relaxed text-stone-600">
+									{translatedText}
+								</p>
+								{viewingTranslationLabel ? (
+									<p className="text-xs text-stone-400">
+										Showing {viewingTranslationLabel} translation
+									</p>
+								) : null}
+							</>
+						) : hasDiarization ? (
 							<div className="flex flex-col gap-4">
 								{transcription.diarizationData?.map((segment) => (
 									<div key={`${segment.speaker}-${segment.start}-${segment.end}`}>

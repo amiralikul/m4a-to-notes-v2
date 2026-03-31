@@ -194,4 +194,20 @@ describe("TranscriptionWorkspacePane", () => {
 		expect(html).toContain("Resumen de la revisión semanal del producto.");
 		expect(html).toContain("Show Original");
 	});
+
+	it("renders the translated transcript when a translation is being viewed", () => {
+		const html = renderToStaticMarkup(
+			<TranscriptionWorkspacePane
+				activeTab="transcript"
+				onTabChange={() => {}}
+				transcription={completedTranscription}
+				summary={completedSummary}
+				translations={[completedTranslation]}
+				viewingTranslationId="translation_es"
+			/>,
+		);
+
+		expect(html).toContain("Debemos enviar el rediseño del panel esta semana.");
+		expect(html).toContain("Showing Spanish translation");
+	});
 });
