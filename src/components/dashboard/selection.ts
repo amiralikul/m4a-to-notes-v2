@@ -15,7 +15,7 @@ export function resolveDashboardSelection<
 			selectedId: null,
 			normalizedId: null,
 			selectedItem: null,
-			shouldReplaceUrl: false,
+			shouldReplaceUrl: Boolean(requestedId),
 		};
 	}
 

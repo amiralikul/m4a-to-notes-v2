@@ -65,6 +65,15 @@ describe("resolveDashboardSelection", () => {
 		expect(result.selectedItem?.id).toBe("item-a");
 		expect(result.shouldReplaceUrl).toBe(true);
 	});
+
+	it("canonicalizes a stale item query even when the list is empty", () => {
+		const result = resolveDashboardSelection([], "missing-item");
+
+		expect(result.selectedId).toBeNull();
+		expect(result.normalizedId).toBeNull();
+		expect(result.selectedItem).toBeNull();
+		expect(result.shouldReplaceUrl).toBe(true);
+	});
 });
 
 describe("getNextSelectedIdAfterDelete", () => {
@@ -84,6 +93,30 @@ describe("getNextSelectedIdAfterDelete", () => {
 		];
 
 		const result = getNextSelectedIdAfterDelete(items, "item-a", "item-a");
+
+		expect(result).toBe("item-b");
+	});
+
+	it("preserves the current selection when deleting a different item", () => {
+		const items = [
+			item({ id: "item-a", filename: "File A.m4a" }),
+			item({ id: "item-b", filename: "File B.m4a", createdAt: "2026-03-31T09:00:00.000Z" }),
+			item({ id: "item-c", filename: "File C.m4a", createdAt: "2026-03-31T08:00:00.000Z" }),
+		];
+
+		const result = getNextSelectedIdAfterDelete(items, "item-c", "item-b");
+
+		expect(result).toBe("item-b");
+	});
+
+	it("selects the previous remaining item when deleting the tail item", () => {
+		const items = [
+			item({ id: "item-a", filename: "File A.m4a" }),
+			item({ id: "item-b", filename: "File B.m4a", createdAt: "2026-03-31T09:00:00.000Z" }),
+			item({ id: "item-c", filename: "File C.m4a", createdAt: "2026-03-31T08:00:00.000Z" }),
+		];
+
+		const result = getNextSelectedIdAfterDelete(items, "item-c", "item-c");
 
 		expect(result).toBe("item-b");
 	});
