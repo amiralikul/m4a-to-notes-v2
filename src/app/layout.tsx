@@ -40,10 +40,15 @@ export default function RootLayout({
 	children: React.ReactNode;
 }>) {
 	return (
-		<html lang="en" className={cn("font-sans", geist.variable)}>
-			<body
-				className={`${dmSans.variable} ${instrumentSerif.variable} ${geistMono.variable} antialiased`}
-			>
+		<html
+			lang="en"
+			className={cn(
+        				dmSans.variable,
+        				instrumentSerif.variable,
+        				geistMono.variable,
+        			, "font-sans", geist.variable)}
+		>
+			<body className="antialiased">
 				<QueryProvider>
 					<LemonSqueezyProvider>
 						<SiteHeader />

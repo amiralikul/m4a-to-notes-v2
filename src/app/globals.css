@@ -50,6 +50,9 @@
 }
 
 :root {
+	--font-dm-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+	--font-geist-mono: "Geist Mono", ui-monospace, "SFMono-Regular", monospace;
+	--font-instrument-serif: "Instrument Serif", ui-serif, Georgia, serif;
 	--radius: 0.625rem;
 	--card: oklch(1 0 0);
 	--card-foreground: oklch(0.145 0 0);
