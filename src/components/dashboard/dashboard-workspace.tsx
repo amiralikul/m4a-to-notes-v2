@@ -26,6 +26,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { SUPPORTED_LANGUAGES } from "@/lib/constants/languages";
 import { transcriptionKeys } from "@/lib/query-keys";
 import { DashboardEmptyState } from "./dashboard-empty-state";
+import { DASHBOARD_WORKSPACE_GRID_CLASS } from "./layout-classes";
 import {
 	createOptimisticDeleteSelectionTransition,
 	resolveDashboardSelection,
@@ -458,9 +459,9 @@ export function DashboardWorkspace() {
 
 	return (
 		<div className="container mx-auto flex flex-col gap-6 py-8">
-			<FileUpload showHistory={false} />
+			<FileUpload showHistory={false} variant="dashboardCompact" />
 
-			<div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+			<div className={DASHBOARD_WORKSPACE_GRID_CLASS}>
 				<TranscriptionSidebar
 					items={items}
 					selectedId={selectedId}

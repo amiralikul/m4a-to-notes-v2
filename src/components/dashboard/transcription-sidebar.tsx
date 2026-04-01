@@ -20,9 +20,13 @@ import {
 } from "@/components/ui/empty";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
+import {
+	TRANSCRIPTION_SIDEBAR_SCROLL_CLASS,
+	TRANSCRIPTION_SIDEBAR_SCROLL_CONTENT_CLASS,
+} from "./layout-classes";
 import { getSummaryStatusConfig, getTranscriptionStatusConfig } from "./status-config";
 import type { DashboardTranscriptionItem } from "./types";
-import { cn } from "@/lib/utils";
 
 export interface TranscriptionSidebarProps {
 	items: DashboardTranscriptionItem[];
@@ -136,8 +140,8 @@ export function TranscriptionSidebar({
 						<SidebarEmptyState />
 					</div>
 				) : (
-					<ScrollArea className="h-[32rem]">
-						<div className="flex flex-col gap-2 p-3">
+					<ScrollArea className={TRANSCRIPTION_SIDEBAR_SCROLL_CLASS}>
+						<div className={TRANSCRIPTION_SIDEBAR_SCROLL_CONTENT_CLASS}>
 							{items.map((item) => {
 								const isSelected = item.id === selectedId;
 								const status = getTranscriptionStatusConfig(item.status);
@@ -150,7 +154,7 @@ export function TranscriptionSidebar({
 										onClick={() => onSelect(item.id)}
 										aria-pressed={isSelected}
 										className={cn(
-											"flex flex-col gap-3 rounded-2xl border p-3 text-left transition-colors",
+											"flex w-full min-w-0 flex-col gap-3 rounded-2xl border p-3 text-left transition-colors",
 											isSelected
 												? "border-stone-900 bg-stone-900 text-stone-50"
 												: "border-stone-200 bg-background hover:bg-stone-50",
@@ -165,7 +169,7 @@ export function TranscriptionSidebar({
 											<time
 												dateTime={item.createdAt}
 												className={cn(
-													"text-xs",
+													"shrink-0 text-xs",
 													isSelected ? "text-stone-300" : "text-stone-500",
 												)}
 											>
