@@ -12,12 +12,11 @@ describe("font variable wiring", () => {
 			"utf8",
 		);
 
-		expect(globalsSource).toContain("--font-sans: var(--font-dm-sans);");
+		expect(globalsSource).toContain("--font-sans: var(--font-sans);");
 		expect(globalsSource).toContain("--font-mono: var(--font-geist-mono);");
-		expect(globalsSource).toContain("--font-dm-sans:");
+		expect(globalsSource).toContain("--font-display: var(--font-instrument-serif);");
 		expect(globalsSource).toContain("--font-geist-mono:");
-		expect(globalsSource).not.toContain("--font-sans: var(--font-sans);");
-		expect(layoutSource).not.toContain('variable:"--font-sans"');
-		expect(layoutSource).not.toContain('variable: "--font-sans"');
+		expect(globalsSource).toContain("--font-instrument-serif:");
+		expect(layoutSource).toContain('variable: "--font-sans"');
 	});
 });
