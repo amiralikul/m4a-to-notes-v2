@@ -9,6 +9,7 @@ function mapTranscription(
 	return {
 		id: t.id,
 		filename: t.filename,
+		displayName: t.displayName,
 		status: t.status,
 		progress: t.progress,
 		preview: t.preview,

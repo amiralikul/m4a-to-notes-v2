@@ -1,0 +1,1 @@
+ALTER TABLE `transcriptions` ADD `display_name` text;

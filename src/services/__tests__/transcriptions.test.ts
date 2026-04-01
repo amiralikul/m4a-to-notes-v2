@@ -53,6 +53,56 @@ describe("TranscriptionsService", () => {
 			const result = await service.findById("non-existent-id");
 			expect(result).toBeNull();
 		});
+
+		it("returns displayName when one has been set", async () => {
+			const id = await service.create({
+				audioKey: "blob://meeting.m4a",
+				filename: "meeting.m4a",
+			});
+
+			await service.updateDisplayName(id, "Team Sync");
+
+			const result = await service.findById(id);
+			expect(result).not.toBeNull();
+			expect(result!.displayName).toBe("Team Sync");
+			expect(result!.filename).toBe("meeting.m4a");
+		});
+	});
+
+	describe("updateDisplayName", () => {
+		it("updates displayName without changing filename", async () => {
+			const id = await service.create({
+				audioKey: "blob://meeting.m4a",
+				filename: "meeting.m4a",
+			});
+
+			const updated = await service.updateDisplayName(id, "Team Sync");
+
+			expect(updated.displayName).toBe("Team Sync");
+			expect(updated.filename).toBe("meeting.m4a");
+
+			const saved = await service.findById(id);
+			expect(saved).not.toBeNull();
+			expect(saved!.displayName).toBe("Team Sync");
+			expect(saved!.filename).toBe("meeting.m4a");
+		});
+
+		it("normalizes displayName before persisting", async () => {
+			const id = await service.create({
+				audioKey: "blob://meeting.m4a",
+				filename: "meeting.m4a",
+			});
+
+			const trimmed = await service.updateDisplayName(id, "  Team Sync  ");
+			expect(trimmed.displayName).toBe("Team Sync");
+
+			const cleared = await service.updateDisplayName(id, "   ");
+			expect(cleared.displayName).toBeNull();
+
+			const saved = await service.findById(id);
+			expect(saved).not.toBeNull();
+			expect(saved!.displayName).toBeNull();
+		});
 	});
 
 	describe("status transitions", () => {
