@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "38a42867-5bfe-44d2-a93f-7388bc437af8",
-  "prevId": "fb1b6df1-36e0-497a-aae1-4e5fff9d5819",
+  "id": "788aea6d-62d9-4753-b26d-24ad67242516",
+  "prevId": "38a42867-5bfe-44d2-a93f-7388bc437af8",
   "tables": {
     "accounts": {
       "name": "accounts",
@@ -285,6 +285,89 @@
         }
       },
       "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "chat_messages": {
+      "name": "chat_messages",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "chat_id": {
+          "name": "chat_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "parts": {
+          "name": "parts",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "quoted_chunks": {
+          "name": "quoted_chunks",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CURRENT_TIMESTAMP)"
+        }
+      },
+      "indexes": {
+        "chat_messages_chat_id_idx": {
+          "name": "chat_messages_chat_id_idx",
+          "columns": [
+            "chat_id"
+          ],
+          "isUnique": false
+        },
+        "chat_messages_chat_id_created_at_idx": {
+          "name": "chat_messages_chat_id_created_at_idx",
+          "columns": [
+            "chat_id",
+            "created_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "chat_messages_chat_id_transcription_chats_id_fk": {
+          "name": "chat_messages_chat_id_transcription_chats_id_fk",
+          "tableFrom": "chat_messages",
+          "tableTo": "transcription_chats",
+          "columnsFrom": [
+            "chat_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
@@ -654,6 +737,103 @@
         "sessions_user_id_users_id_fk": {
           "name": "sessions_user_id_users_id_fk",
           "tableFrom": "sessions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "transcription_chats": {
+      "name": "transcription_chats",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "transcription_id": {
+          "name": "transcription_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CURRENT_TIMESTAMP)"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CURRENT_TIMESTAMP)"
+        }
+      },
+      "indexes": {
+        "transcription_chats_transcription_user_unique": {
+          "name": "transcription_chats_transcription_user_unique",
+          "columns": [
+            "transcription_id",
+            "user_id"
+          ],
+          "isUnique": true
+        },
+        "transcription_chats_user_id_idx": {
+          "name": "transcription_chats_user_id_idx",
+          "columns": [
+            "user_id"
+          ],
+          "isUnique": false
+        },
+        "transcription_chats_updated_at_idx": {
+          "name": "transcription_chats_updated_at_idx",
+          "columns": [
+            "updated_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "transcription_chats_transcription_id_transcriptions_id_fk": {
+          "name": "transcription_chats_transcription_id_transcriptions_id_fk",
+          "tableFrom": "transcription_chats",
+          "tableTo": "transcriptions",
+          "columnsFrom": [
+            "transcription_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "transcription_chats_user_id_users_id_fk": {
+          "name": "transcription_chats_user_id_users_id_fk",
+          "tableFrom": "transcription_chats",
           "tableTo": "users",
           "columnsFrom": [
             "user_id"
