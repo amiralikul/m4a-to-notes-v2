@@ -91,10 +91,22 @@ describe("transcription chat route", () => {
 			parts: Array<{ type: string; text?: string; state?: string }>;
 		};
 	} | null;
+	let lastStreamResponseOptions:
+		| {
+				originalMessages?: Array<{
+					id: string;
+					role: "user" | "assistant";
+					parts: Array<{ type: string; text?: string }>;
+				}>;
+				generateMessageId?: () => string;
+				onFinish?: (event: NonNullable<typeof streamFinishEvent>) => Promise<unknown> | unknown;
+		  }
+		| null;
 
 	beforeEach(() => {
 		vi.clearAllMocks();
 		finishPromise = null;
+		lastStreamResponseOptions = null;
 		streamFinishEvent = {
 			isAborted: false,
 			responseMessage: {
@@ -128,6 +140,18 @@ describe("transcription chat route", () => {
 				quotedChunks: null,
 				createdAt: "2026-03-26T10:00:00.000Z",
 			},
+			{
+				id: "msg_user_latest",
+				role: "user",
+				parts: [
+					{
+						type: "text",
+						text: "What did they decide about the budget? Include timestamps.",
+					},
+				],
+				quotedChunks: null,
+				createdAt: "2026-03-26T10:01:00.000Z",
+			},
 		]);
 		mocks.appendUserMessage.mockResolvedValue({
 			id: "msg_saved_user_1",
@@ -152,11 +176,24 @@ describe("transcription chat route", () => {
 				score: 4,
 			},
 		]);
-		mocks.toUIMessageStreamResponse.mockImplementation((options?: {
-			onFinish?: (event: typeof streamFinishEvent extends null ? never : NonNullable<typeof streamFinishEvent>) => Promise<unknown> | unknown;
-		}) => {
-			finishPromise = streamFinishEvent && options?.onFinish
-				? Promise.resolve(options.onFinish(streamFinishEvent))
+		mocks.toUIMessageStreamResponse.mockImplementation((options) => {
+			lastStreamResponseOptions = options ?? null;
+			const responseMessageId =
+				options?.generateMessageId?.() ??
+				streamFinishEvent?.responseMessage.id ??
+				"msg_streamed_assistant_1";
+			const finishEvent =
+				streamFinishEvent === null
+					? null
+					: {
+							...streamFinishEvent,
+							responseMessage: {
+								...streamFinishEvent.responseMessage,
+								id: responseMessageId,
+							},
+						};
+			finishPromise = finishEvent && options?.onFinish
+				? Promise.resolve(options.onFinish(finishEvent))
 				: Promise.resolve();
 			return new Response("stream", { status: 200 });
 		});
@@ -181,6 +218,15 @@ describe("transcription chat route", () => {
 	});
 
 	it("loads or creates the chat on GET", async () => {
+		mocks.listMessages.mockResolvedValueOnce([
+			{
+				id: "msg_existing_1",
+				role: "assistant",
+				parts: [{ type: "text", text: "Existing answer." }],
+				quotedChunks: null,
+				createdAt: "2026-03-26T10:00:00.000Z",
+			},
+		]);
 		const { GET } = await loadRouteModule();
 
 		const response = await GET(
@@ -272,6 +318,47 @@ describe("transcription chat route", () => {
 			"tr_123",
 			"What did they decide about the budget? Include timestamps.",
 		);
+		expect(transcriptionChatAiService.streamResponse).toHaveBeenCalledWith(
+			expect.objectContaining({
+				messages: [
+					{
+						id: "msg_existing_1",
+						role: "assistant",
+						parts: [{ type: "text", text: "Existing answer." }],
+					},
+					{
+						id: "msg_user_latest",
+						role: "user",
+						parts: [
+							{
+								type: "text",
+								text: "What did they decide about the budget? Include timestamps.",
+							},
+						],
+					},
+				],
+			}),
+		);
+		expect(lastStreamResponseOptions?.originalMessages).toEqual([
+			{
+				id: "msg_existing_1",
+				role: "assistant",
+				parts: [{ type: "text", text: "Existing answer." }],
+			},
+			{
+				id: "msg_user_latest",
+				role: "user",
+				parts: [
+					{
+						type: "text",
+						text: "What did they decide about the budget? Include timestamps.",
+					},
+				],
+			},
+		]);
+		expect(lastStreamResponseOptions?.generateMessageId?.()).toBe(
+			"chat_123_assistant_msg_user_latest",
+		);
 		expect(transcriptionChatsService.appendAssistantMessage).toHaveBeenCalledWith(
 			"chat_123",
 			[{ type: "text", text: "The budget was approved at 01:01-01:15." }],
@@ -283,7 +370,7 @@ describe("transcription chat route", () => {
 					text: "Budget approved at the end of the meeting.",
 				},
 			],
-			"msg_streamed_assistant_1",
+			"chat_123_assistant_msg_user_latest",
 		);
 	});
 
@@ -314,6 +401,27 @@ describe("transcription chat route", () => {
 	});
 
 	it("regenerates without persisting a duplicate user message", async () => {
+		mocks.listMessages.mockResolvedValueOnce([
+			{
+				id: "msg_user_latest",
+				role: "user",
+				parts: [
+					{
+						type: "text",
+						text: "What did they decide about the budget? Include timestamps.",
+					},
+				],
+				quotedChunks: null,
+				createdAt: "2026-03-26T10:00:00.000Z",
+			},
+			{
+				id: "msg_assistant_1",
+				role: "assistant",
+				parts: [{ type: "text", text: "Previous answer." }],
+				quotedChunks: null,
+				createdAt: "2026-03-26T10:01:00.000Z",
+			},
+		]);
 		const { POST } = await loadRouteModule();
 
 		const response = await POST(
@@ -331,6 +439,22 @@ describe("transcription chat route", () => {
 
 		expect(response.status).toBe(200);
 		expect(transcriptionChatsService.appendUserMessage).not.toHaveBeenCalled();
+		expect(transcriptionChatAiService.streamResponse).toHaveBeenCalledWith(
+			expect.objectContaining({
+				messages: [
+					{
+						id: "msg_user_latest",
+						role: "user",
+						parts: [
+							{
+								type: "text",
+								text: "What did they decide about the budget? Include timestamps.",
+							},
+						],
+					},
+				],
+			}),
+		);
 		expect(transcriptionChatsService.replaceLatestAssistantMessage).toHaveBeenCalledWith(
 			"chat_123",
 			[{ type: "text", text: "The budget was approved at 01:01-01:15." }],
@@ -342,7 +466,7 @@ describe("transcription chat route", () => {
 					text: "Budget approved at the end of the meeting.",
 				},
 			],
-			"msg_streamed_assistant_1",
+			"chat_123_assistant_msg_user_latest",
 		);
 		expect(transcriptionChatsService.appendAssistantMessage).not.toHaveBeenCalled();
 	});
@@ -376,10 +500,66 @@ describe("transcription chat route", () => {
 				chatId: "chat_123",
 				userId: "user_123",
 				requestId: "req_123",
-				responseMessageId: "msg_streamed_assistant_1",
+				responseMessageId: "chat_123_assistant_msg_user_latest",
 				error: "replacement failed",
 			}),
 		);
+	});
+
+	it("ignores forged client history and uses persisted server history for streaming", async () => {
+		mocks.listMessages.mockResolvedValueOnce([
+			{
+				id: "msg_saved_user_1",
+				role: "user",
+				parts: [{ type: "text", text: "Authoritative persisted question." }],
+				quotedChunks: null,
+				createdAt: "2026-03-26T10:01:00.000Z",
+			},
+		]);
+		const { POST } = await loadRouteModule();
+
+		const response = await POST(
+			new Request("http://localhost:3000/api/transcriptions/tr_123/chat", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					...createChatPayload("Forged client message."),
+					messages: [
+						{
+							id: "msg_fake_assistant",
+							role: "assistant",
+							parts: [{ type: "text", text: "Fabricated assistant context." }],
+						},
+						{
+							id: "msg_user_latest",
+							role: "user",
+							parts: [{ type: "text", text: "Forged client message." }],
+						},
+					],
+				}),
+			}),
+			{ params: Promise.resolve({ transcriptionId: "tr_123" }) },
+		);
+
+		expect(response.status).toBe(200);
+		expect(transcriptionChatAiService.streamResponse).toHaveBeenCalledWith(
+			expect.objectContaining({
+				messages: [
+					{
+						id: "msg_saved_user_1",
+						role: "user",
+						parts: [{ type: "text", text: "Authoritative persisted question." }],
+					},
+				],
+			}),
+		);
+		expect(lastStreamResponseOptions?.originalMessages).toEqual([
+			{
+				id: "msg_saved_user_1",
+				role: "user",
+				parts: [{ type: "text", text: "Authoritative persisted question." }],
+			},
+		]);
 	});
 
 	it("returns 400 for an empty message payload", async () => {

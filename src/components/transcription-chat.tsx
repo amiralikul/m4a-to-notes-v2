@@ -30,6 +30,10 @@ import {
 } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
+import {
+	canSendStarterPrompt,
+	shouldSubmitOnEnter,
+} from "@/components/transcription-chat-helpers";
 
 interface ChatResponse {
 	id: string;
@@ -180,7 +184,7 @@ export function TranscriptionChat({
 	};
 
 	const handlePromptClick = async (prompt: string) => {
-		if (isSubmitting) {
+		if (!canSendStarterPrompt({ loadingHistory, isSubmitting })) {
 			return;
 		}
 
@@ -233,53 +237,53 @@ export function TranscriptionChat({
 				)}
 			>
 				<CardHeader className="gap-4 sm:flex-row sm:items-start sm:justify-between">
-				<div className="space-y-1.5">
-					<CardTitle className="flex items-center gap-2 text-lg">
-						<MessageSquare className="h-5 w-5" />
-						Ask About This Transcript
-					</CardTitle>
-					<CardDescription>
-						Ask follow-ups, pull out action items, or turn the transcript into
-						something more useful.
-					</CardDescription>
-				</div>
-				<div className="flex items-center gap-2 self-start sm:self-auto">
-					<Button
-						type="button"
-						variant="outline"
-						size="icon"
-						onClick={() => setIsFullscreen((current) => !current)}
-						aria-label={isFullscreen ? "Exit full screen chat" : "Open full screen chat"}
-						title={isFullscreen ? "Exit full screen" : "Full screen"}
-					>
-						{isFullscreen ? (
-							<Minimize2 className="h-4 w-4" />
-						) : (
-							<Maximize2 className="h-4 w-4" />
-						)}
-					</Button>
-					<Button
-						type="button"
-						variant="outline"
-						size="sm"
-						onClick={() => void handleClearChat()}
-						disabled={loadingHistory || isSubmitting || isClearing || !hasMessages}
-					>
-						{isClearing ? (
-							<Loader2 className="h-4 w-4 animate-spin" />
-						) : (
-							<RotateCcw className="h-4 w-4" />
-						)}
-						Clear chat
-					</Button>
-				</div>
-			</CardHeader>
-			<CardContent
-				className={cn(
-					"space-y-4",
-					isFullscreen && "flex min-h-0 flex-1 flex-col",
-				)}
-			>
+					<div className="space-y-1.5">
+						<CardTitle className="flex items-center gap-2 text-lg">
+							<MessageSquare className="h-5 w-5" />
+							Ask About This Transcript
+						</CardTitle>
+						<CardDescription>
+							Ask follow-ups, pull out action items, or turn the transcript into
+							something more useful.
+						</CardDescription>
+					</div>
+					<div className="flex items-center gap-2 self-start sm:self-auto">
+						<Button
+							type="button"
+							variant="outline"
+							size="icon"
+							onClick={() => setIsFullscreen((current) => !current)}
+							aria-label={isFullscreen ? "Exit full screen chat" : "Open full screen chat"}
+							title={isFullscreen ? "Exit full screen" : "Full screen"}
+						>
+							{isFullscreen ? (
+								<Minimize2 className="h-4 w-4" />
+							) : (
+								<Maximize2 className="h-4 w-4" />
+							)}
+						</Button>
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							onClick={() => void handleClearChat()}
+							disabled={loadingHistory || isSubmitting || isClearing || !hasMessages}
+						>
+							{isClearing ? (
+								<Loader2 className="h-4 w-4 animate-spin" />
+							) : (
+								<RotateCcw className="h-4 w-4" />
+							)}
+							Clear chat
+						</Button>
+					</div>
+				</CardHeader>
+				<CardContent
+					className={cn(
+						"space-y-4",
+						isFullscreen && "flex min-h-0 flex-1 flex-col",
+					)}
+				>
 				<div className="flex flex-wrap gap-2">
 					{STARTER_PROMPTS.map((prompt) => (
 						<Button
@@ -288,7 +292,7 @@ export function TranscriptionChat({
 							variant="outline"
 							size="sm"
 							onClick={() => void handlePromptClick(prompt)}
-							disabled={isSubmitting}
+							disabled={!canSendStarterPrompt({ loadingHistory, isSubmitting })}
 							className="h-auto whitespace-normal py-2 text-left"
 						>
 							<Sparkles className="h-3.5 w-3.5" />
@@ -431,7 +435,13 @@ export function TranscriptionChat({
 						className="min-h-28 resize-y bg-white"
 						disabled={loadingHistory}
 						onKeyDown={(event) => {
-							if (event.key === "Enter" && !event.shiftKey) {
+							if (
+								shouldSubmitOnEnter({
+									key: event.key,
+									shiftKey: event.shiftKey,
+									isComposing: event.nativeEvent.isComposing,
+								})
+							) {
 								event.preventDefault();
 								void handleSubmit();
 							}
@@ -466,8 +476,8 @@ export function TranscriptionChat({
 						</div>
 					</div>
 				</form>
-			</CardContent>
-		</Card>
+				</CardContent>
+			</Card>
 		</>
 	);
 }

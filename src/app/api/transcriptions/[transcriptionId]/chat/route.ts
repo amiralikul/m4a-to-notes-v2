@@ -87,14 +87,31 @@ export const POST = route({
 			], body.messageId);
 		}
 
+		const persistedMessages = await transcriptionChatsService.listMessages(chat.id);
+		const historyMessages = toUiMessages(persistedMessages);
+		const modelMessages = isRegeneration
+			? omitLatestAssistantMessage(historyMessages)
+			: historyMessages;
+		const modelLatestUserText = extractLatestUserText(modelMessages);
+
+		if (!modelLatestUserText) {
+			throw new ValidationError(
+				"Message payload must include a user text message",
+			);
+		}
+
 		const retrievedChunks =
 			await transcriptionChatRetrievalService.findRelevantChunks(
 				params.transcriptionId,
-				latestUserText,
+				modelLatestUserText,
 			);
+		const assistantMessageId = createAssistantMessageId(
+			chat.id,
+			body.messageId ?? body.id,
+		);
 
 		const result = await transcriptionChatAiService.streamResponse({
-			messages: body.messages as UIMessage[],
+			messages: modelMessages,
 			retrievedChunks,
 			abortSignal: request.signal,
 			requestId: body.id,
@@ -102,8 +119,8 @@ export const POST = route({
 		});
 
 		return result.toUIMessageStreamResponse({
-			originalMessages: body.messages as UIMessage[],
-			generateMessageId: () => crypto.randomUUID(),
+			originalMessages: modelMessages,
+			generateMessageId: () => assistantMessageId,
 			onFinish: async ({ isAborted, responseMessage }) => {
 				if (isAborted) return;
 
@@ -221,4 +238,32 @@ function extractLatestUserText(messages: UIMessage[]): string | null {
 	}
 
 	return null;
+}
+
+function toUiMessages(
+	messages: Array<{
+		id: string;
+		role: "user" | "assistant";
+		parts: unknown;
+	}>,
+): UIMessage[] {
+	return messages.map((message) => ({
+		id: message.id,
+		role: message.role,
+		parts: message.parts as UIMessage["parts"],
+	}));
+}
+
+function omitLatestAssistantMessage(messages: UIMessage[]): UIMessage[] {
+	const latestMessage = messages.at(-1);
+
+	if (latestMessage?.role !== "assistant") {
+		return messages;
+	}
+
+	return messages.slice(0, -1);
+}
+
+function createAssistantMessageId(chatId: string, turnKey: string): string {
+	return `${chatId}_assistant_${turnKey}`;
 }

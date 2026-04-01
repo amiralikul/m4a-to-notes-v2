@@ -97,10 +97,7 @@ function buildTranscriptChatSystemPrompt(
 	const transcriptContext =
 		retrievedChunks.length > 0
 			? retrievedChunks
-					.map(
-						(chunk) =>
-							`[${formatTimestampRange(chunk.startMs, chunk.endMs)}] "${chunk.text}"`,
-					)
+					.map((chunk) => formatRetrievedChunk(chunk))
 					.join("\n\n")
 			: "No relevant transcript chunks were retrieved for this question.";
 
@@ -118,6 +115,16 @@ function buildTranscriptChatSystemPrompt(
 
 function formatTimestampRange(startMs: number, endMs: number): string {
 	return `${formatTimestamp(startMs)}-${formatTimestamp(endMs)}`;
+}
+
+function formatRetrievedChunk(
+	chunk: TranscriptionChatRetrievedChunk,
+): string {
+	if (chunk.startMs === 0 && chunk.endMs === 0) {
+		return `"${chunk.text}"`;
+	}
+
+	return `[${formatTimestampRange(chunk.startMs, chunk.endMs)}] "${chunk.text}"`;
 }
 
 function formatTimestamp(valueMs: number): string {

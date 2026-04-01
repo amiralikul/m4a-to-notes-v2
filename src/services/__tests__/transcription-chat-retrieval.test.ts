@@ -102,6 +102,25 @@ describe("TranscriptionChatRetrievalService", () => {
 		expect(results[1].text).toBe("פגישה כללית אחרת");
 	});
 
+	it("matches canonically equivalent Unicode text in chunk scoring", async () => {
+		const transcriptionId = await seedChunks([
+			"The cafe\u0301 budget was approved.",
+			"Different topic entirely.",
+		]);
+
+		const results = await retrievalService.findRelevantChunks(
+			transcriptionId,
+			"café budget",
+			2,
+		);
+
+		expect(results).toHaveLength(1);
+		expect(results[0]).toMatchObject({
+			chunkIndex: 0,
+			text: "The cafe\u0301 budget was approved.",
+		});
+	});
+
 	it("boosts a normalized phrase only at token boundaries", async () => {
 		const transcriptionId = await seedChunks([
 			"release-plan approved",
@@ -218,6 +237,29 @@ describe("TranscriptionChatRetrievalService", () => {
 		expect(results[0].text.length).toBeLessThan(transcriptText.length);
 		expect(results[0].text.length).toBeLessThanOrEqual(4_003);
 		expect(results[0].text).toContain("budget decision approved");
+	});
+
+	it("matches canonically equivalent Unicode text in transcript fallback excerpts", async () => {
+		const transcriptionId = await transcriptionsService.create({
+			audioKey: "https://blob.example/audio.m4a",
+			filename: "audio.m4a",
+		});
+		const transcriptText = `${"intro ".repeat(400)}caf\u00e9 budget decision${" outro".repeat(400)}`;
+
+		await transcriptionsService.markCompleted(
+			transcriptionId,
+			"caf\u00e9 budget decision",
+			transcriptText,
+		);
+
+		const results = await retrievalService.findRelevantChunks(
+			transcriptionId,
+			"cafe\u0301 budget",
+			1,
+		);
+
+		expect(results).toHaveLength(1);
+		expect(results[0].text).toContain("caf\u00e9 budget decision");
 	});
 
 	it("returns at most the requested number of chunks with deterministic tie breaking", async () => {
