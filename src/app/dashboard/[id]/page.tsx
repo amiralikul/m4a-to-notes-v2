@@ -27,10 +27,12 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { TranscriptionTitleEditor } from "@/components/transcription-title-editor";
 import { transcriptionKeys } from "@/lib/query-keys";
 import { SUPPORTED_LANGUAGES } from "@/lib/constants/languages";
 import type { LanguageCode } from "@/lib/constants/languages";
 import { useAuth } from "@/hooks/use-auth";
+import { useTranscriptionRename } from "@/hooks/use-transcription-rename";
 
 interface DiarizationSegment {
 	speaker: string;
@@ -44,6 +46,7 @@ interface TranscriptionDetail {
 	status: "pending" | "processing" | "completed" | "failed";
 	progress: number;
 	filename: string;
+	displayName: string | null;
 	createdAt: string;
 	completedAt: string | null;
 	preview: string | null;
@@ -149,6 +152,7 @@ export default function TranscriptionDetailPage() {
 	const router = useRouter();
 	const { isLoaded, isSignedIn } = useAuth();
 	const queryClient = useQueryClient();
+	const renameMutation = useTranscriptionRename(id);
 	const [selectedLanguage, setSelectedLanguage] = useState<string>("");
 	const transcriptRef = useRef<HTMLDivElement>(null);
 	const summaryRef = useRef<HTMLDivElement>(null);
@@ -286,10 +290,16 @@ export default function TranscriptionDetailPage() {
 
 			{/* Header */}
 			<div className="flex items-center justify-between flex-wrap gap-4">
-				<div>
-					<h1 className="text-2xl font-display italic text-stone-900">
-						{transcription.filename}
-					</h1>
+				<div className="min-w-0 flex-1">
+					<TranscriptionTitleEditor
+						displayName={transcription.displayName}
+						filename={transcription.filename}
+						isPending={renameMutation.isPending}
+						errorMessage={renameMutation.errorMessage}
+						onSave={renameMutation.rename}
+						onCancel={renameMutation.clearError}
+						className="max-w-xl"
+					/>
 					<div className="flex items-center gap-2 mt-1">
 						<Badge className={statusConfig[transcription.status].className}>
 							{statusConfig[transcription.status].label}

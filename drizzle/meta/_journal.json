@@ -187,8 +187,15 @@
     {
       "idx": 26,
       "version": "6",
+      "when": 1773998707199,
+      "tag": "0026_add_transcription_display_name",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "6",
       "when": 1774531008757,
-      "tag": "0026_add_transcription_chat_tables",
+      "tag": "0027_add_transcription_chat_tables",
       "breakpoints": true
     }
   ]
