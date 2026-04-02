@@ -38,6 +38,14 @@ export interface TranscriptionSidebarProps {
 	onRetry?: () => void;
 }
 
+const SIDEBAR_SKELETON_ROW_IDS = [
+	"row-1",
+	"row-2",
+	"row-3",
+	"row-4",
+	"row-5",
+] as const;
+
 function formatDateTime(value: string) {
 	return new Date(value).toLocaleString(undefined, {
 		month: "short",
@@ -50,9 +58,9 @@ function formatDateTime(value: string) {
 function SidebarSkeleton() {
 	return (
 		<div className="flex flex-col gap-2 p-3">
-			{Array.from({ length: 5 }).map((_, index) => (
+			{SIDEBAR_SKELETON_ROW_IDS.map((rowId) => (
 				<div
-					key={`sidebar-skeleton-${index}`}
+					key={`sidebar-skeleton-${rowId}`}
 					className="flex flex-col gap-3 rounded-2xl border border-stone-200 p-3"
 				>
 					<div className="flex items-center justify-between gap-3">

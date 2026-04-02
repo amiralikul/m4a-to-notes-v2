@@ -26,6 +26,14 @@ import { useAuth } from "@/hooks/use-auth";
 import { useTranscriptionRename } from "@/hooks/use-transcription-rename";
 import { SUPPORTED_LANGUAGES } from "@/lib/constants/languages";
 import { transcriptionKeys } from "@/lib/query-keys";
+import {
+	fetchSummary,
+	getDetailRefetchInterval,
+	getSummaryRetryDelay,
+	getTimedPollingInterval,
+	isTranslationQueryReady,
+	shouldRetrySummary,
+} from "@/components/dashboard/dashboard-workspace-queries";
 import { DashboardEmptyState } from "./dashboard-empty-state";
 import { DASHBOARD_WORKSPACE_GRID_CLASS } from "./layout-classes";
 import {
@@ -35,7 +43,6 @@ import {
 import { TranscriptionSidebar } from "./transcription-sidebar";
 import { TranscriptionWorkspacePane } from "./transcription-workspace-pane";
 import type {
-	DashboardSummaryPayload,
 	DashboardTranscriptionDetail,
 	DashboardTranscriptionItem,
 	DashboardTranslationItem,
@@ -64,17 +71,6 @@ async function fetchTranscription(id: string): Promise<DashboardTranscriptionDet
 		cache: "no-store",
 	});
 	if (!res.ok) throw new Error("Failed to fetch transcription");
-	return res.json();
-}
-
-async function fetchSummary(id: string): Promise<DashboardSummaryPayload> {
-	const res = await fetch(`/api/transcriptions/${id}/summary`, {
-		cache: "no-store",
-	});
-	if (!res.ok) {
-		if (res.status === 404) throw new Error("Summary is not available yet.");
-		throw new Error(`Failed to fetch summary (${res.status})`);
-	}
 	return res.json();
 }
 
@@ -183,6 +179,7 @@ export function DashboardWorkspace() {
 		viewingTranslationId: null,
 	});
 	const listPollingStartRef = useRef<number | null>(null);
+	const summaryRetryStartRef = useRef<number | null>(null);
 	const translationsPollingStartRef = useRef<number | null>(null);
 
 	const listQuery = useQuery({
@@ -191,30 +188,24 @@ export function DashboardWorkspace() {
 		enabled: isLoaded,
 		refetchInterval: (query) => {
 			const transcriptions = query.state.data?.transcriptions;
-			if (!transcriptions) return false;
-
-			const hasInProgress = transcriptions.some(
+			const hasInProgress = Boolean(transcriptions?.some(
 				(item) =>
 					item.status === "pending" ||
 					item.status === "processing" ||
 					(item.status === "completed" &&
 						(item.summaryStatus === "pending" ||
 							item.summaryStatus === "processing")),
-			);
-
-			if (!hasInProgress) {
-				listPollingStartRef.current = null;
-				return false;
-			}
-
-			if (!listPollingStartRef.current) {
-				listPollingStartRef.current = Date.now();
-			}
-
-			const elapsed = Date.now() - listPollingStartRef.current;
-			if (elapsed > MAX_POLLING_MS) return false;
-
-			return elapsed < 60_000 ? 5_000 : 15_000;
+			));
+			const polling = getTimedPollingInterval({
+				hasInProgress,
+				startedAt: listPollingStartRef.current,
+				now: Date.now(),
+				maxPollingMs: MAX_POLLING_MS,
+				shortIntervalMs: 5_000,
+				longIntervalMs: 15_000,
+			});
+			listPollingStartRef.current = polling.startedAt;
+			return polling.interval;
 		},
 	});
 
@@ -252,12 +243,18 @@ export function DashboardWorkspace() {
 		selection.shouldReplaceUrl,
 	]);
 
+	useEffect(() => {
+		summaryRetryStartRef.current = null;
+		translationsPollingStartRef.current = null;
+	}, [selectedId]);
+
 	const detailQuery = useQuery({
 		queryKey: selectedId
 			? transcriptionKeys.detail(selectedId)
 			: [...transcriptionKeys.all, "detail", "none"],
 		queryFn: () => fetchTranscription(selectedId!),
-		enabled: isLoaded && !!selectedId,
+		enabled: !!selectedId,
+		refetchInterval: (query) => getDetailRefetchInterval(query.state.data ?? null),
 	});
 
 	const detail = detailQuery.data ?? null;
@@ -268,11 +265,40 @@ export function DashboardWorkspace() {
 			: [...transcriptionKeys.all, "summary", "none"],
 		queryFn: () => fetchSummary(selectedId!),
 		enabled:
-			isLoaded &&
 			!!selectedId &&
 			(detail?.summaryStatus === "completed" ||
 				detail?.summaryStatus === "failed"),
 		staleTime: Infinity,
+		retry: (_failureCount, error) => {
+			const retryState = shouldRetrySummary({
+				error,
+				startedAt: summaryRetryStartRef.current,
+				now: Date.now(),
+				maxPollingMs: MAX_POLLING_MS,
+			});
+			summaryRetryStartRef.current = retryState.startedAt;
+			return retryState.retry;
+		},
+		retryDelay: getSummaryRetryDelay,
+	});
+	const summary = summaryQuery.data
+		? summaryQuery.data
+		: detail && summaryQuery.error
+			? {
+					transcriptionId: detail.transcriptionId,
+					summaryStatus: detail.summaryStatus ?? "failed",
+					summaryData: null,
+					summaryError: {
+						message: summaryQuery.error.message,
+					},
+					summaryUpdatedAt: detail.summaryUpdatedAt,
+				}
+			: null;
+	const translationsReady = isTranslationQueryReady({
+		isLoaded,
+		isSignedIn,
+		selectedId,
+		detail,
 	});
 
 	const translationsQuery = useQuery({
@@ -280,34 +306,23 @@ export function DashboardWorkspace() {
 			? transcriptionKeys.translations(selectedId)
 			: [...transcriptionKeys.all, "translations", "none"],
 		queryFn: () => fetchTranslations(selectedId!),
-		enabled:
-			isLoaded &&
-			isSignedIn &&
-			!!selectedId &&
-			detail?.status === "completed" &&
-			detail?.summaryStatus === "completed",
+		enabled: translationsReady,
 		refetchInterval: (query) => {
 			const translations = query.state.data?.translations;
-			if (!translations) return false;
-
-			const hasInProgress = translations.some(
+			const hasInProgress = Boolean(translations?.some(
 				(item) =>
 					item.status === "pending" || item.status === "processing",
-			);
-
-			if (!hasInProgress) {
-				translationsPollingStartRef.current = null;
-				return false;
-			}
-
-			if (!translationsPollingStartRef.current) {
-				translationsPollingStartRef.current = Date.now();
-			}
-
-			const elapsed = Date.now() - translationsPollingStartRef.current;
-			if (elapsed > MAX_POLLING_MS) return false;
-
-			return elapsed < 60_000 ? 3_000 : 10_000;
+			));
+			const polling = getTimedPollingInterval({
+				hasInProgress,
+				startedAt: translationsPollingStartRef.current,
+				now: Date.now(),
+				maxPollingMs: MAX_POLLING_MS,
+				shortIntervalMs: 3_000,
+				longIntervalMs: 10_000,
+			});
+			translationsPollingStartRef.current = polling.startedAt;
+			return polling.interval;
 		},
 	});
 
@@ -323,9 +338,11 @@ export function DashboardWorkspace() {
 			.filter((translation) => translation.status !== "failed")
 			.map((translation) => translation.language),
 	);
-	const availableLanguages = Object.entries(SUPPORTED_LANGUAGES).filter(
-		([language]) => !nonFailedLanguages.has(language),
-	);
+	const availableLanguages = translationsReady
+		? Object.entries(SUPPORTED_LANGUAGES).filter(
+				([language]) => !nonFailedLanguages.has(language),
+			)
+		: [];
 
 	const requestTranslationMutation = useMutation({
 		mutationFn: ({
@@ -438,12 +455,14 @@ export function DashboardWorkspace() {
 				);
 			}
 		},
-		onSettled: async (_data, _error, deletedId) => {
-			queryClient.removeQueries({ queryKey: transcriptionKeys.detail(deletedId) });
-			queryClient.removeQueries({ queryKey: transcriptionKeys.summary(deletedId) });
-			queryClient.removeQueries({
-				queryKey: transcriptionKeys.translations(deletedId),
-			});
+		onSettled: async (_data, error, deletedId) => {
+			if (!error) {
+				queryClient.removeQueries({ queryKey: transcriptionKeys.detail(deletedId) });
+				queryClient.removeQueries({ queryKey: transcriptionKeys.summary(deletedId) });
+				queryClient.removeQueries({
+					queryKey: transcriptionKeys.translations(deletedId),
+				});
+			}
 
 			await queryClient.invalidateQueries({
 				queryKey: transcriptionKeys.list(),
@@ -508,7 +527,7 @@ export function DashboardWorkspace() {
 							}))
 						}
 						transcription={detail}
-						summary={summaryQuery.data ?? null}
+						summary={summary}
 						translations={translations}
 						availableLanguages={availableLanguages}
 						selectedLanguage={selectedLanguage}
@@ -543,11 +562,14 @@ export function DashboardWorkspace() {
 								selectedLanguage: language,
 							}))
 						}
-						onRequestTranslation={(language) =>
-							void requestTranslationMutation.mutate({
-								transcriptionId: detail.transcriptionId,
-								language,
-							})
+						onRequestTranslation={
+							translationsReady
+								? (language) =>
+										void requestTranslationMutation.mutate({
+											transcriptionId: detail.transcriptionId,
+											language,
+										})
+								: undefined
 						}
 						onToggleViewingTranslation={(translationId) =>
 							setWorkspaceState((current) => {

@@ -4,6 +4,7 @@ import { Languages, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import {
 	Select,
 	SelectContent,
+	SelectGroup,
 	SelectItem,
 	SelectTrigger,
 	SelectValue,
@@ -61,11 +62,13 @@ export function TranscriptionTranslationsPanel({
 							<SelectValue placeholder="Select language" />
 						</SelectTrigger>
 						<SelectContent>
-							{availableLanguages.map(([code, label]) => (
-								<SelectItem key={code} value={code}>
-									{label}
-								</SelectItem>
-							))}
+							<SelectGroup>
+								{availableLanguages.map(([code, label]) => (
+									<SelectItem key={code} value={code}>
+										{label}
+									</SelectItem>
+								))}
+							</SelectGroup>
 						</SelectContent>
 					</Select>
 					<Button
