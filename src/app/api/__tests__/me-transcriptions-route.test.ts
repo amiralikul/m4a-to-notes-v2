@@ -49,6 +49,7 @@ describe("GET /api/me/transcriptions", () => {
 			{
 				id: "tr_1",
 				filename: "anon-file.m4a",
+				displayName: "Anonymous title",
 				status: "completed",
 				progress: 100,
 				preview: "preview text",
@@ -76,6 +77,7 @@ describe("GET /api/me/transcriptions", () => {
 		expect(transcriptionsService.countByActorId).toHaveBeenCalledWith("actor_1");
 		expect(body.total).toBe(1);
 		expect(body.transcriptions).toHaveLength(1);
+		expect(body.transcriptions[0].displayName).toBe("Anonymous title");
 	});
 
 	it("returns signed-in user's transcriptions when authenticated", async () => {
@@ -87,6 +89,7 @@ describe("GET /api/me/transcriptions", () => {
 			{
 				id: "tr_1",
 				filename: "user-file.m4a",
+				displayName: "Signed-in title",
 				status: "processing",
 				progress: 40,
 				preview: null,
@@ -114,6 +117,7 @@ describe("GET /api/me/transcriptions", () => {
 		expect(transcriptionsService.countByUserId).toHaveBeenCalledWith("user_1");
 		expect(body.total).toBe(1);
 		expect(body.transcriptions).toHaveLength(1);
+		expect(body.transcriptions[0].displayName).toBe("Signed-in title");
 	});
 
 	it("uses default limit when query parameter is invalid", async () => {

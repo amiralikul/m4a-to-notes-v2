@@ -7,6 +7,6 @@ services:
     environment:
       PORT: "8080"
       LOG_LEVEL: "info"
-      ALLOWED_ORIGINS: "http://localhost:3000"
+      ALLOWED_ORIGINS: "http://localhost:3000,http://localhost:3434"
       BLOB_READ_WRITE_TOKEN: "${BLOB_READ_WRITE_TOKEN}"
       M4A_TO_NOTES_READ_WRITE_TOKEN: "${BLOB_READ_WRITE_TOKEN}"

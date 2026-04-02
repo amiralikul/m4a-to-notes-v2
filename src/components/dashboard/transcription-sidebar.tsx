@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/empty";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getTranscriptionTitle } from "@/components/transcription-title-utils";
 import { cn } from "@/lib/utils";
 import {
 	TRANSCRIPTION_SIDEBAR_SCROLL_CLASS,
@@ -146,6 +147,10 @@ export function TranscriptionSidebar({
 								const isSelected = item.id === selectedId;
 								const status = getTranscriptionStatusConfig(item.status);
 								const summaryStatus = getSummaryStatusConfig(item.summaryStatus);
+								const resolvedTitle = getTranscriptionTitle(
+									item.displayName ?? null,
+									item.filename,
+								);
 
 								return (
 									<button
@@ -163,8 +168,18 @@ export function TranscriptionSidebar({
 										<div className="flex items-start justify-between gap-3">
 											<div className="min-w-0 flex-1">
 												<p className="truncate text-sm font-medium">
-													{item.filename}
+													{resolvedTitle}
 												</p>
+												{item.displayName ? (
+													<p
+														className={cn(
+															"truncate text-xs",
+															isSelected ? "text-stone-300" : "text-stone-500",
+														)}
+													>
+														{item.filename}
+													</p>
+												) : null}
 											</div>
 											<time
 												dateTime={item.createdAt}

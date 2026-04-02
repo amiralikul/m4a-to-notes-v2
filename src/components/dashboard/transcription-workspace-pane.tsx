@@ -2,6 +2,7 @@
 
 import { AudioLines, FileText, Trash2, Users } from "lucide-react";
 import { AudioPlayer } from "@/components/audio-player";
+import { TranscriptionTitleEditor } from "@/components/transcription-title-editor";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,6 +36,10 @@ export interface TranscriptionWorkspacePaneProps {
 	transcriptDownloadHref?: string;
 	audioDownloadHref?: string;
 	onDeleteTranscription?: () => void;
+	onRenameTranscription?: (nextDisplayName: string) => Promise<void> | void;
+	renameIsPending?: boolean;
+	renameErrorMessage?: string | null;
+	onRenameErrorDismiss?: () => void;
 	onSelectedLanguageChange?: (language: string) => void;
 	onRequestTranslation?: (language: string) => void;
 	onToggleViewingTranslation?: (translationId: string) => void;
@@ -56,9 +61,20 @@ function WorkspaceHeader({
 	transcriptDownloadHref,
 	audioDownloadHref,
 	onDeleteTranscription,
+	onRenameTranscription,
+	renameIsPending,
+	renameErrorMessage,
+	onRenameErrorDismiss,
 }: Pick<
 	TranscriptionWorkspacePaneProps,
-	"transcription" | "transcriptDownloadHref" | "audioDownloadHref" | "onDeleteTranscription"
+	| "transcription"
+	| "transcriptDownloadHref"
+	| "audioDownloadHref"
+	| "onDeleteTranscription"
+	| "onRenameTranscription"
+	| "renameIsPending"
+	| "renameErrorMessage"
+	| "onRenameErrorDismiss"
 >) {
 	const transcriptionStatus = getTranscriptionStatusConfig(transcription.status);
 	const summaryStatus = getSummaryStatusConfig(transcription.summaryStatus);
@@ -68,9 +84,22 @@ function WorkspaceHeader({
 			<div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
 				<div className="flex min-w-0 flex-col gap-3">
 					<div className="flex flex-wrap items-center gap-2">
-						<CardTitle className="text-2xl font-semibold tracking-tight text-stone-900">
-							{transcription.filename}
-						</CardTitle>
+						<div className="min-w-0">
+							{onRenameTranscription ? (
+								<TranscriptionTitleEditor
+									displayName={transcription.displayName ?? null}
+									filename={transcription.filename}
+									isPending={renameIsPending}
+									errorMessage={renameErrorMessage}
+									onSave={onRenameTranscription}
+									onCancel={onRenameErrorDismiss}
+								/>
+							) : (
+								<CardTitle className="text-2xl font-semibold tracking-tight text-stone-900">
+									{transcription.displayName ?? transcription.filename}
+								</CardTitle>
+							)}
+						</div>
 						<Badge className={transcriptionStatus.className}>
 							{transcriptionStatus.label}
 						</Badge>
@@ -139,6 +168,10 @@ export function TranscriptionWorkspacePane({
 	transcriptDownloadHref,
 	audioDownloadHref,
 	onDeleteTranscription,
+	onRenameTranscription,
+	renameIsPending = false,
+	renameErrorMessage = null,
+	onRenameErrorDismiss,
 	onSelectedLanguageChange,
 	onRequestTranslation,
 	onToggleViewingTranslation,
@@ -156,6 +189,10 @@ export function TranscriptionWorkspacePane({
 				transcriptDownloadHref={transcriptDownloadHref}
 				audioDownloadHref={audioDownloadHref}
 				onDeleteTranscription={onDeleteTranscription}
+				onRenameTranscription={onRenameTranscription}
+				renameIsPending={renameIsPending}
+				renameErrorMessage={renameErrorMessage}
+				onRenameErrorDismiss={onRenameErrorDismiss}
 			/>
 			<Separator />
 			<CardContent className="flex flex-col gap-5 p-6">

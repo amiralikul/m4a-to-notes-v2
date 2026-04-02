@@ -34,6 +34,7 @@ import {
 	SUPPORTED_AUDIO_FORMATS_TEXT,
 } from "@/lib/validation";
 import { AudioPlayer } from "@/components/audio-player";
+import { TranscriptionTitleEditor } from "@/components/transcription-title-editor";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -46,6 +47,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/use-auth";
+import { useTranscriptionRename } from "@/hooks/use-transcription-rename";
 
 interface UploadedFile {
 	id: string;
@@ -73,6 +75,7 @@ interface ChunkerResponsePayload {
 interface PreviousTranscription {
 	id: string;
 	filename: string;
+	displayName: string | null;
 	status: "pending" | "processing" | "completed" | "failed";
 	progress: number;
 	preview: string | null;
@@ -1323,81 +1326,95 @@ export default function FileUpload({
 					)}
 
 					{previousTranscriptions.map((item) => (
-						<Card
+						<PreviousTranscriptionCard
 							key={item.id}
-							className="overflow-hidden border border-stone-200 bg-white"
-						>
-							<CardContent className="p-4">
-								<div className="flex items-center justify-between gap-4">
-									<div className="min-w-0">
-										<p className="font-medium text-stone-900 truncate">
-											{item.filename}
-										</p>
-										<p className="text-xs text-stone-500">
-											{new Date(
-												item.createdAt,
-											).toLocaleString()}
-										</p>
-									</div>
-									<div className="flex items-center gap-2">
-										<Badge variant="outline">
-											{item.status}
-											{item.status === "processing" ||
-											item.status === "pending"
-												? ` (${item.progress}%)`
-												: ""}
-										</Badge>
-										{item.status === "completed" && (
-											<Button
-												size="sm"
-												variant="outline"
-												onClick={() =>
-													void downloadTranscript(
-														item.id,
-														item.filename,
-													)
-												}
-											>
-												<Download className="h-4 w-4 mr-1" />
-												Download
-											</Button>
-										)}
-										<Button
-											size="sm"
-											variant="outline"
-											onClick={() =>
-												void handleDeletePreviousTranscription(
-													item.id,
-												)
-											}
-											disabled={deletingPreviousIds.has(
-												item.id,
-											)}
-											className="text-red-600 hover:text-red-700 hover:bg-red-50"
-										>
-											{deletingPreviousIds.has(item.id) ? (
-												<Loader2 className="h-4 w-4 animate-spin" />
-											) : (
-												<Trash2 className="h-4 w-4" />
-											)}
-										</Button>
-									</div>
-								</div>
-									{item.preview && (
-										<p className="mt-2 text-sm text-stone-600 line-clamp-2">
-											{item.preview}
-										</p>
-									)}
-									{item.audioKey && (
-										<div className="mt-3">
-											<AudioPlayer src={item.audioKey} />
-										</div>
-									)}
-								</CardContent>
-							</Card>
-						))}
+							item={item}
+							downloadTranscript={downloadTranscript}
+							handleDeletePreviousTranscription={
+								handleDeletePreviousTranscription
+							}
+							deletingPreviousIds={deletingPreviousIds}
+						/>
+					))}
 				</div>
 			)}
 		</div>
+	);
+}
+
+function PreviousTranscriptionCard({
+	item,
+	downloadTranscript,
+	handleDeletePreviousTranscription,
+	deletingPreviousIds,
+}: {
+	item: PreviousTranscription;
+	downloadTranscript: (transcriptionId: string, filename: string) => Promise<void>;
+	handleDeletePreviousTranscription: (transcriptionId: string) => Promise<void>;
+	deletingPreviousIds: Set<string>;
+}) {
+	const renameMutation = useTranscriptionRename(item.id);
+
+	return (
+		<Card className="overflow-hidden border border-stone-200 bg-white">
+			<CardContent className="p-4">
+				<div className="flex items-center justify-between gap-4">
+					<div className="min-w-0 flex-1">
+						<TranscriptionTitleEditor
+							displayName={item.displayName}
+							filename={item.filename}
+							isPending={renameMutation.isPending}
+							errorMessage={renameMutation.errorMessage}
+							onSave={renameMutation.rename}
+							onCancel={renameMutation.clearError}
+						/>
+						<p className="mt-1 text-xs text-stone-500">
+							{new Date(item.createdAt).toLocaleString()}
+						</p>
+					</div>
+					<div className="flex items-center gap-2">
+						<Badge variant="outline">
+							{item.status}
+							{item.status === "processing" || item.status === "pending"
+								? ` (${item.progress}%)`
+								: ""}
+						</Badge>
+						{item.status === "completed" && (
+							<Button
+								size="sm"
+								variant="outline"
+								onClick={() => void downloadTranscript(item.id, item.filename)}
+							>
+								<Download className="h-4 w-4 mr-1" />
+								Download
+							</Button>
+						)}
+						<Button
+							size="sm"
+							variant="outline"
+							onClick={() => void handleDeletePreviousTranscription(item.id)}
+							disabled={deletingPreviousIds.has(item.id)}
+							className="text-red-600 hover:text-red-700 hover:bg-red-50"
+						>
+							{deletingPreviousIds.has(item.id) ? (
+								<Loader2 className="h-4 w-4 animate-spin" />
+							) : (
+								<Trash2 className="h-4 w-4" />
+							)}
+						</Button>
+					</div>
+				</div>
+				{item.preview && (
+					<p className="mt-2 text-sm text-stone-600 line-clamp-2">
+						{item.preview}
+					</p>
+				)}
+				{item.audioKey && (
+					<div className="mt-3">
+						<AudioPlayer src={item.audioKey} />
+					</div>
+				)}
+			</CardContent>
+		</Card>
 	);
 }

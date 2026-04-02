@@ -16,7 +16,9 @@ export interface DashboardStatusMessage {
 export interface DashboardTranscriptionItem {
 	id: string;
 	filename: string;
+	displayName?: string | null;
 	createdAt: string;
+	completedAt?: string | null;
 	status: DashboardTranscriptionStatus;
 	progress: number;
 	preview: string | null;

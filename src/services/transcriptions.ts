@@ -251,6 +251,17 @@ export class TranscriptionsService {
 		});
 	}
 
+	async updateDisplayName(
+		transcriptionId: string,
+		displayName: string | null,
+	): Promise<Transcription> {
+		const normalizedDisplayName = displayName?.trim() || null;
+
+		return this.update(transcriptionId, {
+			displayName: normalizedDisplayName,
+		});
+	}
+
 	async updateProgress(
 		transcriptionId: string,
 		progress: number,
@@ -492,6 +503,7 @@ export class TranscriptionsService {
 			status: transcription.status,
 			progress: transcription.progress,
 			filename: transcription.filename,
+			displayName: transcription.displayName,
 			createdAt: transcription.createdAt,
 			completedAt: transcription.completedAt,
 			preview: transcription.preview,

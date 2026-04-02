@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/use-auth";
+import { useTranscriptionRename } from "@/hooks/use-transcription-rename";
 import { SUPPORTED_LANGUAGES } from "@/lib/constants/languages";
 import { transcriptionKeys } from "@/lib/query-keys";
 import { DashboardEmptyState } from "./dashboard-empty-state";
@@ -233,6 +234,7 @@ export function DashboardWorkspace() {
 		workspaceState.selectedId === selectedId
 			? workspaceState.viewingTranslationId
 			: null;
+	const renameMutation = useTranscriptionRename(selectedId ?? "");
 
 	useEffect(() => {
 		if (!hasResolvedList || listQuery.isError || !selection.shouldReplaceUrl) return;
@@ -521,6 +523,12 @@ export function DashboardWorkspace() {
 						onDeleteTranscription={() =>
 							void deleteMutation.mutate(detail.transcriptionId)
 						}
+						onRenameTranscription={(nextDisplayName) =>
+							renameMutation.rename(nextDisplayName)
+						}
+						renameIsPending={renameMutation.isPending}
+						renameErrorMessage={renameMutation.errorMessage}
+						onRenameErrorDismiss={renameMutation.clearError}
 						onSelectedLanguageChange={(language) =>
 							setWorkspaceState((current) => ({
 								...(current.selectedId === selectedId
