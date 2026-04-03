@@ -26,8 +26,13 @@ vi.mock("@tanstack/react-query", () => ({
 	useQueryClient: useQueryClientMock,
 }));
 
+vi.mock("next/navigation", () => ({
+	useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+	useSearchParams: () => ({ get: () => null }),
+}));
+
 vi.mock("@/hooks/use-auth", () => ({
-	useAuth: () => ({ isLoaded: true }),
+	useAuth: () => ({ isLoaded: true, isSignedIn: true }),
 }));
 
 vi.mock("@/components/file-upload", () => ({
@@ -37,11 +42,40 @@ vi.mock("@/components/file-upload", () => ({
 describe("Dashboard list titles", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		useQueryMock.mockReturnValue({
-			data: {
-				transcriptions: [
-					{
+		useQueryMock.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => {
+			if (queryKey[0] === "transcriptions" && queryKey[1] === "list") {
+				return {
+					data: {
+						transcriptions: [
+							{
+								id: "tr_1",
+								filename: "meeting.m4a",
+								displayName: "Team Sync",
+								status: "completed",
+								progress: 100,
+								preview: null,
+								summaryStatus: null,
+								summaryUpdatedAt: null,
+								createdAt: "2026-03-20T00:00:00.000Z",
+								completedAt: "2026-03-20T00:05:00.000Z",
+								audioKey: "/audio/meeting.m4a",
+								enableDiarization: false,
+								translationCount: 0,
+							},
+						],
+						total: 1,
+					},
+					isLoading: false,
+					error: null,
+					refetch: vi.fn(),
+				};
+			}
+
+			if (queryKey[0] === "transcriptions" && queryKey[1] === "tr_1") {
+				return {
+					data: {
 						id: "tr_1",
+						transcriptionId: "tr_1",
 						filename: "meeting.m4a",
 						displayName: "Team Sync",
 						status: "completed",
@@ -51,15 +85,26 @@ describe("Dashboard list titles", () => {
 						summaryUpdatedAt: null,
 						createdAt: "2026-03-20T00:00:00.000Z",
 						completedAt: "2026-03-20T00:05:00.000Z",
-						audioKey: "",
+						audioKey: "/audio/meeting.m4a",
 						enableDiarization: false,
 						translationCount: 0,
+						transcriptText: "preview",
+						diarizationData: null,
+						error: null,
+						summaryError: null,
 					},
-				],
-				total: 1,
-			},
-			isLoading: false,
-			error: null,
+					isLoading: false,
+					error: null,
+					refetch: vi.fn(),
+				};
+			}
+
+			return {
+				data: undefined,
+				isLoading: false,
+				error: null,
+				refetch: vi.fn(),
+			};
 		});
 	});
 
@@ -71,11 +116,40 @@ describe("Dashboard list titles", () => {
 	});
 
 	it("falls back to filename on dashboard rows when displayName is null", () => {
-		useQueryMock.mockReturnValue({
-			data: {
-				transcriptions: [
-					{
+		useQueryMock.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => {
+			if (queryKey[0] === "transcriptions" && queryKey[1] === "list") {
+				return {
+					data: {
+						transcriptions: [
+							{
+								id: "tr_2",
+								filename: "fallback.m4a",
+								displayName: null,
+								status: "completed",
+								progress: 100,
+								preview: null,
+								summaryStatus: null,
+								summaryUpdatedAt: null,
+								createdAt: "2026-03-20T00:00:00.000Z",
+								completedAt: "2026-03-20T00:05:00.000Z",
+								audioKey: "/audio/fallback.m4a",
+								enableDiarization: false,
+								translationCount: 0,
+							},
+						],
+						total: 1,
+					},
+					isLoading: false,
+					error: null,
+					refetch: vi.fn(),
+				};
+			}
+
+			if (queryKey[0] === "transcriptions" && queryKey[1] === "tr_2") {
+				return {
+					data: {
 						id: "tr_2",
+						transcriptionId: "tr_2",
 						filename: "fallback.m4a",
 						displayName: null,
 						status: "completed",
@@ -85,15 +159,26 @@ describe("Dashboard list titles", () => {
 						summaryUpdatedAt: null,
 						createdAt: "2026-03-20T00:00:00.000Z",
 						completedAt: "2026-03-20T00:05:00.000Z",
-						audioKey: "",
+						audioKey: "/audio/fallback.m4a",
 						enableDiarization: false,
 						translationCount: 0,
+						transcriptText: "preview",
+						diarizationData: null,
+						error: null,
+						summaryError: null,
 					},
-				],
-				total: 1,
-			},
-			isLoading: false,
-			error: null,
+					isLoading: false,
+					error: null,
+					refetch: vi.fn(),
+				};
+			}
+
+			return {
+				data: undefined,
+				isLoading: false,
+				error: null,
+				refetch: vi.fn(),
+			};
 		});
 
 		const html = renderToStaticMarkup(<DashboardPage />);

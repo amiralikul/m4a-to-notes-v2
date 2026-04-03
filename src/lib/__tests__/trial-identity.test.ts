@@ -1,29 +1,35 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-	resolveActorIdentity,
-	signActorId,
-	TRIAL_ACTOR_COOKIE_NAME,
-	verifySignedActorId,
-} from "@/lib/trial-identity";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const TEST_SECRET = "trial-cookie-test-secret";
 
 describe("trial identity", () => {
 	beforeEach(() => {
-		process.env.TRIAL_COOKIE_SECRET = TEST_SECRET;
+		vi.resetModules();
+		vi.doMock("@/env", () => ({
+			env: {
+				TRIAL_COOKIE_SECRET: TEST_SECRET,
+			},
+		}));
 	});
 
 	afterEach(() => {
-		delete process.env.TRIAL_COOKIE_SECRET;
+		vi.doUnmock("@/env");
+		vi.resetModules();
 	});
 
-	it("signs and verifies actor ids", () => {
+	it("signs and verifies actor ids", async () => {
+		const { signActorId, verifySignedActorId } = await import(
+			"@/lib/trial-identity"
+		);
 		const actorId = "123e4567-e89b-12d3-a456-426614174000";
 		const signed = signActorId(actorId);
 		expect(verifySignedActorId(signed)).toBe(actorId);
 	});
 
-	it("rejects tampered signed cookie value", () => {
+	it("rejects tampered signed cookie value", async () => {
+		const { signActorId, verifySignedActorId } = await import(
+			"@/lib/trial-identity"
+		);
 		const actorId = "123e4567-e89b-12d3-a456-426614174000";
 		const signed = signActorId(actorId);
 		const tampered = `${signed}x`;
@@ -31,6 +37,11 @@ describe("trial identity", () => {
 	});
 
 	it("reuses valid signed cookie", async () => {
+		const {
+			resolveActorIdentity,
+			signActorId,
+			TRIAL_ACTOR_COOKIE_NAME,
+		} = await import("@/lib/trial-identity");
 		const actorId = "123e4567-e89b-12d3-a456-426614174000";
 		const signed = signActorId(actorId);
 		const { cookieStore, setCalls } = createMockCookieStore({
@@ -44,6 +55,9 @@ describe("trial identity", () => {
 	});
 
 	it("creates and sets a new cookie when missing", async () => {
+		const { resolveActorIdentity, TRIAL_ACTOR_COOKIE_NAME } = await import(
+			"@/lib/trial-identity"
+		);
 		const { cookieStore, setCalls } = createMockCookieStore();
 
 		const identity = await resolveActorIdentity(cookieStore);
@@ -57,6 +71,9 @@ describe("trial identity", () => {
 	});
 
 	it("replaces invalid cookie value with a new signed cookie", async () => {
+		const { resolveActorIdentity, TRIAL_ACTOR_COOKIE_NAME } = await import(
+			"@/lib/trial-identity"
+		);
 		const { cookieStore, setCalls } = createMockCookieStore({
 			[TRIAL_ACTOR_COOKIE_NAME]: "invalid-cookie-value",
 		});
