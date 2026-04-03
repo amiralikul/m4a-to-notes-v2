@@ -202,9 +202,9 @@ export function TranscriptionWorkspacePane({
 					className="flex flex-col gap-5"
 				>
 					<TabsList className="grid w-full grid-cols-3">
-						<TabsTrigger value="summary">Summary</TabsTrigger>
-						<TabsTrigger value="transcript">Transcript</TabsTrigger>
-						<TabsTrigger value="chat">Chat</TabsTrigger>
+						<TabsTrigger value="summary" className="cursor-pointer">Summary</TabsTrigger>
+						<TabsTrigger value="transcript" className="cursor-pointer">Transcript</TabsTrigger>
+						<TabsTrigger value="chat" className="cursor-pointer">Chat</TabsTrigger>
 					</TabsList>
 
 					<AudioPlayer src={resolvedAudioSrc} />

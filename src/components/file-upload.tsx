@@ -840,7 +840,7 @@ export default function FileUpload({
 		}
 	};
 
-	const getStatusText = (status: UploadedFile["status"]) => {
+	function getStatusText(status: UploadedFile["status"]) {
 		switch (status) {
 			case "uploading":
 				return "Uploading...";
@@ -853,7 +853,7 @@ export default function FileUpload({
 			default:
 				return "Preparing...";
 		}
-	};
+	}
 
 	const triggerTranscriptDownload = useCallback(
 		(text: string, downloadFilename: string) => {

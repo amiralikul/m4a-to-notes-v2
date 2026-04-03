@@ -1,5 +1,5 @@
 export const DASHBOARD_WORKSPACE_GRID_CLASS =
-	"grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]";
+	"grid gap-6 lg:grid-cols-[380px_minmax(0,1fr)]";
 
 export const TRANSCRIPTION_SIDEBAR_SCROLL_CLASS =
 	"max-h-[28rem] lg:max-h-[calc(100vh-13rem)]";

@@ -167,7 +167,7 @@ export function TranscriptionSidebar({
 										onClick={() => onSelect(item.id)}
 										aria-pressed={isSelected}
 										className={cn(
-											"flex w-full min-w-0 flex-col gap-3 rounded-2xl border p-3 text-left transition-colors",
+											"flex w-full min-w-0 cursor-pointer flex-col gap-3 rounded-2xl border p-3 text-left transition-colors",
 											isSelected
 												? "border-stone-900 bg-stone-900 text-stone-50"
 												: "border-stone-200 bg-background hover:bg-stone-50",
