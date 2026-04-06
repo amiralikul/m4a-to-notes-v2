@@ -99,7 +99,7 @@ export default function HomePage() {
 					<div className="container px-4 md:px-6">
 						<div className="text-center mb-16">
 							<p className="text-sm font-medium text-amber-600 uppercase tracking-wider mb-3">
-								Why AudioScribe
+								Why WavesToText
 							</p>
 							<h2 className="text-3xl sm:text-4xl md:text-5xl font-display italic text-stone-900">
 								Built for accuracy &amp; speed
@@ -196,7 +196,7 @@ export default function HomePage() {
 								asChild
 							>
 								<Link href="/dashboard">
-									Try AudioScribe Free
+									Try WavesToText Free
 									<ArrowRight className="ml-2 h-4 w-4" />
 								</Link>
 							</Button>

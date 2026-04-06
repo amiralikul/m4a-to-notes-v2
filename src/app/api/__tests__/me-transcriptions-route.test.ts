@@ -1,12 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { auth } from "@clerk/nextjs/server";
+import { getServerSession } from "@/lib/auth-server";
 import { resolveActorIdentity } from "@/lib/trial-identity";
-import { actorsService, transcriptionsService } from "@/services";
+import { actorsService, transcriptionsService, translationsService } from "@/services";
 import { GET as listTranscriptions } from "@/app/api/me/transcriptions/route";
 
-vi.mock("@clerk/nextjs/server", () => ({
-	auth: vi.fn().mockResolvedValue({ userId: null }),
-	currentUser: vi.fn().mockResolvedValue(null),
+vi.mock("@/lib/auth-server", () => ({
+	getServerSession: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("@/lib/trial-identity", () => ({
@@ -23,6 +22,9 @@ vi.mock("@/services", () => ({
 		countByUserId: vi.fn(),
 		findByActorId: vi.fn(),
 		countByActorId: vi.fn(),
+	},
+	translationsService: {
+		countByTranscriptionIds: vi.fn().mockResolvedValue(new Map()),
 	},
 }));
 
@@ -42,11 +44,12 @@ describe("GET /api/me/transcriptions", () => {
 	});
 
 	it("returns anonymous user's transcriptions when signed out", async () => {
-		vi.mocked(auth).mockResolvedValue({ userId: null } as never);
+		vi.mocked(getServerSession).mockResolvedValue(null);
 		vi.mocked(transcriptionsService.findByActorId).mockResolvedValue([
 			{
 				id: "tr_1",
 				filename: "anon-file.m4a",
+				displayName: "Anonymous title",
 				status: "completed",
 				progress: 100,
 				preview: "preview text",
@@ -74,14 +77,19 @@ describe("GET /api/me/transcriptions", () => {
 		expect(transcriptionsService.countByActorId).toHaveBeenCalledWith("actor_1");
 		expect(body.total).toBe(1);
 		expect(body.transcriptions).toHaveLength(1);
+		expect(body.transcriptions[0].displayName).toBe("Anonymous title");
 	});
 
 	it("returns signed-in user's transcriptions when authenticated", async () => {
-		vi.mocked(auth).mockResolvedValue({ userId: "user_1" } as never);
+		vi.mocked(getServerSession).mockResolvedValue({
+			user: { id: "user_1", email: "user@test.com", name: "User" },
+			session: { id: "sess_1", userId: "user_1" },
+		} as never);
 		vi.mocked(transcriptionsService.findByUserId).mockResolvedValue([
 			{
 				id: "tr_1",
 				filename: "user-file.m4a",
+				displayName: "Signed-in title",
 				status: "processing",
 				progress: 40,
 				preview: null,
@@ -109,10 +117,14 @@ describe("GET /api/me/transcriptions", () => {
 		expect(transcriptionsService.countByUserId).toHaveBeenCalledWith("user_1");
 		expect(body.total).toBe(1);
 		expect(body.transcriptions).toHaveLength(1);
+		expect(body.transcriptions[0].displayName).toBe("Signed-in title");
 	});
 
 	it("uses default limit when query parameter is invalid", async () => {
-		vi.mocked(auth).mockResolvedValue({ userId: "user_1" } as never);
+		vi.mocked(getServerSession).mockResolvedValue({
+			user: { id: "user_1", email: "user@test.com", name: "User" },
+			session: { id: "sess_1", userId: "user_1" },
+		} as never);
 
 		const response = await listTranscriptions(
 			new Request("http://localhost:3000/api/me/transcriptions?limit=-10"),

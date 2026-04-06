@@ -7,6 +7,7 @@ import type {
 	UpdateTranscription,
 } from "@/db/schema";
 import { transcriptions } from "@/db/schema";
+import type { AppDatabase, ProductionDatabase } from "@/db/types";
 import { getErrorMessage } from "@/lib/errors";
 import type { Logger } from "@/lib/logger";
 import type { OwnerIdentity } from "@/lib/route";
@@ -33,20 +34,14 @@ export type SummaryStatusType =
 
 export const TranscriptionSource = {
 	WEB: "web",
-	TELEGRAM: "telegram",
 } as const;
 
 export type TranscriptionSourceType =
 	(typeof TranscriptionSource)[keyof typeof TranscriptionSource];
 
-type Database = Parameters<typeof eq>[0] extends never
-	? never
-	: // biome-ignore lint: needed for generic DB type
-		any;
-
 export class TranscriptionsService {
 	constructor(
-		private db: Database,
+		private db: AppDatabase,
 		private logger: Logger,
 	) {}
 
@@ -256,6 +251,17 @@ export class TranscriptionsService {
 		});
 	}
 
+	async updateDisplayName(
+		transcriptionId: string,
+		displayName: string | null,
+	): Promise<Transcription> {
+		const normalizedDisplayName = displayName?.trim() || null;
+
+		return this.update(transcriptionId, {
+			displayName: normalizedDisplayName,
+		});
+	}
+
 	async updateProgress(
 		transcriptionId: string,
 		progress: number,
@@ -394,11 +400,11 @@ export class TranscriptionsService {
 
 	async countByUserId(userId: string): Promise<number> {
 		try {
-			const result = await this.db
+			const result = await (this.db as ProductionDatabase)
 				.select({ count: count() })
 				.from(transcriptions)
 				.where(eq(transcriptions.userId, userId));
-			return result[0]?.count ?? 0;
+			return Number(result[0]?.count ?? 0);
 		} catch (error) {
 			this.logger.error("Failed to count transcriptions by userId", {
 				userId,
@@ -410,7 +416,7 @@ export class TranscriptionsService {
 
 	async countByActorId(actorId: string): Promise<number> {
 		try {
-			const result = await this.db
+			const result = await (this.db as ProductionDatabase)
 				.select({ count: count() })
 				.from(transcriptions)
 				.where(
@@ -419,7 +425,7 @@ export class TranscriptionsService {
 						eq(transcriptions.ownerId, actorId),
 					),
 				);
-			return result[0]?.count ?? 0;
+			return Number(result[0]?.count ?? 0);
 		} catch (error) {
 			this.logger.error("Failed to count transcriptions by actorId", {
 				actorId,
@@ -497,9 +503,11 @@ export class TranscriptionsService {
 			status: transcription.status,
 			progress: transcription.progress,
 			filename: transcription.filename,
+			displayName: transcription.displayName,
 			createdAt: transcription.createdAt,
 			completedAt: transcription.completedAt,
 			preview: transcription.preview,
+			contentType: transcription.contentType,
 			enableDiarization: transcription.enableDiarization,
 			diarizationData: transcription.diarizationData ?? null,
 			transcriptText: transcription.transcriptText,

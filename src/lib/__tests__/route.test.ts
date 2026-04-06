@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { z, ZodError } from "zod";
 
-vi.mock("@clerk/nextjs/server", () => ({
-	auth: vi.fn(),
+vi.mock("@/lib/auth-server", () => ({
+	getServerSession: vi.fn(),
 }));
 
 vi.mock("@/lib/trial-identity", () => ({
@@ -25,14 +25,28 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 import { route } from "../route";
-import { auth } from "@clerk/nextjs/server";
+import { getServerSession } from "@/lib/auth-server";
 import { resolveActorIdentity } from "@/lib/trial-identity";
 import { actorsService } from "@/services";
 import { NotFoundError, ForbiddenError, ValidationError } from "../errors";
 
-const mockAuth = vi.mocked(auth);
+const mockGetServerSession = vi.mocked(getServerSession);
 const mockResolveActorIdentity = vi.mocked(resolveActorIdentity);
 const mockEnsureActor = vi.mocked(actorsService.ensureActor);
+
+function makeSession(userId: string) {
+	return {
+		user: {
+			id: userId,
+			email: `${userId}@test.com`,
+			name: "Test User",
+		},
+		session: {
+			id: "sess_1",
+			userId,
+		},
+	} as Awaited<ReturnType<typeof getServerSession>>;
+}
 
 function makeRequest(body?: unknown): Request {
 	if (body !== undefined) {
@@ -56,7 +70,7 @@ describe("route()", () => {
 
 	describe("auth: required", () => {
 		it("returns 401 when not signed in", async () => {
-			mockAuth.mockResolvedValue({ userId: null } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+			mockGetServerSession.mockResolvedValue(null);
 
 			const handler = route({
 				auth: "required",
@@ -69,7 +83,7 @@ describe("route()", () => {
 		});
 
 		it("provides userId to handler when signed in", async () => {
-			mockAuth.mockResolvedValue({ userId: "user_123" } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+			mockGetServerSession.mockResolvedValue(makeSession("user_123"));
 
 			const handler = route({
 				auth: "required",
@@ -84,7 +98,7 @@ describe("route()", () => {
 
 	describe("auth: optional", () => {
 		it("resolves userId when signed in", async () => {
-			mockAuth.mockResolvedValue({ userId: "user_123" } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+			mockGetServerSession.mockResolvedValue(makeSession("user_123"));
 
 			const handler = route({
 				auth: "optional",
@@ -103,7 +117,7 @@ describe("route()", () => {
 		});
 
 		it("resolves actorId when not signed in", async () => {
-			mockAuth.mockResolvedValue({ userId: null } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+			mockGetServerSession.mockResolvedValue(null);
 			mockResolveActorIdentity.mockResolvedValue({ actorId: "actor_456" });
 			mockEnsureActor.mockResolvedValue(undefined as never);
 
@@ -133,13 +147,13 @@ describe("route()", () => {
 
 			const res = await handler(makeRequest());
 			expect(res.status).toBe(200);
-			expect(mockAuth).not.toHaveBeenCalled();
+			expect(mockGetServerSession).not.toHaveBeenCalled();
 		});
 	});
 
 	describe("params validation", () => {
 		it("validates and passes params to handler", async () => {
-			mockAuth.mockResolvedValue({ userId: "user_1" } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+			mockGetServerSession.mockResolvedValue(makeSession("user_1"));
 
 			const handler = route({
 				auth: "required",
@@ -153,7 +167,7 @@ describe("route()", () => {
 		});
 
 		it("returns 400 for invalid params", async () => {
-			mockAuth.mockResolvedValue({ userId: "user_1" } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+			mockGetServerSession.mockResolvedValue(makeSession("user_1"));
 
 			const handler = route({
 				auth: "required",
@@ -171,7 +185,7 @@ describe("route()", () => {
 
 	describe("body validation", () => {
 		it("validates and passes body to handler", async () => {
-			mockAuth.mockResolvedValue({ userId: "user_1" } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+			mockGetServerSession.mockResolvedValue(makeSession("user_1"));
 
 			const handler = route({
 				auth: "required",
@@ -185,7 +199,7 @@ describe("route()", () => {
 		});
 
 		it("returns 400 for invalid body", async () => {
-			mockAuth.mockResolvedValue({ userId: "user_1" } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+			mockGetServerSession.mockResolvedValue(makeSession("user_1"));
 
 			const handler = route({
 				auth: "required",
@@ -200,7 +214,7 @@ describe("route()", () => {
 		});
 
 		it("returns 400 for non-JSON body", async () => {
-			mockAuth.mockResolvedValue({ userId: "user_1" } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+			mockGetServerSession.mockResolvedValue(makeSession("user_1"));
 
 			const handler = route({
 				auth: "required",
@@ -220,7 +234,7 @@ describe("route()", () => {
 
 	describe("response handling", () => {
 		it("auto-wraps plain objects as JSON", async () => {
-			mockAuth.mockResolvedValue({ userId: "user_1" } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+			mockGetServerSession.mockResolvedValue(makeSession("user_1"));
 
 			const handler = route({
 				auth: "required",
@@ -234,7 +248,7 @@ describe("route()", () => {
 		});
 
 		it("passes through Response objects unchanged", async () => {
-			mockAuth.mockResolvedValue({ userId: "user_1" } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+			mockGetServerSession.mockResolvedValue(makeSession("user_1"));
 
 			const handler = route({
 				auth: "required",
@@ -253,7 +267,7 @@ describe("route()", () => {
 
 	describe("error boundary", () => {
 		it("maps AppError to its status code", async () => {
-			mockAuth.mockResolvedValue({ userId: "user_1" } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+			mockGetServerSession.mockResolvedValue(makeSession("user_1"));
 
 			const handler = route({
 				auth: "required",
@@ -270,7 +284,7 @@ describe("route()", () => {
 		});
 
 		it("maps ForbiddenError to 403", async () => {
-			mockAuth.mockResolvedValue({ userId: "user_1" } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+			mockGetServerSession.mockResolvedValue(makeSession("user_1"));
 
 			const handler = route({
 				auth: "required",
@@ -285,7 +299,7 @@ describe("route()", () => {
 		});
 
 		it("maps ValidationError to 400", async () => {
-			mockAuth.mockResolvedValue({ userId: "user_1" } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+			mockGetServerSession.mockResolvedValue(makeSession("user_1"));
 
 			const handler = route({
 				auth: "required",
@@ -300,7 +314,7 @@ describe("route()", () => {
 		});
 
 		it("maps thrown ZodError to 400", async () => {
-			mockAuth.mockResolvedValue({ userId: "user_1" } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+			mockGetServerSession.mockResolvedValue(makeSession("user_1"));
 
 			const handler = route({
 				auth: "required",
@@ -319,7 +333,7 @@ describe("route()", () => {
 		});
 
 		it("maps unknown errors to 500", async () => {
-			mockAuth.mockResolvedValue({ userId: "user_1" } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+			mockGetServerSession.mockResolvedValue(makeSession("user_1"));
 
 			const handler = route({
 				auth: "required",

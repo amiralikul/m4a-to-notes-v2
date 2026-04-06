@@ -10,6 +10,7 @@ import {
 import { getErrorMessage } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { trialUsageService } from "@/services";
+import { env } from "@/env";
 
 export const POST = route({
 	auth: "optional",
@@ -35,9 +36,7 @@ export const POST = route({
 			const jsonResponse = await handleUpload({
 				body,
 				request,
-				token:
-					process.env.BLOB_READ_WRITE_TOKEN ||
-					process.env.M4A_TO_NOTES_READ_WRITE_TOKEN,
+				token: env.BLOB_READ_WRITE_TOKEN || env.M4A_TO_NOTES_READ_WRITE_TOKEN,
 				onBeforeGenerateToken: async () => {
 					return {
 						allowedContentTypes: [...AUDIO_LIMITS.VALID_MIME_TYPES],

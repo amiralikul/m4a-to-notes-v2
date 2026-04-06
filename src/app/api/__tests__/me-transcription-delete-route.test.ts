@@ -1,12 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { auth } from "@clerk/nextjs/server";
+import { getServerSession } from "@/lib/auth-server";
 import { resolveActorIdentity } from "@/lib/trial-identity";
 import { actorsService, storageService, transcriptionsService } from "@/services";
 import { DELETE as deleteTranscription } from "@/app/api/me/transcriptions/[transcriptionId]/route";
 
-vi.mock("@clerk/nextjs/server", () => ({
-	auth: vi.fn().mockResolvedValue({ userId: null }),
-	currentUser: vi.fn().mockResolvedValue(null),
+vi.mock("@/lib/auth-server", () => ({
+	getServerSession: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("@/lib/trial-identity", () => ({
@@ -33,7 +32,7 @@ vi.mock("@/lib/logger", () => ({
 describe("DELETE /api/me/transcriptions/[transcriptionId]", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		vi.mocked(auth).mockResolvedValue({ userId: null } as never);
+		vi.mocked(getServerSession).mockResolvedValue(null);
 		vi.mocked(resolveActorIdentity).mockResolvedValue({ actorId: "actor_1" });
 		vi.mocked(actorsService.ensureActor).mockResolvedValue(undefined);
 		vi.mocked(storageService.deleteObject).mockResolvedValue(undefined);
@@ -41,7 +40,10 @@ describe("DELETE /api/me/transcriptions/[transcriptionId]", () => {
 	});
 
 	it("allows signed-in user to delete own transcription", async () => {
-		vi.mocked(auth).mockResolvedValue({ userId: "user_1" } as never);
+		vi.mocked(getServerSession).mockResolvedValue({
+			user: { id: "user_1", email: "user@test.com", name: "User" },
+			session: { id: "sess_1", userId: "user_1" },
+		} as never);
 		vi.mocked(transcriptionsService.findByIdForOwner).mockResolvedValue({
 			id: "tr_1",
 			userId: "user_1",
@@ -61,7 +63,7 @@ describe("DELETE /api/me/transcriptions/[transcriptionId]", () => {
 	});
 
 	it("allows anonymous user to delete own transcription", async () => {
-		vi.mocked(auth).mockResolvedValue({ userId: null } as never);
+		vi.mocked(getServerSession).mockResolvedValue(null);
 		vi.mocked(resolveActorIdentity).mockResolvedValue({ actorId: "actor_1" });
 		vi.mocked(transcriptionsService.findByIdForOwner).mockResolvedValue({
 			id: "tr_1",
@@ -82,7 +84,7 @@ describe("DELETE /api/me/transcriptions/[transcriptionId]", () => {
 	});
 
 	it("returns 404 for anonymous non-owner", async () => {
-		vi.mocked(auth).mockResolvedValue({ userId: null } as never);
+		vi.mocked(getServerSession).mockResolvedValue(null);
 		vi.mocked(resolveActorIdentity).mockResolvedValue({ actorId: "actor_1" });
 		vi.mocked(transcriptionsService.findByIdForOwner).mockResolvedValue(null);
 

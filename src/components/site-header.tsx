@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { SafeAuthButtons } from "./safe-auth-buttons";
-import { useUser } from "@clerk/nextjs";
+import { useAuth } from "@/hooks/use-auth";
 
 export function SiteHeader() {
 	const [scrolled, setScrolled] = useState(false);
-	const { isSignedIn, user } = useUser();
+	const { isSignedIn } = useAuth();
 
 	useEffect(() => {
 		const onScroll = () => setScrolled(window.scrollY > 4);
@@ -38,23 +38,20 @@ export function SiteHeader() {
 							strokeLinejoin="round"
 							className="text-amber-400"
 						>
-							<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-							<path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-							<line x1="12" x2="12" y1="19" y2="22" />
+							<path d="M2 12h2" />
+							<path d="M6 8v8" />
+							<path d="M10 4v16" />
+							<path d="M14 6v12" />
+							<path d="M18 8v8" />
+							<path d="M22 12h-2" />
 						</svg>
 					</div>
 					<span className="font-display text-xl italic text-stone-900">
-						AudioScribe
+						WavesToText
 					</span>
 				</Link>
 
 				<nav className="hidden md:flex flex-1 items-center gap-8 justify-start ml-10">
-					{ user?.id === "user_39ckoysfZ8KgkQnJXBUTnL8JnRN" && <Link
-						href="/job-match"
-						className="text-sm text-stone-500 hover:text-stone-900 transition-colors"
-					>
-						Job Match
-					</Link> }
 					<Link
 						href="/features"
 						className="text-sm text-stone-500 hover:text-stone-900 transition-colors"
@@ -82,12 +79,6 @@ export function SiteHeader() {
 				</nav>
 
 				<div className="ml-auto flex items-center gap-4">
-					{ user?.id === "user_39ckoysfZ8KgkQnJXBUTnL8JnRN" &&  <Link
-						href="/job-match"
-						className="text-sm text-stone-500 hover:text-stone-900 transition-colors"
-					>
-						Job Match
-					</Link> }
 					<Link
 						href="/dashboard"
 						className="text-sm text-stone-500 hover:text-stone-900 transition-colors"

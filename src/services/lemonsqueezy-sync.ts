@@ -6,9 +6,11 @@ import {
 	mapLemonSqueezyVariantToPlan,
 	getPlanHierarchyValue,
 } from "@/lib/constants/plans";
+import type { AppDatabase } from "@/db/types";
 import { getErrorMessage } from "@/lib/errors";
 import type { Logger } from "@/lib/logger";
 import type { LemonSqueezySubscriptionAttributes } from "@/lib/types";
+import { env } from "@/env";
 import { UsersService } from "./users";
 
 interface EntitlementsMapping {
@@ -33,11 +35,10 @@ export class LemonSqueezySyncService {
 	private users: UsersService;
 
 	constructor(
-		// biome-ignore lint: needed for generic DB type
-		database: any,
+		database: AppDatabase,
 		logger: Logger,
 	) {
-		this.apiKey = process.env.LEMONSQUEEZY_API_KEY || "";
+		this.apiKey = env.LEMONSQUEEZY_API_KEY || "";
 		this.logger = logger;
 		this.users = new UsersService(database, logger);
 	}
@@ -88,7 +89,7 @@ export class LemonSqueezySyncService {
 	}
 
 	async syncSubscription(
-		clerkUserId: string,
+		userId: string,
 		subscriptionId: string,
 		eventType: string,
 	) {
@@ -105,7 +106,7 @@ export class LemonSqueezySyncService {
 
 			const entitlements = this.mapToEntitlements(subscriptionId, subscription);
 
-			await this.users.set(clerkUserId, {
+			await this.users.set(userId, {
 				plan: entitlements.plan,
 				status: entitlements.status,
 				expiresAt: entitlements.meta.endsAt || entitlements.meta.renewsAt,
@@ -115,7 +116,7 @@ export class LemonSqueezySyncService {
 			});
 
 			this.logger.info("Entitlements updated from canonical state", {
-				clerkUserId,
+				userId,
 				subscriptionId,
 				plan: entitlements.plan,
 				status: entitlements.status,

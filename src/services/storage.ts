@@ -1,10 +1,9 @@
 import { del, put } from "@vercel/blob";
 import { getErrorMessage } from "@/lib/errors";
 import { logger } from "@/lib/logger";
+import { env } from "@/env";
 
-const blobToken =
-	process.env.BLOB_READ_WRITE_TOKEN ||
-	process.env.M4A_TO_NOTES_READ_WRITE_TOKEN;
+const blobToken = env.BLOB_READ_WRITE_TOKEN || env.M4A_TO_NOTES_READ_WRITE_TOKEN;
 
 export class StorageService {
 	async uploadContent(

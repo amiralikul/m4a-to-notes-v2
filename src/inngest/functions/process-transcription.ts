@@ -7,7 +7,6 @@ import {
 	transcriptionAiService,
 	assemblyAiService,
 } from "@/services";
-import { sendTelegramMessage } from "@/services/telegram";
 import { TranscriptionStatus } from "@/services/transcriptions";
 import { getErrorMessage } from "@/lib/errors";
 import { mergeChunkTranscripts } from "@/lib/transcript-merge";
@@ -382,34 +381,6 @@ export const processTranscription = inngest.createFunction(
 			name: INNGEST_EVENTS.TRANSCRIPTION_COMPLETED,
 			data: { transcriptionId },
 		});
-
-		// Notify Telegram if source is telegram
-		if (t.source === "telegram" && t.userMetadata) {
-			await step.run("notify-telegram", async () => {
-				const chatId = (t.userMetadata as Record<string, unknown>)
-					?.chatId as string | undefined;
-				const botToken = process.env.TELEGRAM_BOT_TOKEN;
-
-				if (!chatId || !botToken) {
-					logger.warn(
-						"Cannot notify Telegram: missing chatId or botToken",
-						{ transcriptionId },
-					);
-					return;
-				}
-
-				const message =
-					transcriptText.length > 4000
-						? `${transcriptText.substring(0, 4000)}...\n\n(Transcription truncated. Full text available in the web app.)`
-						: transcriptText;
-
-				await sendTelegramMessage(chatId, message, botToken);
-				logger.info("Telegram notification sent", {
-					transcriptionId,
-					chatId,
-				});
-			});
-		}
 
 		return {
 			status: "completed",

@@ -155,6 +155,41 @@
       "when": 1772310981694,
       "tag": "0021_add_translations_fk_delete_cascade",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1772814315915,
+      "tag": "0022_add_content_type_column",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1773156322752,
+      "tag": "0023_drop_conversations_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1773171675323,
+      "tag": "0024_add_better_auth_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1773174644574,
+      "tag": "0025_rename_better_auth_tables_plural",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1773998707199,
+      "tag": "0026_add_transcription_display_name",
+      "breakpoints": true
     }
   ]
 }

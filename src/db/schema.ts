@@ -1,6 +1,87 @@
 import { sql } from "drizzle-orm";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
+export const users = sqliteTable(
+	"users",
+	{
+		id: text("id").primaryKey(),
+		name: text("name").notNull(),
+		email: text("email").notNull(),
+		emailVerified: integer("email_verified", { mode: "boolean" })
+			.notNull()
+			.default(false),
+		image: text("image"),
+		createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+		updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+	},
+	(table) => [uniqueIndex("users_email_unique").on(table.email)],
+);
+
+export const sessions = sqliteTable(
+	"sessions",
+	{
+		id: text("id").primaryKey(),
+		expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+		token: text("token").notNull(),
+		createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+		updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+		ipAddress: text("ip_address"),
+		userAgent: text("user_agent"),
+		userId: text("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+	},
+	(table) => [
+		uniqueIndex("sessions_token_unique").on(table.token),
+		index("sessions_user_id_idx").on(table.userId),
+	],
+);
+
+export const accounts = sqliteTable(
+	"accounts",
+	{
+		id: text("id").primaryKey(),
+		accountId: text("account_id").notNull(),
+		providerId: text("provider_id").notNull(),
+		userId: text("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		accessToken: text("access_token"),
+		refreshToken: text("refresh_token"),
+		idToken: text("id_token"),
+		accessTokenExpiresAt: integer("access_token_expires_at", {
+			mode: "timestamp_ms",
+		}),
+		refreshTokenExpiresAt: integer("refresh_token_expires_at", {
+			mode: "timestamp_ms",
+		}),
+		scope: text("scope"),
+		password: text("password"),
+		createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+		updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+	},
+	(table) => [
+		index("accounts_user_id_idx").on(table.userId),
+		uniqueIndex("accounts_provider_account_unique").on(
+			table.providerId,
+			table.accountId,
+		),
+	],
+);
+
+export const verifications = sqliteTable(
+	"verifications",
+	{
+		id: text("id").primaryKey(),
+		identifier: text("identifier").notNull(),
+		value: text("value").notNull(),
+		expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+		createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+		updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+	},
+	(table) => [index("verifications_identifier_idx").on(table.identifier)],
+);
+
 // Jobs table - DEPRECATED: Use transcriptions table
 export const jobs = sqliteTable("jobs", {
 	id: text("id").primaryKey(),
@@ -39,6 +120,7 @@ export const transcriptions = sqliteTable(
 		progress: integer("progress").default(0).notNull(),
 		audioKey: text("audio_key").notNull(),
 		filename: text("filename").notNull(),
+		displayName: text("display_name"),
 		source: text("source", {
 			enum: ["web", "telegram"],
 		}).notNull(),
@@ -68,6 +150,7 @@ export const transcriptions = sqliteTable(
 			code?: string;
 			message?: string;
 		}>(),
+		contentType: text("content_type"),
 		enableDiarization: integer("enable_diarization", { mode: "boolean" }).default(false).notNull(),
 		diarizationData: text("diarization_data", { mode: "json" }).$type<DiarizationSegment[] | null>(),
 		summaryProvider: text("summary_provider"),
@@ -167,26 +250,6 @@ export const actors = sqliteTable(
 	],
 );
 
-// Conversations table
-export const conversations = sqliteTable(
-	"conversations",
-	{
-		chatId: text("chat_id").primaryKey(),
-		data: text("data", { mode: "json" })
-			.$type<ConversationData>()
-			.notNull(),
-		createdAt: text("created_at")
-			.notNull()
-			.default(sql`(CURRENT_TIMESTAMP)`),
-		updatedAt: text("updated_at")
-			.notNull()
-			.default(sql`(CURRENT_TIMESTAMP)`)
-			.$onUpdate(() => sql`(CURRENT_TIMESTAMP)`),
-		expiresAt: text("expires_at").notNull(),
-	},
-	(table) => [index("idx_conversations_expires_at").on(table.expiresAt)],
-);
-
 // User entitlements table
 export const userEntitlements = sqliteTable("user_entitlements", {
 	userId: text("user_id").primaryKey(),
@@ -235,19 +298,6 @@ export const billingSubscriptions = sqliteTable(
 	],
 );
 
-// Type definitions for conversation data
-export interface ConversationData {
-	messages: Array<{
-		id: string;
-		type: "transcription" | "user_message" | "bot_response";
-		content: string;
-		audioFileId?: string;
-		timestamp: string;
-	}>;
-	createdAt: string;
-	updatedAt: string;
-}
-
 export interface DiarizationSegment {
 	speaker: string;   // "A", "B", etc.
 	text: string;
@@ -261,11 +311,41 @@ export interface TranscriptionSummaryActionItem {
 	dueDate?: string;
 }
 
-export interface TranscriptionSummaryData {
+// Legacy format (pre-content-type summaries)
+export interface LegacySummaryData {
 	summary: string;
 	keyPoints: string[];
 	actionItems: TranscriptionSummaryActionItem[];
 	keyTakeaways: string[];
+}
+
+// Rich item for action-item-like sections (task/owner/dueDate)
+export interface SummaryRichItem {
+	text: string;
+	owner?: string | null;
+	dueDate?: string | null;
+}
+
+// A single section in a flexible summary
+export interface SummarySection {
+	key: string;
+	label: string;
+	items: string[] | SummaryRichItem[];
+}
+
+// Flexible format with content-type-specific sections
+export interface FlexibleSummaryData {
+	contentType: string;
+	summary: string;
+	sections: SummarySection[];
+}
+
+export type TranscriptionSummaryData = FlexibleSummaryData | LegacySummaryData;
+
+export function isFlexibleSummary(
+	data: TranscriptionSummaryData,
+): data is FlexibleSummaryData {
+	return "contentType" in data && "sections" in data;
 }
 
 export interface JobAnalysisOneWeekPlanDay {
@@ -347,13 +427,21 @@ export type InsertTrialDailyUsage = typeof trialDailyUsage.$inferInsert;
 export type Actor = typeof actors.$inferSelect;
 export type InsertActor = typeof actors.$inferInsert;
 
-export type Conversation = typeof conversations.$inferSelect;
-export type InsertConversation = typeof conversations.$inferInsert;
-export type UpdateConversation = Partial<Omit<Conversation, "chatId">>;
-
 export type UserEntitlement = typeof userEntitlements.$inferSelect;
 export type InsertUserEntitlement = typeof userEntitlements.$inferInsert;
 export type UpdateUserEntitlement = Partial<Omit<UserEntitlement, "userId">>;
+
+export type AuthUser = typeof users.$inferSelect;
+export type InsertAuthUser = typeof users.$inferInsert;
+
+export type AuthSession = typeof sessions.$inferSelect;
+export type InsertAuthSession = typeof sessions.$inferInsert;
+
+export type AuthAccount = typeof accounts.$inferSelect;
+export type InsertAuthAccount = typeof accounts.$inferInsert;
+
+export type AuthVerification = typeof verifications.$inferSelect;
+export type InsertAuthVerification = typeof verifications.$inferInsert;
 
 export type BillingSubscription = typeof billingSubscriptions.$inferSelect;
 export type InsertBillingSubscription = typeof billingSubscriptions.$inferInsert;

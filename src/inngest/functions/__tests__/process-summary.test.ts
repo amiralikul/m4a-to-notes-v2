@@ -6,6 +6,7 @@ vi.mock("@/services", () => ({
 		markSummaryStarted: vi.fn(),
 		markSummaryCompleted: vi.fn(),
 		markSummaryFailed: vi.fn(),
+		update: vi.fn(),
 	},
 	textAiService: {
 		provider: "openai",
@@ -49,6 +50,16 @@ async function runProcessSummary(transcriptionId: string) {
 	});
 }
 
+const mockFlexibleSummary = {
+	contentType: "meeting",
+	summary: "Discussed release readiness.",
+	sections: [
+		{ key: "keyPoints", label: "Key Points", items: ["QA complete", "Deploy Friday"] },
+		{ key: "actionItems", label: "Action Items", items: [{ text: "Prepare release notes", owner: "Alex" }] },
+		{ key: "keyTakeaways", label: "Key Takeaways", items: ["Release is on track"] },
+	],
+};
+
 describe("process-summary Inngest function", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -60,27 +71,24 @@ describe("process-summary Inngest function", () => {
 			status: "completed",
 			transcriptText: "Meeting transcript text",
 			summaryStatus: "pending",
+			contentType: null,
 		} as never);
 		vi.mocked(transcriptionsService.markSummaryStarted).mockResolvedValue(
 			{} as never,
 		);
-		vi.mocked(textAiService.generateSummary).mockResolvedValue({
-			summary: "Discussed release readiness.",
-			keyPoints: ["QA complete", "Deploy Friday"],
-			actionItems: [{ task: "Prepare release notes", owner: "Alex" }],
-			keyTakeaways: ["Release is on track"],
-		});
+		vi.mocked(textAiService.generateSummary).mockResolvedValue(mockFlexibleSummary);
 		vi.mocked(transcriptionsService.markSummaryCompleted).mockResolvedValue(
 			{} as never,
 		);
+		vi.mocked(transcriptionsService.update).mockResolvedValue({} as never);
 
 		const result = await runProcessSummary("tx-1");
 
 		expect(result).toEqual({
 			status: "completed",
 			transcriptionId: "tx-1",
-			keyPoints: 2,
-			actionItems: 1,
+			contentType: "meeting",
+			sections: 3,
 		});
 		expect(transcriptionsService.markSummaryStarted).toHaveBeenCalledWith(
 			"tx-1",
@@ -89,8 +97,40 @@ describe("process-summary Inngest function", () => {
 		);
 		expect(textAiService.generateSummary).toHaveBeenCalledWith(
 			"Meeting transcript text",
+			null,
 		);
 		expect(transcriptionsService.markSummaryCompleted).toHaveBeenCalled();
+		expect(transcriptionsService.update).toHaveBeenCalledWith("tx-1", {
+			contentType: "meeting",
+		});
+	});
+
+	it("preserves user-selected content type and does not overwrite", async () => {
+		vi.mocked(transcriptionsService.findById).mockResolvedValue({
+			id: "tx-4",
+			status: "completed",
+			transcriptText: "Lecture transcript text",
+			summaryStatus: "pending",
+			contentType: "lecture",
+		} as never);
+		vi.mocked(transcriptionsService.markSummaryStarted).mockResolvedValue(
+			{} as never,
+		);
+		vi.mocked(textAiService.generateSummary).mockResolvedValue({
+			...mockFlexibleSummary,
+			contentType: "lecture",
+		});
+		vi.mocked(transcriptionsService.markSummaryCompleted).mockResolvedValue(
+			{} as never,
+		);
+
+		await runProcessSummary("tx-4");
+
+		expect(textAiService.generateSummary).toHaveBeenCalledWith(
+			"Lecture transcript text",
+			"lecture",
+		);
+		expect(transcriptionsService.update).not.toHaveBeenCalled();
 	});
 
 	it("skips when summary is already completed", async () => {
@@ -99,12 +139,7 @@ describe("process-summary Inngest function", () => {
 			status: "completed",
 			transcriptText: "Transcript",
 			summaryStatus: "completed",
-			summaryData: {
-				summary: "Done",
-				keyPoints: ["A"],
-				actionItems: [],
-				keyTakeaways: ["B"],
-			},
+			summaryData: mockFlexibleSummary,
 		} as never);
 
 		const result = await runProcessSummary("tx-2");

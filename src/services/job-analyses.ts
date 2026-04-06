@@ -6,6 +6,7 @@ import type {
 	UpdateJobAnalysis,
 } from "@/db/schema";
 import { jobAnalyses } from "@/db/schema";
+import type { AppDatabase } from "@/db/types";
 import { getErrorMessage } from "@/lib/errors";
 import type { Logger } from "@/lib/logger";
 
@@ -26,14 +27,9 @@ export const JobSourceType = {
 
 export type JobSourceTypeValue = (typeof JobSourceType)[keyof typeof JobSourceType];
 
-type Database = Parameters<typeof eq>[0] extends never
-	? never
-	: // biome-ignore lint: needed for generic DB type
-		any;
-
 export class JobAnalysesService {
 	constructor(
-		private db: Database,
+		private db: AppDatabase,
 		private logger: Logger,
 	) {}
 

@@ -1,21 +1,15 @@
 import { route } from "@/lib/route";
-import { transcriptionsService } from "@/services";
+import { transcriptionsService, translationsService } from "@/services";
+import type { Transcription } from "@/db/schema";
 
-function mapTranscription(t: {
-	id: string;
-	filename: string;
-	status: string;
-	progress: number | null;
-	preview: string | null;
-	summaryStatus: string | null;
-	summaryUpdatedAt: string | null;
-	createdAt: string | null;
-	completedAt: string | null;
-	audioKey: string | null;
-}) {
+function mapTranscription(
+	t: Transcription,
+	translationCounts: Map<string, number>,
+) {
 	return {
 		id: t.id,
 		filename: t.filename,
+		displayName: t.displayName,
 		status: t.status,
 		progress: t.progress,
 		preview: t.preview,
@@ -24,6 +18,8 @@ function mapTranscription(t: {
 		createdAt: t.createdAt,
 		completedAt: t.completedAt,
 		audioKey: t.audioKey,
+		enableDiarization: t.enableDiarization,
+		translationCount: translationCounts.get(t.id) ?? 0,
 	};
 }
 
@@ -46,8 +42,15 @@ export const GET = route({
 				transcriptionsService.countByUserId(userId),
 			]);
 
+			const translationCounts =
+				await translationsService.countByTranscriptionIds(
+					transcriptions.map((t) => t.id),
+				);
+
 			return {
-				transcriptions: transcriptions.map(mapTranscription),
+				transcriptions: transcriptions.map((t) =>
+					mapTranscription(t, translationCounts),
+				),
 				total,
 			};
 		}
@@ -58,8 +61,15 @@ export const GET = route({
 				transcriptionsService.countByActorId(actorId),
 			]);
 
+			const translationCounts =
+				await translationsService.countByTranscriptionIds(
+					transcriptions.map((t) => t.id),
+				);
+
 			return {
-				transcriptions: transcriptions.map(mapTranscription),
+				transcriptions: transcriptions.map((t) =>
+					mapTranscription(t, translationCounts),
+				),
 				total,
 			};
 		}

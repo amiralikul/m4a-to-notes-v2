@@ -1,6 +1,5 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
 import {
 	AlertTriangle,
 	CheckCircle,
@@ -10,15 +9,9 @@ import {
 	X,
 } from "lucide-react";
 import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import {
 	Dialog,
 	DialogClose,
@@ -31,6 +24,15 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 
+interface SubscriptionEntitlements {
+	status?: "none" | "active" | "trialing" | "past_due" | "canceled";
+	meta?: {
+		subscriptionId?: string;
+		renewsAt?: string;
+		endsAt?: string;
+	};
+}
+
 export function CancelSubscription({
 	entitlements,
 	onCancellationSuccess,
@@ -38,7 +40,7 @@ export function CancelSubscription({
 	variant = "outline",
 	size = "default",
 }: {
-	entitlements?: any;
+	entitlements?: SubscriptionEntitlements | null;
 	onCancellationSuccess?: (method: string) => void;
 	className?: string;
 	variant?:
@@ -50,7 +52,6 @@ export function CancelSubscription({
 		| "link";
 	size?: "default" | "sm" | "lg" | "icon";
 }) {
-	const { user } = useUser();
 	const [isDialogOpen, setIsDialogOpen] = useState(false);
 	const [cancellationMethod, setCancellationMethod] = useState("portal");
 	const [cancellationReason, setCancellationReason] = useState("");

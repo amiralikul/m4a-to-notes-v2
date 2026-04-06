@@ -1,8 +1,8 @@
 import { eq } from "drizzle-orm";
-import { describe, it, expect, beforeEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { translations } from "@/db/schema";
 import { TranscriptionChunksService } from "@/services/transcription-chunks";
-import { createTestDb } from "@/test/db";
+import { cleanupTestDb, createTestDb } from "@/test/db";
 import { createTestLogger } from "@/test/setup";
 import {
 	SummaryStatus,
@@ -11,15 +11,19 @@ import {
 } from "../transcriptions";
 
 describe("TranscriptionsService", () => {
-	let db: ReturnType<typeof createTestDb>;
+	let db: Awaited<ReturnType<typeof createTestDb>>;
 	let service: TranscriptionsService;
 	let chunksService: TranscriptionChunksService;
 
-	beforeEach(() => {
-		db = createTestDb();
+	beforeEach(async () => {
+		db = await createTestDb();
 		const logger = createTestLogger();
 		service = new TranscriptionsService(db, logger);
 		chunksService = new TranscriptionChunksService(db, logger);
+	});
+
+	afterEach(async () => {
+		await cleanupTestDb(db);
 	});
 
 	describe("create", () => {
@@ -42,24 +46,62 @@ describe("TranscriptionsService", () => {
 			expect(transcription!.summaryStatus).toBeNull();
 		});
 
-		it("creates a telegram-source transcription", async () => {
-			const id = await service.create({
-				audioKey: "blob://telegram-audio.m4a",
-				filename: "voice.m4a",
-				source: "telegram",
-				userMetadata: { chatId: "12345" },
-			});
-
-			const transcription = await service.findById(id);
-			expect(transcription!.source).toBe("telegram");
-			expect(transcription!.userMetadata).toEqual({ chatId: "12345" });
-		});
 	});
 
 	describe("findById", () => {
 		it("returns null for non-existent transcription", async () => {
 			const result = await service.findById("non-existent-id");
 			expect(result).toBeNull();
+		});
+
+		it("returns displayName when one has been set", async () => {
+			const id = await service.create({
+				audioKey: "blob://meeting.m4a",
+				filename: "meeting.m4a",
+			});
+
+			await service.updateDisplayName(id, "Team Sync");
+
+			const result = await service.findById(id);
+			expect(result).not.toBeNull();
+			expect(result!.displayName).toBe("Team Sync");
+			expect(result!.filename).toBe("meeting.m4a");
+		});
+	});
+
+	describe("updateDisplayName", () => {
+		it("updates displayName without changing filename", async () => {
+			const id = await service.create({
+				audioKey: "blob://meeting.m4a",
+				filename: "meeting.m4a",
+			});
+
+			const updated = await service.updateDisplayName(id, "Team Sync");
+
+			expect(updated.displayName).toBe("Team Sync");
+			expect(updated.filename).toBe("meeting.m4a");
+
+			const saved = await service.findById(id);
+			expect(saved).not.toBeNull();
+			expect(saved!.displayName).toBe("Team Sync");
+			expect(saved!.filename).toBe("meeting.m4a");
+		});
+
+		it("normalizes displayName before persisting", async () => {
+			const id = await service.create({
+				audioKey: "blob://meeting.m4a",
+				filename: "meeting.m4a",
+			});
+
+			const trimmed = await service.updateDisplayName(id, "  Team Sync  ");
+			expect(trimmed.displayName).toBe("Team Sync");
+
+			const cleared = await service.updateDisplayName(id, "   ");
+			expect(cleared.displayName).toBeNull();
+
+			const saved = await service.findById(id);
+			expect(saved).not.toBeNull();
+			expect(saved!.displayName).toBeNull();
 		});
 	});
 

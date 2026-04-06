@@ -1,8 +1,8 @@
-import { auth } from "@clerk/nextjs/server";
 import { resolveActorIdentity } from "@/lib/trial-identity";
 import { actorsService } from "@/services";
 import { isAppError, getErrorMessage } from "@/lib/errors";
 import { logger } from "@/lib/logger";
+import { getServerSession } from "@/lib/auth-server";
 import { type z, ZodError } from "zod";
 
 // --- Auth context types ---
@@ -63,22 +63,24 @@ export function route<
 	return async (request, nextContext) => {
 		try {
 			// 1. Resolve auth
-			let authContext: AuthContext<TAuth>;
+				let authContext: AuthContext<TAuth>;
 
-			if (config.auth === "required") {
-				const { userId } = await auth();
-				if (!userId) {
-					return Response.json(
-						{ error: "Unauthorized" },
+				if (config.auth === "required") {
+					const session = await getServerSession();
+					const userId = session?.user.id ?? null;
+					if (!userId) {
+						return Response.json(
+							{ error: "Unauthorized" },
 						{ status: 401 },
 					);
-				}
-				authContext = { userId } as AuthContext<TAuth>;
-			} else if (config.auth === "optional") {
-				const { userId } = await auth();
-				let actorId: string | null = null;
-				if (!userId) {
-					const identity = await resolveActorIdentity();
+					}
+					authContext = { userId } as AuthContext<TAuth>;
+				} else if (config.auth === "optional") {
+					const session = await getServerSession();
+					const userId = session?.user.id ?? null;
+					let actorId: string | null = null;
+					if (!userId) {
+						const identity = await resolveActorIdentity();
 					actorId = identity.actorId;
 					await actorsService.ensureActor(actorId);
 				}

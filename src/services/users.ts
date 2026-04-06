@@ -1,15 +1,13 @@
 import { eq } from "drizzle-orm";
 import type { InsertUserEntitlement, UserEntitlement } from "@/db/schema";
 import { userEntitlements } from "@/db/schema";
+import type { AppDatabase } from "@/db/types";
 import { getErrorMessage } from "@/lib/errors";
 import type { Logger } from "@/lib/logger";
 
-// biome-ignore lint: needed for generic DB type
-type Database = any;
-
 export class UsersService {
 	constructor(
-		private db: Database,
+		private db: AppDatabase,
 		private logger: Logger,
 	) {}
 

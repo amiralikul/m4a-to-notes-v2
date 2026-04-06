@@ -59,7 +59,7 @@ export default function CookiePolicyPage() {
 									2. How We Use Cookies
 								</h2>
 								<p className="text-gray-700 mb-6">
-									AudioScribe uses cookies and similar tracking technologies
+									WavesToText uses cookies and similar tracking technologies
 									for various purposes, including to enhance functionality,
 									analyze usage patterns, and provide personalized experiences.
 									We are committed to using these technologies responsibly and
@@ -136,10 +136,6 @@ export default function CookiePolicyPage() {
 										subscription management
 									</li>
 									<li>
-										<strong>Clerk:</strong> User authentication and account
-										management
-									</li>
-									<li>
 										<strong>Analytics Services:</strong> To understand usage
 										patterns and improve our service
 									</li>
@@ -188,7 +184,7 @@ export default function CookiePolicyPage() {
 									Please note that disabling certain cookies may affect the
 									functionality of our website. Essential cookies are required
 									for basic functionality, and disabling them may prevent you
-									from using certain features of AudioScribe.
+									from using certain features of WavesToText.
 								</p>
 
 								<h2 className="text-2xl font-bold text-gray-900 mb-4">
@@ -215,7 +211,7 @@ export default function CookiePolicyPage() {
 									<p className="text-sm text-gray-500 text-center">
 										This Cookie Policy complements our Privacy Policy and
 										Terms of Service, working together with Lemon Squeezy payment
-										processing and Clerk authentication services.
+										processing and our built-in authentication system.
 									</p>
 								</div>
 							</div>

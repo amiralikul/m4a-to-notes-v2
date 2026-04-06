@@ -1,5 +1,4 @@
 "use client";
-import { useUser } from "@clerk/nextjs";
 import {
 	useMutation,
 	useQuery,
@@ -22,6 +21,12 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { upload } from "@vercel/blob/client";
 import { logger } from "@/lib/logger";
+import { env } from "@/env";
+import {
+	DashboardUploadProgressTray,
+	type DashboardUploadProgressItem,
+} from "@/components/file-upload/dashboard-upload-progress-tray";
+import { DashboardUploadRail } from "@/components/file-upload/dashboard-upload-rail";
 import { viewerTranscriptionKeys } from "@/lib/query-keys";
 import { TRIAL_ERROR_CODES } from "@/lib/trial-errors";
 import {
@@ -29,6 +34,7 @@ import {
 	SUPPORTED_AUDIO_FORMATS_TEXT,
 } from "@/lib/validation";
 import { AudioPlayer } from "@/components/audio-player";
+import { TranscriptionTitleEditor } from "@/components/transcription-title-editor";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -40,6 +46,8 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import { useAuth } from "@/hooks/use-auth";
+import { useTranscriptionRename } from "@/hooks/use-transcription-rename";
 
 interface UploadedFile {
 	id: string;
@@ -67,6 +75,7 @@ interface ChunkerResponsePayload {
 interface PreviousTranscription {
 	id: string;
 	filename: string;
+	displayName: string | null;
 	status: "pending" | "processing" | "completed" | "failed";
 	progress: number;
 	preview: string | null;
@@ -76,6 +85,7 @@ interface PreviousTranscription {
 
 interface FileUploadProps {
 	showHistory?: boolean;
+	variant?: "default" | "dashboardCompact";
 }
 
 const DAILY_LIMIT_MESSAGE = "Daily free limit reached (3 files/day).";
@@ -87,7 +97,7 @@ const MAX_CHUNKER_FILE_SIZE = 1024 * 1024 * 1024;
 const RECENT_TRANSCRIPTIONS_LIMIT = 10;
 const CHUNKER_CHUNK_SECONDS = 10 * 60; //FIXME
 const CHUNKER_OVERLAP_SECONDS = 10;
-const AUDIO_CHUNKER_URL = process.env.NEXT_PUBLIC_AUDIO_CHUNKER_URL;
+const AUDIO_CHUNKER_URL = env.NEXT_PUBLIC_AUDIO_CHUNKER_URL;
 
 function isDailyLimitErrorMessage(message: string): boolean {
 	const normalized = message.toLowerCase();
@@ -165,8 +175,9 @@ async function deletePreviousTranscriptionApi(
 
 export default function FileUpload({
 	showHistory = true,
+	variant = "default",
 }: FileUploadProps) {
-	const { isLoaded, isSignedIn } = useUser();
+	const { isLoaded, isSignedIn } = useAuth();
 	const queryClient = useQueryClient();
 	const recentTranscriptionsQueryKey = viewerTranscriptionKeys.list(
 		RECENT_TRANSCRIPTIONS_LIMIT,
@@ -748,6 +759,7 @@ export default function FileUpload({
 			file.error &&
 			isDailyLimitErrorMessage(file.error),
 	);
+	const isDashboardCompact = variant === "dashboardCompact";
 	const maxUploadSizeBytes = AUDIO_CHUNKER_URL
 		? MAX_CHUNKER_FILE_SIZE
 		: AUDIO_LIMITS.MAX_FILE_SIZE;
@@ -763,6 +775,38 @@ export default function FileUpload({
 		(previousTranscriptionsQueryError instanceof Error
 			? previousTranscriptionsQueryError.message
 			: null);
+	const dashboardUploadItems: DashboardUploadProgressItem[] = uploadedFiles.map(
+		(uploadedFile) => {
+			const progress =
+				uploadedFile.status === "completed"
+					? 100
+					: Math.max(uploadedFile.progress || 0, uploadedFile.status === "error" ? 0 : 5);
+			const detail =
+				uploadedFile.status === "error" && uploadedFile.error
+					? uploadedFile.error
+					: uploadedFile.status === "completed"
+						? "Ready in dashboard"
+						: `${progress}% ${uploadedFile.status === "uploading" ? "uploaded" : "complete"}`;
+
+			return {
+				id: uploadedFile.id,
+				filename: uploadedFile.file.name,
+				status: uploadedFile.status,
+				progress,
+				statusLabel: getStatusText(uploadedFile.status).replace("...", ""),
+				detail,
+				error: uploadedFile.error,
+				canRetry:
+					uploadedFile.status === "error" &&
+					Boolean(uploadedFile.error) &&
+					!isDailyLimitErrorMessage(uploadedFile.error || ""),
+				canRemove:
+					uploadedFile.status === "completed" ||
+					uploadedFile.status === "error",
+			};
+		},
+	);
+	const upgradeHref = isSignedIn ? "/subscription" : "/pricing";
 
 	const handleDeletePreviousTranscription = useCallback(
 		async (transcriptionId: string) => {
@@ -796,7 +840,7 @@ export default function FileUpload({
 		}
 	};
 
-	const getStatusText = (status: UploadedFile["status"]) => {
+	function getStatusText(status: UploadedFile["status"]) {
 		switch (status) {
 			case "uploading":
 				return "Uploading...";
@@ -809,7 +853,7 @@ export default function FileUpload({
 			default:
 				return "Preparing...";
 		}
-	};
+	}
 
 	const triggerTranscriptDownload = useCallback(
 		(text: string, downloadFilename: string) => {
@@ -857,78 +901,90 @@ export default function FileUpload({
 	return (
 		<div className="w-full max-w-5xl mx-auto space-y-8">
 			{/* Upload Area */}
-			<Card
-				className={`border-2 border-dashed transition-all duration-300 relative overflow-hidden rounded-2xl ${
-					isDragOver
-						? "border-amber-400 bg-amber-50/50 scale-[1.02] shadow-lg"
-						: "border-stone-300 hover:border-amber-400 hover:bg-amber-50/20 hover:shadow-md"
-				}`}
+			<div
 				onDragOver={handleDragOver}
 				onDragLeave={handleDragLeave}
 				onDrop={handleDrop}
 			>
-				<CardContent className="relative flex flex-col items-center justify-center py-16 px-8 text-center">
-					<div
-						className={`rounded-2xl p-6 mb-6 transition-all duration-300 ${
+				{isDashboardCompact ? (
+					<DashboardUploadRail
+						isDragOver={isDragOver}
+						onBrowseClick={() => fileInputRef.current?.click()}
+						formatsLabel="9 formats supported"
+						maxSizeLabel={`Max ${formatFileSize(maxUploadSizeBytes)} per file`}
+					/>
+				) : (
+					<Card
+						className={`border-2 border-dashed transition-all duration-300 relative overflow-hidden rounded-2xl ${
 							isDragOver
-								? "bg-amber-500 text-stone-950 shadow-xl scale-110"
-								: "bg-stone-100 hover:bg-amber-50"
+								? "border-amber-400 bg-amber-50/50 scale-[1.02] shadow-lg"
+								: "border-stone-300 hover:border-amber-400 hover:bg-amber-50/20 hover:shadow-md"
 						}`}
 					>
-						<Upload
-							className={`h-10 w-10 transition-colors ${!isDragOver ? "text-stone-500" : ""}`}
-						/>
-					</div>
+						<CardContent className="relative flex flex-col items-center justify-center py-16 px-8 text-center">
+							<div
+								className={`rounded-2xl p-6 mb-6 transition-all duration-300 ${
+									isDragOver
+										? "bg-amber-500 text-stone-950 shadow-xl scale-110"
+										: "bg-stone-100 hover:bg-amber-50"
+								}`}
+							>
+								<Upload
+									className={`h-10 w-10 transition-colors ${!isDragOver ? "text-stone-500" : ""}`}
+								/>
+							</div>
 
-					<h3 className="text-2xl font-semibold mb-3 text-stone-900">
-						{isDragOver
-							? "Drop your audio file here"
-							: "Upload Audio File"}
-					</h3>
+							<h3 className="text-2xl font-semibold mb-3 text-stone-900">
+								{isDragOver
+									? "Drop your audio file here"
+									: "Upload Audio File"}
+							</h3>
 
-					<p className="text-stone-500 mb-8 max-w-lg leading-relaxed text-lg">
-						Drag and drop your audio file here, or click to browse
-						and select a file from your device. Supported formats:
-						{" "}
-						{SUPPORTED_AUDIO_FORMATS_TEXT}.
-					</p>
+							<p className="text-stone-500 mb-8 max-w-lg leading-relaxed text-lg">
+								Drag and drop your audio file here, or click to browse
+								and select a file from your device. Supported formats:
+								{" "}
+								{SUPPORTED_AUDIO_FORMATS_TEXT}.
+							</p>
 
-					<Button
-						onClick={() => fileInputRef.current?.click()}
-						size="lg"
-						className="mb-8 h-12 px-8 bg-amber-500 hover:bg-amber-600 text-stone-950 font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all"
-					>
-						<Upload className="mr-3 h-5 w-5" />
-						Choose File
-					</Button>
+							<Button
+								onClick={() => fileInputRef.current?.click()}
+								size="lg"
+								className="mb-8 h-12 px-8 bg-amber-500 hover:bg-amber-600 text-stone-950 font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all"
+							>
+								<Upload className="mr-3 h-5 w-5" />
+								Choose File
+							</Button>
 
-					<div className="flex flex-wrap justify-center gap-3 text-sm">
-						<Badge
-							variant="outline"
-							className="bg-white border-stone-200 text-stone-600 px-4 py-2"
-						>
-							<FileAudio className="w-3 h-3 mr-2" />
-							9 formats supported
-						</Badge>
-						<Badge
-							variant="outline"
-							className="bg-white border-stone-200 text-stone-600 px-4 py-2"
-						>
-							<CheckCircle className="w-3 h-3 mr-2" />
-							Max {formatFileSize(maxUploadSizeBytes)} per file
-						</Badge>
-					</div>
+							<div className="flex flex-wrap justify-center gap-3 text-sm">
+								<Badge
+									variant="outline"
+									className="bg-white border-stone-200 text-stone-600 px-4 py-2"
+								>
+									<FileAudio className="w-3 h-3 mr-2" />
+									9 formats supported
+								</Badge>
+								<Badge
+									variant="outline"
+									className="bg-white border-stone-200 text-stone-600 px-4 py-2"
+								>
+									<CheckCircle className="w-3 h-3 mr-2" />
+									Max {formatFileSize(maxUploadSizeBytes)} per file
+								</Badge>
+							</div>
+						</CardContent>
+					</Card>
+				)}
 
-					<input
-						ref={fileInputRef}
-						type="file"
-						multiple
-						accept={AUDIO_LIMITS.VALID_EXTENSIONS.join(",")}
-						onChange={handleFileSelect}
-						className="sr-only"
-					/>
-				</CardContent>
-			</Card>
+				<input
+					ref={fileInputRef}
+					type="file"
+					multiple
+					accept={AUDIO_LIMITS.VALID_EXTENSIONS.join(",")}
+					onChange={handleFileSelect}
+					className="sr-only"
+				/>
+			</div>
 
 			{/* Upload Settings Dialog */}
 			<Dialog open={dialogOpen} onOpenChange={(open) => {
@@ -1011,7 +1067,41 @@ export default function FileUpload({
 			</Dialog>
 
 			{/* Uploaded Files */}
-			{uploadedFiles.length > 0 && (
+			{isDashboardCompact && uploadedFiles.length > 0 && (
+				<div className="space-y-3">
+					<DashboardUploadProgressTray
+						items={dashboardUploadItems}
+						onRetry={retryFile}
+						onRemove={removeFile}
+					/>
+
+					{hasDailyLimitError && (
+						<Card className="overflow-hidden rounded-3xl border-amber-200 bg-amber-50/80 shadow-sm">
+							<CardContent className="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+								<div className="space-y-1">
+									<p className="text-sm font-semibold text-amber-900">
+										Free daily limit reached
+									</p>
+									<p className="text-sm text-amber-800">
+										Upgrade to Pro for higher limits and uninterrupted
+										transcriptions.
+									</p>
+								</div>
+								<div className="flex gap-3">
+									<Button asChild size="sm">
+										<Link href={upgradeHref}>Upgrade to Pro</Link>
+									</Button>
+									<Button variant="outline" size="sm" asChild>
+										<Link href="/pricing">View Plans</Link>
+									</Button>
+								</div>
+							</CardContent>
+						</Card>
+					)}
+				</div>
+			)}
+
+			{!isDashboardCompact && uploadedFiles.length > 0 && (
 				<div className="space-y-6">
 					<div className="flex items-center justify-between">
 						<h3 className="text-2xl font-semibold text-stone-900">
@@ -1188,11 +1278,7 @@ export default function FileUpload({
 									<div className="flex gap-3">
 										<Button asChild>
 											<Link
-												href={
-													isSignedIn
-														? "/subscription"
-														: "/pricing"
-												}
+												href={upgradeHref}
 											>
 												Upgrade to Pro
 											</Link>
@@ -1240,81 +1326,95 @@ export default function FileUpload({
 					)}
 
 					{previousTranscriptions.map((item) => (
-						<Card
+						<PreviousTranscriptionCard
 							key={item.id}
-							className="overflow-hidden border border-stone-200 bg-white"
-						>
-							<CardContent className="p-4">
-								<div className="flex items-center justify-between gap-4">
-									<div className="min-w-0">
-										<p className="font-medium text-stone-900 truncate">
-											{item.filename}
-										</p>
-										<p className="text-xs text-stone-500">
-											{new Date(
-												item.createdAt,
-											).toLocaleString()}
-										</p>
-									</div>
-									<div className="flex items-center gap-2">
-										<Badge variant="outline">
-											{item.status}
-											{item.status === "processing" ||
-											item.status === "pending"
-												? ` (${item.progress}%)`
-												: ""}
-										</Badge>
-										{item.status === "completed" && (
-											<Button
-												size="sm"
-												variant="outline"
-												onClick={() =>
-													void downloadTranscript(
-														item.id,
-														item.filename,
-													)
-												}
-											>
-												<Download className="h-4 w-4 mr-1" />
-												Download
-											</Button>
-										)}
-										<Button
-											size="sm"
-											variant="outline"
-											onClick={() =>
-												void handleDeletePreviousTranscription(
-													item.id,
-												)
-											}
-											disabled={deletingPreviousIds.has(
-												item.id,
-											)}
-											className="text-red-600 hover:text-red-700 hover:bg-red-50"
-										>
-											{deletingPreviousIds.has(item.id) ? (
-												<Loader2 className="h-4 w-4 animate-spin" />
-											) : (
-												<Trash2 className="h-4 w-4" />
-											)}
-										</Button>
-									</div>
-								</div>
-									{item.preview && (
-										<p className="mt-2 text-sm text-stone-600 line-clamp-2">
-											{item.preview}
-										</p>
-									)}
-									{item.audioKey && (
-										<div className="mt-3">
-											<AudioPlayer src={item.audioKey} />
-										</div>
-									)}
-								</CardContent>
-							</Card>
-						))}
+							item={item}
+							downloadTranscript={downloadTranscript}
+							handleDeletePreviousTranscription={
+								handleDeletePreviousTranscription
+							}
+							deletingPreviousIds={deletingPreviousIds}
+						/>
+					))}
 				</div>
 			)}
 		</div>
+	);
+}
+
+function PreviousTranscriptionCard({
+	item,
+	downloadTranscript,
+	handleDeletePreviousTranscription,
+	deletingPreviousIds,
+}: {
+	item: PreviousTranscription;
+	downloadTranscript: (transcriptionId: string, filename: string) => Promise<void>;
+	handleDeletePreviousTranscription: (transcriptionId: string) => Promise<void>;
+	deletingPreviousIds: Set<string>;
+}) {
+	const renameMutation = useTranscriptionRename(item.id);
+
+	return (
+		<Card className="overflow-hidden border border-stone-200 bg-white">
+			<CardContent className="p-4">
+				<div className="flex items-center justify-between gap-4">
+					<div className="min-w-0 flex-1">
+						<TranscriptionTitleEditor
+							displayName={item.displayName}
+							filename={item.filename}
+							isPending={renameMutation.isPending}
+							errorMessage={renameMutation.errorMessage}
+							onSave={renameMutation.rename}
+							onCancel={renameMutation.clearError}
+						/>
+						<p className="mt-1 text-xs text-stone-500">
+							{new Date(item.createdAt).toLocaleString()}
+						</p>
+					</div>
+					<div className="flex items-center gap-2">
+						<Badge variant="outline">
+							{item.status}
+							{item.status === "processing" || item.status === "pending"
+								? ` (${item.progress}%)`
+								: ""}
+						</Badge>
+						{item.status === "completed" && (
+							<Button
+								size="sm"
+								variant="outline"
+								onClick={() => void downloadTranscript(item.id, item.filename)}
+							>
+								<Download className="h-4 w-4 mr-1" />
+								Download
+							</Button>
+						)}
+						<Button
+							size="sm"
+							variant="outline"
+							onClick={() => void handleDeletePreviousTranscription(item.id)}
+							disabled={deletingPreviousIds.has(item.id)}
+							className="text-red-600 hover:text-red-700 hover:bg-red-50"
+						>
+							{deletingPreviousIds.has(item.id) ? (
+								<Loader2 className="h-4 w-4 animate-spin" />
+							) : (
+								<Trash2 className="h-4 w-4" />
+							)}
+						</Button>
+					</div>
+				</div>
+				{item.preview && (
+					<p className="mt-2 text-sm text-stone-600 line-clamp-2">
+						{item.preview}
+					</p>
+				)}
+				{item.audioKey && (
+					<div className="mt-3">
+						<AudioPlayer src={item.audioKey} />
+					</div>
+				)}
+			</CardContent>
+		</Card>
 	);
 }
